@@ -24,6 +24,10 @@ interface PromptInputProps {
   onStop?: () => void;
   /** Whether the stop operation is in progress */
   isStopping?: boolean;
+  /** External value for controlled mode (e.g., from template selection) */
+  externalValue?: string;
+  /** Callback when value changes - useful for parent state sync */
+  onValueChange?: (value: string) => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -58,6 +62,8 @@ export function PromptInput({
   status,
   onStop,
   isStopping = false,
+  externalValue,
+  onValueChange,
   className,
 }: PromptInputProps) {
   // Initialize from localStorage to persist draft across app backgrounds
@@ -69,6 +75,23 @@ export function PromptInput({
     }
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sync external value when it changes (e.g., from template selection)
+  useEffect(() => {
+    if (externalValue !== undefined && externalValue !== value) {
+      setValue(externalValue);
+      // Persist to localStorage
+      try {
+        if (externalValue) {
+          localStorage.setItem(STORAGE_KEY, externalValue);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
+    }
+  }, [externalValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Trim value to check if it's empty (whitespace-only counts as empty)
   const hasContent = value.trim().length > 0;
@@ -100,6 +123,9 @@ export function PromptInput({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     setValue(newValue);
+
+    // Notify parent of value change
+    onValueChange?.(newValue);
 
     // Persist to localStorage (debouncing not needed - this is fast)
     try {

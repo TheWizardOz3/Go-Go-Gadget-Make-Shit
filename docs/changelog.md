@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.10.0 | 2026-01-14 | prerelease | Quick Templates complete |
 | 0.9.0 | 2026-01-14 | prerelease | Session Picker complete |
 | 0.8.0 | 2026-01-14 | prerelease | Project Switcher complete |
 | 0.7.0 | 2026-01-14 | prerelease | Stop Button complete |
@@ -36,6 +37,74 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.10.0] - 2026-01-14
+
+### Added
+- **Quick Templates** — One-tap prompt templates for common vibe-coding workflow commands
+  - Horizontally scrollable chips displayed above the prompt input
+  - 6 default templates matching vibe-coding-prompts workflow:
+    - 📋 Plan Milestone, 📝 Plan Feature, 🔨 Build Task
+    - 🧪 Test, ✅ Finalize, 🔧 Fix/Update
+  - Templates load from per-project `.claude/templates.yaml` with default fallback
+  - YAML schema: `templates: [{label, icon?, prompt}]`
+  - Template tap inserts prompt into input field for review before sending
+  - Haptic feedback on tap (30ms vibration via Vibration API)
+  - Disabled state when Claude is working
+  - Loading skeleton while templates are being fetched
+  - 44px minimum touch targets for accessibility
+
+- **Template Service** — Backend service for loading templates
+  - `templateService.ts` with `getTemplates()` and `getDefaultTemplates()`
+  - YAML parsing with `yaml` package
+  - Graceful fallback to defaults on file not found, parse errors, or invalid schema
+  - Filters out invalid templates (missing label or prompt)
+
+- **Templates API Endpoint** — New endpoint for fetching project templates
+  - `GET /api/projects/:encodedPath/templates`
+  - Returns project-specific templates or defaults
+
+- **useTemplates Hook** — SWR-based data fetching for templates
+  - 1-minute deduping interval (templates don't change often)
+  - No auto-refresh (static data)
+  - Error handling with single retry
+
+- **TemplateChips Component** — UI component for template display
+  - `TemplateChips` — Horizontal scrollable toolbar of template buttons
+  - `TemplateChipsSkeleton` — Loading state with animated placeholders
+  - Icons rendered with `aria-hidden="true"` for accessibility
+  - Proper ARIA labels for screen readers
+
+### Fixed
+- **Empty conversation templates** — Templates weren't rendering when conversation was empty (no messages). Fixed by adding TemplateChips to the empty messages return block in `ConversationView.tsx`.
+
+### Technical Details
+- **Dependencies Added:**
+  - `yaml@^2.4.5` (server) — YAML parsing for templates.yaml files
+
+- **Files Created:**
+  - `server/src/services/templateService.ts` — Template loading service
+  - `server/src/services/templateService.test.ts` — 16 unit tests
+  - `client/src/hooks/useTemplates.ts` — SWR hook for templates
+  - `client/src/hooks/useTemplates.test.ts` — 11 unit tests
+  - `client/src/components/conversation/TemplateChips.tsx` — UI component + skeleton
+  - `client/src/components/conversation/TemplateChips.test.tsx` — 24 unit tests
+
+- **Files Modified:**
+  - `server/src/api/projects.ts` — Added templates endpoint
+  - `client/src/components/conversation/ConversationView.tsx` — Integrated templates
+  - `client/src/components/conversation/PromptInput.tsx` — External value control
+  - `client/src/App.tsx` — Pass encodedPath to ConversationView
+
+### Verified
+- All 8 implementation tasks complete
+- `pnpm lint` passes with 0 errors
+- `pnpm typecheck` passes with 0 errors
+- `pnpm test` passes with **295 tests** (180 client + 115 server)
+- **51 new tests** (244 → 295 total)
+- Manual browser testing: templates load, scroll, insert on tap
 
 ---
 

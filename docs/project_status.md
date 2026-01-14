@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-14 (Quick Templates In Progress)
+**Last Updated**: 2026-01-14 (Quick Templates Complete)
 
 ---
 
@@ -59,11 +59,12 @@
 | Stop Button | 2026-01-14 | [Feature doc](Features/stop-button.md) - 27 new tests, 160 total |
 | Project Switcher | 2026-01-14 | [Feature doc](Features/project-switcher.md) - 35 new tests, 195 total |
 | Session Picker | 2026-01-14 | [Feature doc](Features/session-picker.md) - 49 new tests, 244 total |
+| Quick Templates | 2026-01-14 | [Feature doc](Features/quick-templates.md) - 51 new tests, 295 total |
 
 ### In Progress
 | Feature | Started | Notes |
 |---------|---------|-------|
-| *None* | - | Next: Quick Templates (requires `/plan-feature`) |
+| *None* | - | Next: Files Changed View (requires `/plan-feature`) |
 
 ### MVP Build Order (Sequenced)
 
@@ -77,7 +78,7 @@
 | 6 | ~~Stop Button~~ | #1 ✅ | LOW | ✅ Complete |
 | 7 | ~~Project Switcher~~ | #1 ✅ | MEDIUM | ✅ Complete |
 | 8 | ~~Session Picker~~ | #2 ✅, #7 ✅ | MEDIUM | ✅ Complete |
-| 9 | **Quick Templates** | #5 ✅, #7 ✅ | MEDIUM | Convenience - one-tap common prompts |
+| 9 | ~~Quick Templates~~ | #5 ✅, #7 ✅ | MEDIUM | ✅ Complete |
 | 10 | **Files Changed View** | #1 ✅ + Git service | MEDIUM | Review - list modified files |
 | 11 | **File Diff View** | #10 | HIGH | Review - green/red change highlighting |
 | 12 | **Voice Input** | #5 ✅ | MEDIUM | Hands-free - dictate via Groq Whisper |
@@ -94,9 +95,10 @@
 ## Upcoming Work
 
 ### Next Up
-1. **Files Changed View** - List modified files (depends on #1 ✅ + Git service)
-2. **File Diff View** - Full file with green/red highlighting (depends on #10)
+1. **Files Changed View** - List modified files (requires `/plan-feature`)
+2. **File Diff View** - Full file with green/red highlighting (depends on Files Changed)
 3. **Voice Input** - Dictate prompts with Groq Whisper transcription
+4. **iMessage Notifications** - Get notified when Claude finishes
 
 ---
 

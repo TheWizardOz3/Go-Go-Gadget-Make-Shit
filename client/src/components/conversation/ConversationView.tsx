@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { useConversation } from '@/hooks/useConversation';
 import { useSendPrompt } from '@/hooks/useSendPrompt';
 import { useStopAgent } from '@/hooks/useStopAgent';
+import { useTemplates } from '@/hooks/useTemplates';
 import { ConversationSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { MessageList } from './MessageList';
@@ -17,10 +18,13 @@ import { EmptyState } from './EmptyState';
 import { JumpToLatest } from './JumpToLatest';
 import { PullToRefresh } from './PullToRefresh';
 import { PromptInput } from './PromptInput';
+import { TemplateChips, TemplateChipsSkeleton } from './TemplateChips';
 
 interface ConversationViewProps {
   /** Session ID to load conversation for */
   sessionId: string | null;
+  /** Encoded project path for loading templates */
+  encodedPath: string | null;
   /** Additional CSS classes */
   className?: string;
 }
@@ -31,7 +35,7 @@ const SCROLL_THRESHOLD = 150;
 /** Threshold in pixels for triggering pull-to-refresh */
 const PULL_THRESHOLD = 80;
 
-export function ConversationView({ sessionId, className }: ConversationViewProps) {
+export function ConversationView({ sessionId, encodedPath, className }: ConversationViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
@@ -43,12 +47,32 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
   const touchStartY = useRef(0);
   const isPulling = useRef(false);
 
+  // External value for PromptInput (from template selection)
+  const [externalInputValue, setExternalInputValue] = useState<string | undefined>(undefined);
+
   const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId);
   const { sendPrompt, isSending } = useSendPrompt(sessionId);
   const { stopAgent, isStopping } = useStopAgent(sessionId);
+  const { templates, isLoading: templatesLoading } = useTemplates(encodedPath);
 
   // Toast state for showing "Agent stopped" message
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  /**
+   * Handle template selection - sets input value
+   */
+  const handleTemplateSelect = useCallback((prompt: string) => {
+    setExternalInputValue(prompt);
+  }, []);
+
+  /**
+   * Clear external value after it's been applied
+   * This allows the PromptInput to manage its own state after template insertion
+   */
+  const handleInputValueChange = useCallback(() => {
+    // Clear external value so user can edit freely
+    setExternalInputValue(undefined);
+  }, []);
 
   /**
    * Scroll to the bottom of the conversation
@@ -274,6 +298,16 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
         <div className="flex-1 flex items-center justify-center">
           <EmptyState title="No messages yet" message="Send a message to start the conversation." />
         </div>
+        {/* Template chips */}
+        {templatesLoading ? (
+          <TemplateChipsSkeleton />
+        ) : templates && templates.length > 0 ? (
+          <TemplateChips
+            templates={templates}
+            onSelect={handleTemplateSelect}
+            disabled={status === 'working'}
+          />
+        ) : null}
         <PromptInput
           onSend={handleSend}
           isSending={isSending}
@@ -281,6 +315,8 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
           status={status}
           onStop={handleStop}
           isStopping={isStopping}
+          externalValue={externalInputValue}
+          onValueChange={handleInputValueChange}
         />
       </div>
     );
@@ -336,6 +372,17 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
         />
       </div>
 
+      {/* Template chips */}
+      {templatesLoading ? (
+        <TemplateChipsSkeleton />
+      ) : templates && templates.length > 0 ? (
+        <TemplateChips
+          templates={templates}
+          onSelect={handleTemplateSelect}
+          disabled={status === 'working'}
+        />
+      ) : null}
+
       {/* Prompt input */}
       <PromptInput
         onSend={handleSend}
@@ -344,6 +391,8 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
         status={status}
         onStop={handleStop}
         isStopping={isStopping}
+        externalValue={externalInputValue}
+        onValueChange={handleInputValueChange}
       />
 
       {/* Toast notification */}

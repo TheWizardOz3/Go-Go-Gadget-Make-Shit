@@ -2,6 +2,7 @@ import { Router, type Router as RouterType } from 'express';
 import { success, error, ErrorCodes } from '../lib/responses.js';
 import { logger } from '../lib/logger.js';
 import { scanProjects, getProject, getSessionsForProject } from '../services/projectScanner.js';
+import { getTemplates } from '../services/templateService.js';
 
 const router: RouterType = Router();
 
@@ -102,10 +103,29 @@ router.get('/:encodedPath/sessions', async (req, res) => {
  * Get prompt templates for a project
  * GET /api/projects/:encodedPath/templates
  *
- * TODO: Implement template loading from .claude/templates.yaml
+ * Returns templates from .claude/templates.yaml if it exists,
+ * otherwise returns default vibe-coding-prompts templates.
  */
-router.get('/:encodedPath/templates', (_req, res) => {
-  res.status(501).json(error(ErrorCodes.NOT_IMPLEMENTED, 'Templates not yet implemented'));
+router.get('/:encodedPath/templates', async (req, res) => {
+  try {
+    const { encodedPath } = req.params;
+
+    // First check if project exists
+    const project = await getProject(encodedPath);
+    if (!project) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Project not found'));
+      return;
+    }
+
+    const templates = await getTemplates(encodedPath);
+    res.json(success(templates));
+  } catch (err) {
+    logger.error('Failed to get templates', {
+      encodedPath: req.params.encodedPath,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get templates'));
+  }
 });
 
 /**

@@ -272,7 +272,11 @@ export default function App() {
         hasProjects={projects.length > 0}
         hasSessions={(sessions?.length ?? 0) > 0}
       />
-      <ConversationView sessionId={selectedSession} className="flex-1" />
+      <ConversationView
+        sessionId={selectedSession}
+        encodedPath={selectedProject}
+        className="flex-1"
+      />
 
       {/* Project Picker Modal */}
       <ProjectPicker
