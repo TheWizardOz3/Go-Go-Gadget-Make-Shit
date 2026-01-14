@@ -20,7 +20,9 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "shared": ["../shared/types/index.ts"],
+      "shared/*": ["../shared/*"]
     }
   },
   "include": ["src/**/*"],

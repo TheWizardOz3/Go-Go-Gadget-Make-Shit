@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.3.0 | 2026-01-14 | prerelease | JSONL Watcher Service complete |
 | 0.2.0 | 2026-01-14 | prerelease | API Server Setup complete |
 | 0.1.0 | 2026-01-13 | prerelease | Project scaffolding complete |
 | 0.0.2 | 2026-01-13 | prerelease | Technical architecture documentation |
@@ -29,6 +30,50 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.3.0] - 2026-01-14
+
+### Added
+- **JSONL Watcher Service** — Core data layer for parsing Claude Code session files
+  - JSONL parser for Claude Code's session format (user, assistant, tool_use messages)
+  - Project scanner to discover projects in `~/.claude/projects/`
+  - Session manager with in-memory caching (30s TTL for sessions, 5min for projects)
+  - File watcher using chokidar with automatic cache invalidation
+  - Path encoder/decoder for Claude's folder naming scheme
+  - Status detection logic (working/waiting/idle) based on Claude process + message state
+
+- **API Endpoints** — Full implementation of session and project data endpoints
+  - `GET /api/projects` — List all projects with session counts and last activity
+  - `GET /api/projects/:encodedPath` — Get single project details
+  - `GET /api/projects/:encodedPath/sessions` — List sessions for a specific project
+  - `GET /api/sessions` — List recent sessions across all projects (with `?limit=`)
+  - `GET /api/sessions/:id` — Get full session details with messages
+  - `GET /api/sessions/:id/messages` — Get messages with `?since=` for efficient polling
+  - `GET /api/sessions/:id/status` — Get current session status
+
+### Fixed
+- **Path Decoding Bug** — Claude's folder encoding is not reversible since directories can contain hyphens. Now extracts actual path from JSONL `cwd` field instead of decoding folder names.
+
+### Technical Details
+- **New Files:**
+  - `server/src/lib/jsonlParser.ts` — Parse JSONL, transform to Messages, extract metadata
+  - `server/src/lib/pathEncoder.ts` — Encode/decode paths, get project names
+  - `server/src/lib/fileWatcher.ts` — Watch JSONL files with chokidar
+  - `server/src/services/projectScanner.ts` — Scan projects directory
+  - `server/src/services/sessionManager.ts` — Session loading, caching, status
+
+- **Dependencies Added:**
+  - `chokidar@^3.6.0` — File system watching
+
+### Verified
+- All 6 acceptance criteria passing
+- 9 API endpoint tests passing (all return expected HTTP status codes)
+- File watcher starts and registers callbacks on server startup
+- Caching working (cache hits visible in server logs)
+- Error handling working (404 for not found, 400 for invalid input)
+- `pnpm lint` and `pnpm typecheck` pass with 0 errors
 
 ---
 

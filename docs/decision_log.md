@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-008 | 2026-01-14 | data | active | Extract project paths from JSONL cwd field |
 | ADR-007 | 2026-01-14 | api | active | Standardized API response format |
 | ADR-001 | 2026-01-13 | arch | active | Local-first architecture via Tailscale |
 | ADR-002 | 2026-01-13 | data | active | File-based storage (no database) |
@@ -30,6 +31,29 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-008: Extract Project Paths from JSONL cwd Field
+**Date:** 2026-01-14 | **Category:** data | **Status:** active
+
+#### Trigger
+During testing of the JSONL Watcher Service, discovered that Claude Code's folder encoding scheme is not reversible. Directories like `/Users/derek/Doubleo/agents-dev` get encoded as `-Users-derek-Doubleo-agents-dev`, but decoding by replacing hyphens with slashes incorrectly produces `/Users/derek/Doubleo/agents/dev`.
+
+#### Decision
+Extract the actual project path from the JSONL `cwd` field instead of attempting to decode the folder name. Every JSONL entry contains a `cwd` field with the absolute project path. Only fall back to folder name decoding if JSONL files are empty.
+
+#### Rationale
+- **Accuracy:** The `cwd` field is authoritative — Claude Code writes the actual working directory
+- **Hyphen ambiguity:** Folder names can contain hyphens (e.g., `my-project`), making encoding non-reversible
+- **Resilience:** Works regardless of how Claude encodes paths in the future
+- **Minimal overhead:** We're already parsing JSONL files, extracting one field is trivial
+
+#### AI Instructions
+- Always use `extractProjectPath(entries)` from `jsonlParser.ts` to get the project path
+- The `pathEncoder.decodePath()` function is a fallback only — prefer extracted paths
+- When scanning projects, check ALL JSONL files (including agent sidechains) for the `cwd` field since main session files might be empty
+- Log a warning if falling back to folder decoding
+
+---
 
 ### ADR-007: Standardized API Response Format
 **Date:** 2026-01-14 | **Category:** api | **Status:** active

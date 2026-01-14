@@ -29,6 +29,40 @@ export interface Session {
   status: SessionStatus;
 }
 
+/** Session with ISO string dates (for API responses) */
+export interface SessionSerialized {
+  id: string;
+  projectPath: string;
+  projectName: string;
+  startedAt: string;
+  lastActivityAt: string;
+  messageCount: number;
+  status: SessionStatus;
+}
+
+/** Summary of a session for listing (lighter than full Session) */
+export interface SessionSummary {
+  /** Session UUID (filename without .jsonl) */
+  id: string;
+  /** Full path to the JSONL file */
+  filePath: string;
+  /** Session start time */
+  startedAt: Date | null;
+  /** Last activity time */
+  lastActivityAt: Date | null;
+  /** Number of messages */
+  messageCount: number;
+}
+
+/** SessionSummary with ISO string dates (for API responses) */
+export interface SessionSummarySerialized {
+  id: string;
+  filePath: string;
+  startedAt: string | null;
+  lastActivityAt: string | null;
+  messageCount: number;
+}
+
 // =============================================================================
 // Message Types
 // =============================================================================
@@ -67,6 +101,16 @@ export interface Message {
   toolUse?: ToolUseEvent[];
 }
 
+/** Message with ISO string date (for API responses) */
+export interface MessageSerialized {
+  id: string;
+  sessionId: string;
+  type: MessageType;
+  content: string;
+  timestamp: string;
+  toolUse?: ToolUseEvent[];
+}
+
 // =============================================================================
 // Project Types
 // =============================================================================
@@ -85,6 +129,16 @@ export interface Project {
   lastSessionId?: string;
   /** Last activity timestamp */
   lastActivityAt?: Date;
+}
+
+/** Project with ISO string date (for API responses) */
+export interface ProjectSerialized {
+  path: string;
+  name: string;
+  encodedPath: string;
+  sessionCount: number;
+  lastSessionId?: string;
+  lastActivityAt?: string;
 }
 
 // =============================================================================
@@ -163,4 +217,21 @@ export interface ApiErrorResponse {
 export interface StatusResponse {
   healthy: boolean;
   claudeRunning: boolean;
+}
+
+// =============================================================================
+// Session Messages API Response Types
+// =============================================================================
+
+/** Response from GET /api/sessions/:id/messages */
+export interface MessagesResponse {
+  messages: MessageSerialized[];
+  status: SessionStatus;
+  sessionId: string;
+}
+
+/** Response from GET /api/sessions/:id/status */
+export interface SessionStatusResponse {
+  sessionId: string;
+  status: SessionStatus;
 }

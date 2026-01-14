@@ -8,6 +8,8 @@ import { errorHandler, apiNotFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { config } from './lib/config.js';
 import { logger } from './lib/logger.js';
+import { startWatching, onSessionChange } from './lib/fileWatcher.js';
+import { invalidateSessionCache } from './services/sessionManager.js';
 
 // ES Module dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -75,5 +77,14 @@ app.listen(PORT, () => {
     port: PORT,
     url: `http://localhost:${PORT}`,
     healthCheck: `http://localhost:${PORT}/api/status`,
+  });
+
+  // Start file watcher for JSONL session files
+  startWatching();
+
+  // Invalidate cache when session files change
+  onSessionChange((sessionId, eventType) => {
+    logger.debug('Session file changed, invalidating cache', { sessionId, eventType });
+    invalidateSessionCache(sessionId);
   });
 });

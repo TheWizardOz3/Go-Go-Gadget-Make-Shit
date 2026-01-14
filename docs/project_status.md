@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-14 (API Server Setup Complete)
+**Last Updated**: 2026-01-14 (JSONL Watcher Service Complete)
 
 ---
 
@@ -51,27 +51,28 @@
 | Architecture Documentation | 2026-01-13 | Full architecture in `docs/architecture.md` |
 | Project Scaffolding | 2026-01-13 | All 10 tasks complete - pnpm, Express, Vite, Tailwind, ESLint, Husky |
 | Environment Setup | 2026-01-13 | `.env` files, README, setup scripts, Tailscale/Groq docs |
-| API Server Setup | 2026-01-14 | [Feature doc](Features/api-server-setup.md) - Middleware, routes, validation, error handling |
+| API Server Setup | 2026-01-14 | [Feature doc](Features/api-server-setup.md) - Middleware, routes, validation |
+| JSONL Watcher Service | 2026-01-14 | [Feature doc](Features/jsonl-watcher-service.md) - Parser, scanner, watcher, caching |
 
 ### In Progress
 | Feature/Task | Started | Feature Doc | Notes |
 |--------------|---------|-------------|-------|
-| — | — | — | Ready for JSONL Watcher Service |
+| — | — | — | Ready for Conversation View UI |
 
 ### MVP Build Order (Sequenced)
 
 | # | Feature | Dependencies | Complexity | Notes |
 |---|---------|--------------|------------|-------|
 | 1 | ~~API Server Setup~~ | Scaffold ✅ | MEDIUM | ✅ Complete |
-| 2 | **JSONL Watcher Service** | #1 ✅ | MEDIUM | **NEXT** - Core data layer - parse Claude's session files |
-| 3 | **Conversation View UI** | #1, #2 | MEDIUM | Primary interface - see what Claude is doing |
-| 4 | **Status Indicator** | #2 | LOW | Working/Waiting/Idle at a glance |
-| 5 | **Text Input & Send** | #1 | LOW | Primary interaction - send prompts to Claude |
-| 6 | **Stop Button** | #1 | LOW | Safety - kill runaway agent |
-| 7 | **Project Switcher** | #1 | MEDIUM | Navigation - switch between codebases |
-| 8 | **Session Picker** | #2, #7 | MEDIUM | Navigation - resume/start sessions |
+| 2 | ~~JSONL Watcher Service~~ | #1 ✅ | MEDIUM | ✅ Complete |
+| 3 | **Conversation View UI** | #1 ✅, #2 ✅ | MEDIUM | **NEXT** - Primary interface - see what Claude is doing |
+| 4 | **Status Indicator** | #2 ✅ | LOW | Working/Waiting/Idle at a glance |
+| 5 | **Text Input & Send** | #1 ✅ | LOW | Primary interaction - send prompts to Claude |
+| 6 | **Stop Button** | #1 ✅ | LOW | Safety - kill runaway agent |
+| 7 | **Project Switcher** | #1 ✅ | MEDIUM | Navigation - switch between codebases |
+| 8 | **Session Picker** | #2 ✅, #7 | MEDIUM | Navigation - resume/start sessions |
 | 9 | **Quick Templates** | #5, #7 | MEDIUM | Convenience - one-tap common prompts |
-| 10 | **Files Changed View** | #1 + Git service | MEDIUM | Review - list modified files |
+| 10 | **Files Changed View** | #1 ✅ + Git service | MEDIUM | Review - list modified files |
 | 11 | **File Diff View** | #10 | HIGH | Review - green/red change highlighting |
 | 12 | **Voice Input** | #5 | MEDIUM | Hands-free - dictate via Groq Whisper |
 | 13 | **iMessage Notifications** | Hooks setup | MEDIUM | Alerts - know when Claude finishes |
@@ -87,9 +88,9 @@
 ## Upcoming Work
 
 ### Next Up
-1. **JSONL Watcher Service** - Parse and monitor ~/.claude/projects/ conversation files
-2. **Conversation View UI** - Primary mobile interface for viewing Claude conversations
-3. **Status Indicator** - Working/Waiting/Idle at a glance
+1. **Conversation View UI** - Primary mobile interface for viewing Claude conversations (depends on #1 ✅, #2 ✅)
+2. **Status Indicator** - Working/Waiting/Idle at a glance (depends on #2 ✅)
+3. **Text Input & Send** - Send prompts to Claude from phone (depends on #1 ✅)
 
 ---
 

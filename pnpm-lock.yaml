@@ -81,6 +81,9 @@ importers:
 
   server:
     dependencies:
+      chokidar:
+        specifier: ^3.6.0
+        version: 3.6.0
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -90,6 +93,9 @@ importers:
       express:
         specifier: ^4.21.2
         version: 4.22.1
+      shared:
+        specifier: workspace:*
+        version: link:../shared
       zod:
         specifier: ^3.24.1
         version: 3.25.76
