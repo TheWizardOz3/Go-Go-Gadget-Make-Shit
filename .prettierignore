@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Generated files
+coverage/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Docs that shouldn't be formatted
+docs/**/*.md
+*.md
+
+# Config files that have specific formatting
+tsconfig*.json
+

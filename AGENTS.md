@@ -1,4 +1,4 @@
-# AI Assistant Instructions: {{PROJECT_NAME}}
+# AI Assistant Instructions: GoGoGadgetClaude
 
 > Master instructions for AI coding assistants. This file governs behavior, coding standards, and guardrails.
 
@@ -6,35 +6,33 @@
 
 ## 1. Project Identity
 
-**One-Line Summary:** {{Brief description of what this product does}}
+**One-Line Summary:** A mobile web interface for monitoring and controlling Claude Code sessions running on your laptop.
 
 **Core Objectives:**
-1. {{PRIMARY_OBJECTIVE}}
-2. {{SECONDARY_OBJECTIVE}}
-3. {{TERTIARY_OBJECTIVE}}
+1. Enable remote monitoring and control of Claude Code from a phone via Tailscale
+2. Provide voice and text input for sending prompts to the agent
+3. Display conversation history and code changes with a polished mobile-first UI
 
-**Tech Stack (Quick Ref):** {{FRONTEND_FRAMEWORK}} / {{BACKEND_FRAMEWORK}} / {{DATABASE}} / {{HOSTING}}
+**Tech Stack (Quick Ref):** React + Vite / Node.js + Express / File-based (JSONL) / Local (Tailscale)
 
 **System Architecture:**
 ```
-{{SIMPLIFIED ARCHITECTURE DIAGRAM}}
-
-Example:
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│   Frontend   │ ──── │   Backend    │ ──── │   Database   │
-│   (React)    │ HTTP │   (Node)     │      │  (Postgres)  │
-└──────────────┘      └──────┬───────┘      └──────────────┘
-                             │
-                      ┌──────┴───────┐
-                      │    Cache     │
-                      │   (Redis)    │
-                      └──────────────┘
+┌─────────────────┐         ┌─────────────────────────────────────┐
+│  iPhone Safari  │ Tailscale│  Laptop (macOS)                    │
+│  (React SPA)    │◄────────►│  Node.js Express :3456             │
+└─────────────────┘  :3456   │         │                          │
+                             │         ▼                          │
+                             │  ┌─────────────┐  ┌──────────────┐ │
+                             │  │ ~/.claude/  │  │ Claude Code  │ │
+                             │  │ (JSONL)     │  │ (CLI)        │ │
+                             │  └─────────────┘  └──────────────┘ │
+                             └─────────────────────────────────────┘
 ```
 
 **Design Principles:**
-- **{{PRINCIPLE_1}}:** {{Brief description}}
-- **{{PRINCIPLE_2}}:** {{Brief description}}
-- **{{PRINCIPLE_3}}:** {{Brief description}}
+- **Walk-Friendly:** Large touch targets, one-handed use, works while moving
+- **Instant Clarity:** Status obvious at a glance—working, waiting, or idle
+- **Minimal Friction:** Quick-select templates over typing, voice input for hands-free
 
 ---
 
@@ -59,18 +57,16 @@ Example:
 **Security:**
 
 - Never commit secrets, credentials, or API keys — use environment variables
-- Never log sensitive data (passwords, tokens, PII, OAuth credentials)
+- Never log sensitive data (API keys, phone numbers)
 - All user input must be validated server-side with Zod
-- All database queries must use Prisma (parameterized by default)
-- Credentials stored encrypted (AES-256-GCM) — never log decrypted values
+- Sanitize all file paths to prevent path traversal attacks
+- Tailscale provides network-level auth — no additional auth needed for MVP
 
 **Data Integrity:**
 
-- All database migrations must be reversible with rollback scripts
-- Prefer soft deletes (`deleted_at`) for business data; hard deletes allowed for technical data (logs, sessions) or compliance
-- Tenant isolation enforced via Supabase RLS
-- All destructive operations require explicit confirmation and audit logging
-- Database schema changes require migration files (no manual DB edits)
+- Claude Code manages conversation data (JSONL) — we only read, never write to these files
+- App settings stored in `~/.gogogadgetclaude/settings.json`
+- All file operations restricted to known directories (projects, ~/.claude)
 
 **Code Quality:**
 
@@ -556,33 +552,61 @@ After completing any significant work, verify:
 
 ```bash
 # Development
-{{DEV_START_COMMAND}}           # Start development server
-{{BUILD_COMMAND}}               # Build for production
-{{LINT_COMMAND}}                # Run linter
-{{FORMAT_COMMAND}}              # Run formatter
+pnpm dev                        # Start both client and server in dev mode
+pnpm dev:client                 # Start only Vite dev server (client)
+pnpm dev:server                 # Start only Node.js server
+
+# Build & Production
+pnpm build                      # Build client for production
+pnpm start                      # Run production server (serves built client)
+
+# Code Quality
+pnpm lint                       # Run ESLint on all code
+pnpm lint:fix                   # Run ESLint and fix auto-fixable issues
+pnpm format                     # Run Prettier
+pnpm typecheck                  # TypeScript type checking
 
 # Testing
-{{TEST_COMMAND}}                # Run all tests
-{{TEST_WATCH_COMMAND}}          # Run tests in watch mode
-{{TEST_COVERAGE_COMMAND}}       # Run tests with coverage
+pnpm test                       # Run all tests
+pnpm test:watch                 # Run tests in watch mode
+pnpm test:coverage              # Run tests with coverage report
 
-# Database
-{{DB_MIGRATE_COMMAND}}          # Run migrations
-{{DB_SEED_COMMAND}}             # Seed database
-{{DB_RESET_COMMAND}}            # Reset database
-
-# Other
-{{TYPE_CHECK_COMMAND}}          # TypeScript type check
-{{GEN_TYPES_COMMAND}}           # Generate types from schema
+# Setup
+pnpm install                    # Install all dependencies
+./scripts/setup-hooks.sh        # Configure Claude Code hooks for notifications
 ```
 
 ---
 
 ## 13. Project-Specific Guidelines
 
-{{Add any project-specific conventions, patterns, or rules that don't fit the categories above}}
+### Claude Code Integration
+- **JSONL Parsing:** Claude Code stores sessions in `~/.claude/projects/[encoded-path]/[session-id].jsonl`. Each line is a JSON object with type, message, timestamp, etc.
+- **Hooks:** Claude Code supports hooks (Stop, PreToolUse, etc.) — we use the Stop hook to trigger notifications
+- **CLI Commands:** Use `claude -p "prompt" --continue` to send prompts to existing sessions
+
+### File Structure
+- **Client code:** `client/src/` — React components, hooks, stores
+- **Server code:** `server/src/` — Express routes, services, utilities
+- **Shared types:** `shared/types/` — TypeScript interfaces used by both
+
+### Mobile-First UI
+- Touch targets minimum 44×44px (prefer 48×48px for primary actions)
+- Design for one-handed use — primary actions within thumb reach
+- Use Tailwind responsive utilities, but default styles should work for mobile
+- Test on real iPhone Safari, not just Chrome DevTools
+
+### Key Integrations
+- **Tailscale:** Network access — laptop must have Tailscale installed and running
+- **Groq Whisper:** Voice transcription — requires `GROQ_API_KEY` in `.env`
+- **AppleScript:** Notifications via iMessage — macOS only
+
+### Data Flow
+1. React polls `/api/sessions/:id/messages` every 2-3 seconds
+2. Server reads JSONL files from `~/.claude/projects/`
+3. User sends prompt → Server spawns `claude -p` → Claude writes to JSONL → Next poll picks it up
 
 ---
 
-*Last Updated: {{DATE}}*
+*Last Updated: 2026-01-13*
 

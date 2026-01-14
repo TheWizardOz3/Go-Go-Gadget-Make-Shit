@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design Tokens - GoGoGadgetClaude
+ * Colors from product_spec.md visual design system
+ */
+:root {
+  /* Light mode (default) */
+  --color-background: #fafafa;
+  --color-surface: #ffffff;
+  --color-accent: #6366f1;
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-working: #3b82f6;
+
+  /* Text colors */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #4a4a4a;
+  --color-text-muted: #9a9a9a;
+}
+
+.dark {
+  /* Dark mode */
+  --color-background: #0a0a0a;
+  --color-surface: #141414;
+  --color-accent: #818cf8;
+  --color-success: #34d399;
+  --color-error: #f87171;
+  --color-working: #60a5fa;
+
+  /* Text colors */
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #b0b0b0;
+  --color-text-muted: #6a6a6a;
+}
+
+@layer base {
+  html {
+    /* Prevent iOS text size adjustment */
+    -webkit-text-size-adjust: 100%;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-text-primary;
+    font-family:
+      'SF Pro Display',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior: none;
+  }
+
+  /* Ensure minimum touch targets for interactive elements */
+  button,
+  a,
+  [role='button'] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@layer components {
+  /* Card component */
+  .card {
+    @apply bg-surface rounded-lg shadow-card;
+  }
+
+  /* Status badge variants */
+  .badge-working {
+    @apply bg-working/10 text-working border border-working/30;
+  }
+
+  .badge-success {
+    @apply bg-success/10 text-success border border-success/30;
+  }
+
+  .badge-error {
+    @apply bg-error/10 text-error border border-error/30;
+  }
+}
+
+@layer utilities {
+  /* Safe area insets for notched devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

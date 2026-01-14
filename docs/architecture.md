@@ -1,4 +1,4 @@
-# Technical Architecture: {{PROJECT_NAME}}
+# Technical Architecture: GoGoGadgetClaude
 
 > **Purpose:** This is the Engineering Design Document (EDD) — the "How" of implementation. It serves as the technical reference for AI coding assistants and human developers alike. For product requirements and the "What," see `product_spec.md`.
 
@@ -10,238 +10,257 @@
 
 | Layer | Technology | Version | Package Name | Rationale |
 |-------|------------|---------|--------------|-----------|
-| Framework | {{FRAMEWORK}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Language | {{LANGUAGE}} | {{VERSION}} | — | {{WHY_CHOSEN}} |
-| State Management | {{STATE_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Data Fetching | {{DATA_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Routing | {{ROUTER}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Styling | {{STYLE_SYSTEM}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Component Library | {{COMPONENT_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Form Handling | {{FORM_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Validation | {{VALIDATION_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Build Tool | {{BUILD_TOOL}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Package Manager | {{PACKAGE_MANAGER}} | {{VERSION}} | — | {{WHY_CHOSEN}} |
+| Framework | React | 18.x | `react` | Mature, excellent mobile web support, large ecosystem |
+| Language | TypeScript | 5.x | `typescript` | Type safety, better DX, catches errors early |
+| State Management | Zustand | 4.x | `zustand` | Lightweight, minimal boilerplate, simple API |
+| Data Fetching | Native fetch + SWR | 2.x | `swr` | Simple caching, revalidation, lightweight |
+| Routing | React Router | 6.x | `react-router-dom` | Standard React routing, simple for this app |
+| Styling | Tailwind CSS | 3.x | `tailwindcss` | Rapid UI development, mobile utilities, small bundle |
+| Component Library | Custom + Radix UI | — | `@radix-ui/react-*` | Accessible primitives, unstyled (we control look) |
+| Form Handling | Native + Zod | 3.x | `zod` | Lightweight, TypeScript-first validation |
+| Syntax Highlighting | Shiki | 1.x | `shiki` | Accurate highlighting, VSCode themes, fast |
+| Build Tool | Vite | 5.x | `vite` | Fast builds, excellent DX, native ESM |
+| Package Manager | pnpm | 8.x | — | Fast, disk-efficient, strict dependencies |
 
 ### 1.2 Backend Stack
 
 | Layer | Technology | Version | Package Name | Rationale |
 |-------|------------|---------|--------------|-----------|
-| Runtime | {{RUNTIME}} | {{VERSION}} | — | {{WHY_CHOSEN}} |
-| Language | {{LANGUAGE}} | {{VERSION}} | — | {{WHY_CHOSEN}} |
-| Framework | {{FRAMEWORK}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| API Style | {{REST/GRAPHQL/GRPC/TRPC}} | — | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| ORM / Data Layer | {{ORM}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Validation | {{VALIDATION_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Authentication | {{AUTH_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| Job Queue | {{QUEUE_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
-| WebSocket | {{WS_LIB}} | {{VERSION}} | {{PACKAGE_NAME}} | {{WHY_CHOSEN}} |
+| Runtime | Node.js | 20.x LTS | — | Stable, ubiquitous, same language as frontend |
+| Language | TypeScript | 5.x | `typescript` | Type safety, shared types with frontend |
+| Framework | Express | 4.x | `express` | Simple, well-documented, mature |
+| API Style | REST | — | — | Simple for this use case, no need for GraphQL complexity |
+| File Watching | chokidar | 3.x | `chokidar` | Cross-platform, reliable file watching |
+| Process Management | execa | 8.x | `execa` | Better child process handling than native |
+| YAML Parsing | yaml | 2.x | `yaml` | Parse template config files |
+| Git Operations | simple-git | 3.x | `simple-git` | Clean Git CLI wrapper |
+| Validation | Zod | 3.x | `zod` | Shared with frontend, TypeScript-first |
 
 ### 1.3 Database & Storage
 
 | Component | Technology | Version/Tier | Hosted By | Rationale |
 |-----------|------------|--------------|-----------|-----------|
-| Primary Database | {{DATABASE}} | {{VERSION}} | {{HOST}} | {{WHY_CHOSEN}} |
-| Cache Layer | {{CACHE}} | {{VERSION}} | {{HOST}} | {{WHY_CHOSEN}} |
-| Search Engine | {{SEARCH}} | {{VERSION}} | {{HOST}} | {{WHY_CHOSEN}} |
-| File Storage | {{STORAGE}} | — | {{HOST}} | {{WHY_CHOSEN}} |
-| Vector Database | {{VECTOR_DB}} | {{VERSION}} | {{HOST}} | {{WHY_CHOSEN}} |
+| Primary Database | None (file-based) | — | Local filesystem | Claude manages JSONL; we only read |
+| App Settings | JSON file | — | `~/.gogogadgetclaude/` | Simple config, no DB needed |
+| Session State | localStorage | — | Browser | Remember last project, UI preferences |
+| Conversation Data | JSONL | — | `~/.claude/projects/` | Claude Code's native format (read-only) |
 
 ### 1.4 Infrastructure & DevOps
 
 | Component | Technology | Tier/Plan | Rationale |
 |-----------|------------|-----------|-----------|
-| Hosting (Frontend) | {{HOST}} | {{TIER}} | {{WHY_CHOSEN}} |
-| Hosting (Backend) | {{HOST}} | {{TIER}} | {{WHY_CHOSEN}} |
-| Hosting (Database) | {{HOST}} | {{TIER}} | {{WHY_CHOSEN}} |
-| CI/CD | {{CI_CD}} | {{TIER}} | {{WHY_CHOSEN}} |
-| Container Registry | {{REGISTRY}} | {{TIER}} | {{WHY_CHOSEN}} |
-| CDN | {{CDN}} | {{TIER}} | {{WHY_CHOSEN}} |
-| DNS | {{DNS}} | {{TIER}} | {{WHY_CHOSEN}} |
-| SSL/TLS | {{SSL_PROVIDER}} | — | {{WHY_CHOSEN}} |
-| Secrets Management | {{SECRETS}} | {{TIER}} | {{WHY_CHOSEN}} |
+| Network Access | Tailscale | Free (Personal) | Secure, easy setup, works through NAT |
+| Hosting | Local laptop | — | No cloud costs, data stays local |
+| Notifications | macOS AppleScript | — | Native, free, reliable, no external service |
+| Voice Transcription | Groq Whisper API | Free tier | Excellent accuracy, generous free tier |
+| Voice Fallback | Web Speech API | — | Built into browser, zero cost backup |
 
 ### 1.5 Observability & Monitoring
 
 | Component | Technology | Tier/Plan | Purpose |
 |-----------|------------|-----------|---------|
-| Error Tracking | {{ERROR_TOOL}} | {{TIER}} | {{PURPOSE}} |
-| APM / Tracing | {{APM_TOOL}} | {{TIER}} | {{PURPOSE}} |
-| Log Aggregation | {{LOG_TOOL}} | {{TIER}} | {{PURPOSE}} |
-| Uptime Monitoring | {{UPTIME_TOOL}} | {{TIER}} | {{PURPOSE}} |
-| Analytics | {{ANALYTICS_TOOL}} | {{TIER}} | {{PURPOSE}} |
+| Error Tracking | Console logging | — | Simple, sufficient for single-user local app |
+| Log Aggregation | Console + file | — | Development debugging |
+| Uptime Monitoring | None needed | — | Local app, no external monitoring required |
+| Analytics | None | — | Personal tool, no analytics needed |
 
 ### 1.6 Development Tools
 
 | Tool | Purpose | Configuration File |
 |------|---------|-------------------|
-| Linter | {{LINTER}} | {{CONFIG_FILE}} |
-| Formatter | {{FORMATTER}} | {{CONFIG_FILE}} |
-| Type Checker | {{TYPE_CHECKER}} | {{CONFIG_FILE}} |
-| Test Runner | {{TEST_RUNNER}} | {{CONFIG_FILE}} |
-| Git Hooks | {{GIT_HOOKS}} | {{CONFIG_FILE}} |
-| Environment Variables | {{ENV_TOOL}} | {{CONFIG_FILE}} |
+| Linter | ESLint | `eslint.config.js` |
+| Formatter | Prettier | `.prettierrc` |
+| Type Checker | TypeScript | `tsconfig.json` |
+| Test Runner | Vitest | `vitest.config.ts` |
+| Git Hooks | Husky + lint-staged | `.husky/`, `package.json` |
+| Environment Variables | dotenv | `.env`, `.env.example` |
 
 ---
 
 ## 2. System Architecture
 
 ### 2.1 Architecture Pattern
-**Pattern:** {{MONOLITH | MODULAR_MONOLITH | MICROSERVICES | SERVERLESS | JAMSTACK | HYBRID}}
+**Pattern:** Client-Server (Local)
 
 **Description:**  
-{{High-level description of why this pattern was chosen and how the system is organized}}
+A Node.js server runs on the user's laptop, serving a React web app and providing REST APIs. The phone connects via Tailscale's private network. The server watches Claude Code's JSONL session files and exposes endpoints for conversation state, sending prompts, and controlling the agent.
 
 ### 2.2 High-Level Architecture Diagram
 
 ```
-{{TEXT-BASED DIAGRAM OR MERMAID SYNTAX}}
-
-Example:
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLIENT LAYER                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │   Web App   │  │ Mobile App  │  │   Admin     │              │
-│  │   (React)   │  │  (Future)   │  │   Panel     │              │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
-└─────────┼────────────────┼────────────────┼─────────────────────┘
-          │                │                │
-          ▼                ▼                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       API GATEWAY / EDGE                         │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │              CDN / Load Balancer / Auth Edge              │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       APPLICATION LAYER                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │   API       │  │  Background │  │  WebSocket  │              │
-│  │   Server    │  │   Workers   │  │   Server    │              │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
-└─────────┼────────────────┼────────────────┼─────────────────────┘
-          │                │                │
-          ▼                ▼                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        DATA LAYER                                │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │  Database   │  │    Cache    │  │   Storage   │              │
-│  │  (Primary)  │  │   (Redis)   │  │   (S3/R2)   │              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────┐              ┌──────────────────────────────────────────────┐
+│   iPhone Safari     │              │   Laptop (macOS)                             │
+│                     │   Tailscale  │                                              │
+│  ┌───────────────┐  │   Private    │  ┌──────────────┐    ┌───────────────────┐  │
+│  │  React SPA    │◄─┼───Network────┼─►│  Node.js     │◄──►│  Claude Code CLI  │  │
+│  │  (Vite build) │  │   :3456      │  │  Express     │    │                   │  │
+│  └───────────────┘  │              │  │  Server      │    └─────────┬─────────┘  │
+│                     │              │  └───────┬──────┘              │            │
+└─────────────────────┘              │          │                     │            │
+                                     │          ▼                     ▼            │
+                                     │  ┌──────────────┐    ┌───────────────────┐  │
+                                     │  │ ~/.claude/   │    │  Git Repos        │  │
+                                     │  │ projects/    │    │  (Your Projects)  │  │
+                                     │  │ (JSONL)      │    │                   │  │
+                                     │  └──────────────┘    └───────────────────┘  │
+                                     │          │                                  │
+                                     │          ▼                                  │
+                                     │  ┌──────────────┐                           │
+                                     │  │ AppleScript  │──────► iMessage to Phone  │
+                                     │  │ (osascript)  │                           │
+                                     │  └──────────────┘                           │
+                                     └──────────────────────────────────────────────┘
 ```
 
 ### 2.3 Service Boundaries & Responsibilities
 
 | Service/Module | Responsibility | Exposes | Consumes |
 |----------------|----------------|---------|----------|
-| {{SERVICE_NAME}} | {{RESPONSIBILITY}} | {{APIS/EVENTS}} | {{DEPENDENCIES}} |
-| {{SERVICE_NAME}} | {{RESPONSIBILITY}} | {{APIS/EVENTS}} | {{DEPENDENCIES}} |
+| Express Server | HTTP API, static file serving | REST endpoints | File system, Git CLI, Claude CLI |
+| JSONL Watcher | Monitor conversation files for changes | Internal events | `~/.claude/projects/` |
+| Session Manager | Parse sessions, track state | API via server | JSONL files |
+| Git Service | Generate diffs, list changes | API via server | Git CLI (simple-git) |
+| Process Controller | Start/stop Claude Code | API via server | execa, Claude CLI |
+| Notification Service | Send iMessage on task complete | Triggered by hooks | AppleScript |
+| React Web App | User interface | — | Server REST API |
 
 ### 2.4 Data Flow Patterns
 
-#### Request Flow
+#### Request Flow (Viewing Conversation)
 ```
-{{DIAGRAM OR DESCRIPTION OF TYPICAL REQUEST FLOW}}
-
-Example:
-1. Client sends request to CDN/Edge
-2. Edge validates auth token (if required)
-3. Request routed to API server
-4. API server validates input
-5. Business logic executed
-6. Database queried/updated
-7. Response returned through layers
+1. React app loads on phone via Tailscale URL
+2. App requests /api/sessions/:id/messages
+3. Server reads JSONL file from ~/.claude/projects/
+4. Server parses JSONL, transforms to API response
+5. Response returned to React app
+6. React renders conversation UI
 ```
 
-#### Event Flow (if applicable)
+#### Command Flow (Sending Prompt)
 ```
-{{DIAGRAM OR DESCRIPTION OF EVENT/MESSAGE FLOW}}
+1. User types/dictates prompt in React app
+2. React POSTs to /api/sessions/:id/send
+3. Server spawns `claude -p "prompt" --continue`
+4. Claude writes to JSONL file
+5. Watcher detects JSONL change
+6. Next poll from React fetches new messages
+```
 
-Example:
-1. Action triggers event
-2. Event published to queue
-3. Worker picks up event
-4. Worker processes and updates state
-5. WebSocket broadcasts to relevant clients
+#### Notification Flow (Task Complete)
+```
+1. Claude Code finishes task, fires Stop hook
+2. Hook script calls local server endpoint
+3. Server triggers AppleScript
+4. osascript sends iMessage to user's phone
+5. User taps notification, opens web app
 ```
 
 ### 2.5 Communication Patterns
 
 | Pattern | Used For | Implementation |
 |---------|----------|----------------|
-| Synchronous HTTP | {{USE_CASE}} | {{IMPLEMENTATION}} |
-| WebSocket | {{USE_CASE}} | {{IMPLEMENTATION}} |
-| Message Queue | {{USE_CASE}} | {{IMPLEMENTATION}} |
-| Server-Sent Events | {{USE_CASE}} | {{IMPLEMENTATION}} |
+| Synchronous HTTP | All API calls | Express REST endpoints |
+| Polling | Conversation updates | React SWR with 2-3 second interval |
+| File Watching | Detecting JSONL changes | chokidar on `~/.claude/projects/` |
+| Process Spawn | Sending prompts, stopping agent | execa with Claude CLI |
 
 ---
 
 ## 3. Project Directory Structure
 
 ### 3.1 Monorepo vs Polyrepo
-**Structure:** {{MONOREPO | POLYREPO | SINGLE_REPO}}
-**Tool:** {{TURBOREPO | NX | LERNA | NONE}}
+**Structure:** Single Repo  
+**Tool:** None (simple npm workspaces not needed)
 
 ### 3.2 Directory Tree
 
 ```
-{{PROJECT_ROOT}}/
-├── .github/                    # GitHub workflows, PR templates
+gogogadgetclaude/
+├── .github/                      # GitHub workflows (optional)
 │   └── workflows/
-├── .vscode/                    # Editor configuration
-├── apps/                       # Application packages (monorepo)
-│   ├── {{FRONTEND_APP}}/       # Frontend application
-│   │   ├── public/             # Static assets
-│   │   ├── src/
-│   │   │   ├── app/            # App entry, routing, providers
-│   │   │   ├── components/     # UI components
-│   │   │   │   ├── ui/         # Primitive/base components
-│   │   │   │   └── features/   # Feature-specific components
-│   │   │   ├── hooks/          # Custom React hooks
-│   │   │   ├── lib/            # Utility functions, helpers
-│   │   │   ├── services/       # API client, external services
-│   │   │   ├── stores/         # State management
-│   │   │   ├── types/          # TypeScript types/interfaces
-│   │   │   └── styles/         # Global styles, themes
-│   │   ├── tests/              # Test files
-│   │   └── {{CONFIG_FILES}}    # tsconfig, vite.config, etc.
-│   │
-│   └── {{BACKEND_APP}}/        # Backend application
-│       ├── src/
-│       │   ├── api/            # Route handlers/controllers
-│       │   │   └── {{VERSION}}/# API versioning
-│       │   ├── config/         # Configuration management
-│       │   ├── db/             # Database connection, migrations
-│       │   │   ├── migrations/
-│       │   │   ├── seeds/
-│       │   │   └── schema/
-│       │   ├── middleware/     # Express/Hono middleware
-│       │   ├── models/         # Data models / entities
-│       │   ├── services/       # Business logic layer
-│       │   ├── jobs/           # Background job definitions
-│       │   ├── utils/          # Utility functions
-│       │   ├── types/          # TypeScript types
-│       │   └── index.ts        # Application entry point
-│       ├── tests/
-│       └── {{CONFIG_FILES}}
+├── .husky/                       # Git hooks
+│   ├── pre-commit
+│   └── _/
+├── .vscode/                      # Editor configuration
+│   └── settings.json
+├── client/                       # React frontend
+│   ├── public/
+│   │   └── favicon.svg
+│   ├── src/
+│   │   ├── components/           # UI components
+│   │   │   ├── ui/               # Primitive components (Button, Input, etc.)
+│   │   │   ├── conversation/     # Conversation view components
+│   │   │   ├── files/            # File diff components
+│   │   │   └── layout/           # Layout components (Header, Nav)
+│   │   ├── hooks/                # Custom React hooks
+│   │   │   ├── useConversation.ts
+│   │   │   ├── useProjects.ts
+│   │   │   ├── useSessions.ts
+│   │   │   └── useVoiceInput.ts
+│   │   ├── lib/                  # Utility functions
+│   │   │   ├── api.ts            # API client
+│   │   │   ├── formatters.ts     # Date, text formatting
+│   │   │   └── cn.ts             # classnames utility
+│   │   ├── stores/               # Zustand stores
+│   │   │   └── appStore.ts
+│   │   ├── types/                # TypeScript types
+│   │   │   └── index.ts
+│   │   ├── App.tsx               # Main app component
+│   │   ├── main.tsx              # Entry point
+│   │   └── index.css             # Global styles + Tailwind
+│   ├── index.html
+│   ├── vite.config.ts
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   └── package.json
 │
-├── packages/                   # Shared packages (monorepo)
-│   ├── {{SHARED_TYPES}}/       # Shared TypeScript types
-│   ├── {{SHARED_UTILS}}/       # Shared utility functions
-│   └── {{UI_LIBRARY}}/         # Shared component library
+├── server/                       # Node.js backend
+│   ├── src/
+│   │   ├── api/                  # Route handlers
+│   │   │   ├── projects.ts
+│   │   │   ├── sessions.ts
+│   │   │   ├── files.ts
+│   │   │   ├── transcribe.ts
+│   │   │   └── settings.ts
+│   │   ├── services/             # Business logic
+│   │   │   ├── sessionManager.ts # JSONL parsing, session state
+│   │   │   ├── gitService.ts     # Git diff operations
+│   │   │   ├── claudeService.ts  # Claude CLI interactions
+│   │   │   ├── notificationService.ts # iMessage via AppleScript
+│   │   │   └── transcriptionService.ts # Groq Whisper API
+│   │   ├── lib/                  # Utilities
+│   │   │   ├── jsonlParser.ts    # Parse Claude JSONL format
+│   │   │   ├── fileWatcher.ts    # chokidar wrapper
+│   │   │   └── config.ts         # Configuration loader
+│   │   ├── types/                # TypeScript types
+│   │   │   └── index.ts
+│   │   ├── middleware/           # Express middleware
+│   │   │   └── errorHandler.ts
+│   │   └── index.ts              # Server entry point
+│   ├── tsconfig.json
+│   └── package.json
 │
-├── docs/                       # Documentation
-│   ├── architecture.md         # This file
-│   ├── product_spec.md         # Product specification
-│   └── {{OTHER_DOCS}}
+├── shared/                       # Shared code (optional)
+│   └── types/                    # Types used by both client and server
+│       └── index.ts
 │
-├── scripts/                    # Build, deploy, utility scripts
-├── docker/                     # Docker configurations
-├── .env.example                # Environment variable template
-├── {{PACKAGE_MANAGER_CONFIG}}  # package.json, pnpm-workspace.yaml
-├── {{TYPESCRIPT_CONFIG}}       # tsconfig.json
+├── scripts/                      # Utility scripts
+│   ├── setup-hooks.sh            # Claude Code hooks setup
+│   └── install-tailscale.sh      # Tailscale setup helper
+│
+├── docs/                         # Documentation
+│   ├── architecture.md           # This file
+│   ├── product_spec.md
+│   ├── decision_log.md
+│   ├── project_status.md
+│   └── changelog.md
+│
+├── .env.example                  # Environment variable template
+├── .gitignore
+├── .prettierrc
+├── eslint.config.js
+├── package.json                  # Root package.json (scripts only)
+├── pnpm-workspace.yaml           # pnpm workspace config
 └── README.md
 ```
 
@@ -249,117 +268,127 @@ Example:
 
 | Directory | Purpose | Contents |
 |-----------|---------|----------|
-| `apps/{{FRONTEND}}/components/ui/` | {{PURPOSE}} | {{CONTENTS}} |
-| `apps/{{FRONTEND}}/components/features/` | {{PURPOSE}} | {{CONTENTS}} |
-| `apps/{{BACKEND}}/services/` | {{PURPOSE}} | {{CONTENTS}} |
-| `apps/{{BACKEND}}/api/` | {{PURPOSE}} | {{CONTENTS}} |
-| `packages/` | {{PURPOSE}} | {{CONTENTS}} |
+| `client/src/components/ui/` | Base UI primitives | Button, Input, Badge, Toast, Modal, etc. |
+| `client/src/components/conversation/` | Conversation feature | MessageList, MessageBubble, StatusIndicator, etc. |
+| `client/src/components/files/` | File diff feature | FileList, DiffViewer, etc. |
+| `server/src/services/` | Business logic layer | All core logic, no HTTP concerns |
+| `server/src/api/` | HTTP route handlers | Thin layer, delegates to services |
+| `shared/types/` | Shared TypeScript types | Session, Message, Project, etc. |
 
 ### 3.4 Business Logic Location
 
-**Primary Location:** `{{PATH_TO_BUSINESS_LOGIC}}`
+**Primary Location:** `server/src/services/`
 
 **Guidelines:**
-- {{GUIDELINE_1 — e.g., "All business rules live in services/, never in controllers"}}
-- {{GUIDELINE_2 — e.g., "Database queries only occur in repositories/"}}
-- {{GUIDELINE_3 — e.g., "Validation schemas co-located with their service"}}
+- All business rules live in `services/`, never in route handlers
+- Route handlers (`api/`) only handle HTTP concerns (parsing, validation, response formatting)
+- JSONL parsing logic isolated in `lib/jsonlParser.ts`
+- Git operations isolated in `services/gitService.ts`
 
 ### 3.5 File Naming Conventions
 
 | Type | Convention | Example |
 |------|------------|---------|
-| Components | {{CONVENTION}} | {{EXAMPLE}} |
-| Hooks | {{CONVENTION}} | {{EXAMPLE}} |
-| Services | {{CONVENTION}} | {{EXAMPLE}} |
-| Types | {{CONVENTION}} | {{EXAMPLE}} |
-| Tests | {{CONVENTION}} | {{EXAMPLE}} |
-| Utilities | {{CONVENTION}} | {{EXAMPLE}} |
+| Components | PascalCase | `MessageBubble.tsx` |
+| Hooks | camelCase with `use` prefix | `useConversation.ts` |
+| Services | camelCase with `Service` suffix | `sessionManager.ts` |
+| Types | PascalCase | `Session.ts` or `index.ts` |
+| Tests | Same name with `.test.ts` suffix | `sessionManager.test.ts` |
+| Utilities | camelCase | `formatters.ts` |
 
 ---
 
 ## 4. Database Design
 
 ### 4.1 Database Selection Rationale
-**Primary Database:** {{DATABASE}}  
-**Why:** {{RATIONALE}}
+**Primary Database:** None (file-based architecture)  
+**Why:** This is a single-user local application. Claude Code already manages conversation data in JSONL files. We read from those files and store minimal app config in JSON files. No database complexity needed.
 
-### 4.2 Entity Relationship Diagram (ERD)
+### 4.2 Data Storage Locations
 
+| Data | Location | Format | Managed By |
+|------|----------|--------|------------|
+| Conversation history | `~/.claude/projects/[path]/[session].jsonl` | JSONL | Claude Code (read-only for us) |
+| Prompt templates | `[repo]/.claude/templates.yaml` | YAML | User |
+| App settings | `~/.gogogadgetclaude/settings.json` | JSON | Our app |
+| Last active project | Browser localStorage | String | Our app |
+
+### 4.3 Data Models
+
+```typescript
+// Session (derived from JSONL files)
+interface Session {
+  id: string;                    // UUID from JSONL filename
+  projectPath: string;           // Decoded from folder path
+  projectName: string;           // Derived from projectPath
+  startedAt: Date;               // First message timestamp
+  lastActivityAt: Date;          // Last message timestamp
+  messageCount: number;          // Total messages in session
+  status: 'working' | 'waiting' | 'idle';
+}
+
+// Message (parsed from JSONL)
+interface Message {
+  id: string;                    // Generated or from JSONL
+  sessionId: string;
+  type: 'user' | 'assistant';
+  content: string;               // May contain markdown
+  timestamp: Date;
+  toolUse?: ToolUseEvent[];      // File edits, commands, etc.
+}
+
+// ToolUseEvent (from JSONL tool_use entries)
+interface ToolUseEvent {
+  tool: string;                  // e.g., 'write_file', 'run_command'
+  input: Record<string, unknown>;
+  output?: string;
+  status: 'pending' | 'complete' | 'error';
+}
+
+// Project (derived from ~/.claude/projects/ structure)
+interface Project {
+  path: string;                  // Full path to project
+  name: string;                  // Basename of path
+  encodedPath: string;           // Claude's encoded folder name
+  sessionCount: number;
+  lastSessionId?: string;
+  lastActivityAt?: Date;
+}
+
+// Template (from .claude/templates.yaml)
+interface Template {
+  label: string;
+  icon: string;
+  prompt: string;
+}
+
+// FileChange (from git diff)
+interface FileChange {
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  additions: number;
+  deletions: number;
+}
+
+// AppSettings (stored in ~/.gogogadgetclaude/settings.json)
+interface AppSettings {
+  notificationsEnabled: boolean;
+  notificationPhoneNumber?: string;  // For iMessage
+  defaultTemplates: Template[];
+  theme: 'light' | 'dark' | 'system';
+}
 ```
-{{MERMAID ERD OR TEXT-BASED ERD}}
 
-Example:
-erDiagram
-    USER ||--o{ POST : creates
-    USER ||--o{ COMMENT : writes
-    POST ||--o{ COMMENT : has
-    USER {
-        uuid id PK
-        string email UK
-        string name
-        timestamp created_at
-    }
-    POST {
-        uuid id PK
-        uuid user_id FK
-        string title
-        text content
-        timestamp created_at
-    }
+### 4.4 JSONL File Structure (Claude Code Format)
+
+Claude Code stores conversations in JSONL format. Each line is a JSON object:
+
+```jsonl
+{"type":"user","message":"Build a hello world app","timestamp":"2024-01-15T10:30:00Z","sessionId":"abc-123","cwd":"/Users/me/project"}
+{"type":"assistant","message":"I'll create a simple hello world app...","timestamp":"2024-01-15T10:30:05Z","sessionId":"abc-123"}
+{"type":"tool_use","tool":"write_file","input":{"path":"hello.js","content":"console.log('Hello!')"},"timestamp":"2024-01-15T10:30:10Z"}
+{"type":"tool_result","tool":"write_file","output":"File written successfully","timestamp":"2024-01-15T10:30:10Z"}
 ```
-
-### 4.3 Schema Documentation
-
-#### Table: {{TABLE_NAME}}
-**Purpose:** {{PURPOSE}}
-
-| Column | Type | Nullable | Default | Constraints | Description |
-|--------|------|----------|---------|-------------|-------------|
-| {{COLUMN}} | {{TYPE}} | {{YES/NO}} | {{DEFAULT}} | {{PK/FK/UK/INDEX}} | {{DESCRIPTION}} |
-
-**Indexes:**
-- `{{INDEX_NAME}}` on (`{{COLUMNS}}`) — {{RATIONALE}}
-
-**Relationships:**
-- {{RELATIONSHIP_DESCRIPTION}}
-
----
-
-*{{Repeat table documentation for each table}}*
-
----
-
-### 4.4 Migration Strategy
-
-**Tool:** {{MIGRATION_TOOL — e.g., Prisma Migrate, Drizzle Kit, Knex}}
-
-**Conventions:**
-- Migration naming: `{{NAMING_CONVENTION}}`
-- Rollback strategy: {{STRATEGY}}
-- Production deployment: {{PROCESS}}
-
-**Commands:**
-```bash
-# Generate migration
-{{COMMAND}}
-
-# Run migrations
-{{COMMAND}}
-
-# Rollback
-{{COMMAND}}
-```
-
-### 4.5 Seeding Strategy
-
-**Purpose:** {{WHEN_AND_WHY_TO_SEED}}
-
-**Seed Data Categories:**
-| Category | Purpose | Environment |
-|----------|---------|-------------|
-| Reference Data | {{PURPOSE}} | {{ALL/PROD/DEV}} |
-| Test Data | {{PURPOSE}} | {{DEV/TEST}} |
-| Demo Data | {{PURPOSE}} | {{STAGING}} |
 
 ---
 
@@ -367,113 +396,95 @@ erDiagram
 
 ### 5.1 API Design Philosophy
 
-**Style:** {{REST | GRAPHQL | GRPC | TRPC}}  
-**Versioning:** {{URL_PATH (/v1/) | HEADER | QUERY_PARAM | NONE}}  
-**Base URL:** `{{BASE_URL}}`
+**Style:** REST  
+**Versioning:** None (single-user local app, no versioning needed)  
+**Base URL:** `http://[tailscale-hostname]:3456/api`
 
 ### 5.2 Authentication & Authorization
 
 #### Authentication Method
-**Type:** {{JWT | SESSION | API_KEY | OAUTH2 | COMBINATION}}
+**Type:** None
 
-**Flow:**
-```
-{{AUTHENTICATION FLOW DIAGRAM}}
+**Rationale:** Tailscale provides network-level authentication. Only devices on your personal Tailscale network can reach the server. This is sufficient security for a personal tool.
 
-Example:
-1. User submits credentials to /auth/login
-2. Server validates and returns JWT access + refresh tokens
-3. Client stores tokens securely
-4. Client sends access token in Authorization header
-5. Server validates token on protected routes
-```
-
-**Token Configuration:**
-| Token Type | Lifetime | Storage | Refresh Strategy |
-|------------|----------|---------|------------------|
-| Access Token | {{DURATION}} | {{WHERE}} | {{STRATEGY}} |
-| Refresh Token | {{DURATION}} | {{WHERE}} | {{STRATEGY}} |
-
-#### Authorization Model
-**Type:** {{RBAC | ABAC | PBAC | CUSTOM}}
-
-**Roles:**
-| Role | Description | Permissions |
-|------|-------------|-------------|
-| {{ROLE}} | {{DESCRIPTION}} | {{PERMISSIONS}} |
+**Future (V2):** Okta OIDC for work account support (separate deployment).
 
 ### 5.3 Endpoint Groups
 
-#### Group: {{GROUP_NAME}} — `{{BASE_PATH}}`
+#### Group: Projects — `/api/projects`
 
-| Method | Endpoint | Purpose | Auth | Request Body | Response |
-|--------|----------|---------|------|--------------|----------|
-| {{METHOD}} | `{{PATH}}` | {{PURPOSE}} | {{AUTH_LEVEL}} | {{BODY_REF}} | {{RESPONSE_REF}} |
+| Method | Endpoint | Purpose | Request Body | Response |
+|--------|----------|---------|--------------|----------|
+| GET | `/api/projects` | List all projects with sessions | — | `Project[]` |
+| GET | `/api/projects/:encodedPath` | Get single project details | — | `Project` |
+| GET | `/api/projects/:encodedPath/templates` | Get prompt templates for project | — | `Template[]` |
+| GET | `/api/projects/:encodedPath/files` | Get changed files (git status) | — | `FileChange[]` |
+| GET | `/api/projects/:encodedPath/files/:filePath` | Get file diff | — | `FileDiff` |
 
-**Request/Response Schemas:**
+#### Group: Sessions — `/api/sessions`
 
-```typescript
-// Request: {{OPERATION_NAME}}
-{{REQUEST_SCHEMA}}
+| Method | Endpoint | Purpose | Request Body | Response |
+|--------|----------|---------|--------------|----------|
+| GET | `/api/sessions` | List recent sessions (all projects) | — | `Session[]` |
+| GET | `/api/sessions/:id` | Get session details | — | `Session` |
+| GET | `/api/sessions/:id/messages` | Get messages (supports `?since=timestamp`) | — | `Message[]` |
+| POST | `/api/sessions/:id/send` | Send prompt to session | `{ prompt: string }` | `{ success: boolean }` |
+| POST | `/api/sessions/:id/stop` | Stop running agent | — | `{ success: boolean }` |
+| POST | `/api/sessions/new` | Start new session | `{ projectPath: string, prompt?: string }` | `Session` |
 
-// Response: {{OPERATION_NAME}}
-{{RESPONSE_SCHEMA}}
-```
+#### Group: Transcription — `/api/transcribe`
 
----
+| Method | Endpoint | Purpose | Request Body | Response |
+|--------|----------|---------|--------------|----------|
+| POST | `/api/transcribe` | Transcribe audio to text | `multipart/form-data` with audio file | `{ text: string }` |
 
-*{{Repeat endpoint group for each logical grouping}}*
+#### Group: Settings — `/api/settings`
 
----
+| Method | Endpoint | Purpose | Request Body | Response |
+|--------|----------|---------|--------------|----------|
+| GET | `/api/settings` | Get app settings | — | `AppSettings` |
+| PUT | `/api/settings` | Update app settings | `Partial<AppSettings>` | `AppSettings` |
+
+#### Group: Status — `/api/status`
+
+| Method | Endpoint | Purpose | Request Body | Response |
+|--------|----------|---------|--------------|----------|
+| GET | `/api/status` | Health check + current Claude status | — | `{ healthy: boolean, claudeRunning: boolean }` |
 
 ### 5.4 Request/Response Standards
-
-#### Request Format
-- **Content-Type:** `{{CONTENT_TYPE}}`
-- **Pagination:** `{{CURSOR | OFFSET | PAGE}}` via `{{PARAMS}}`
-- **Filtering:** `{{PATTERN}}`
-- **Sorting:** `{{PATTERN}}`
 
 #### Response Format
 ```typescript
 // Success Response
 {
-  "success": true,
-  "data": {{DATA}},
-  "meta": {
-    "pagination": {{PAGINATION_OBJECT}}
+  "data": T,  // The actual response data
+  "meta"?: {  // Optional metadata
+    "timestamp": string
   }
 }
 
 // Error Response
 {
-  "success": false,
   "error": {
-    "code": "{{ERROR_CODE}}",
-    "message": "{{USER_FRIENDLY_MESSAGE}}",
-    "details": {{VALIDATION_ERRORS_OR_CONTEXT}}
+    "code": string,      // e.g., "SESSION_NOT_FOUND"
+    "message": string    // Human-readable message
   }
 }
 ```
 
 #### HTTP Status Codes
+
 | Code | Usage |
 |------|-------|
-| 200 | {{USAGE}} |
-| 201 | {{USAGE}} |
-| 400 | {{USAGE}} |
-| 401 | {{USAGE}} |
-| 403 | {{USAGE}} |
-| 404 | {{USAGE}} |
-| 422 | {{USAGE}} |
-| 429 | {{USAGE}} |
-| 500 | {{USAGE}} |
+| 200 | Successful GET, PUT |
+| 201 | Successful POST (resource created) |
+| 400 | Invalid request (bad JSON, missing fields) |
+| 404 | Resource not found (session, project, file) |
+| 500 | Internal server error |
 
 ### 5.5 Rate Limiting
 
-| Endpoint Group | Limit | Window | Scope |
-|----------------|-------|--------|-------|
-| {{GROUP}} | {{LIMIT}} | {{WINDOW}} | {{PER_IP/PER_USER/PER_API_KEY}} |
+Not required for single-user local application.
 
 ---
 
@@ -483,34 +494,124 @@ Example:
 
 | Service | Purpose | Integration Type | Criticality | Documentation |
 |---------|---------|------------------|-------------|---------------|
-| {{SERVICE}} | {{PURPOSE}} | {{SDK/REST/WEBHOOK}} | {{CRITICAL/IMPORTANT/OPTIONAL}} | {{DOCS_LINK}} |
+| Tailscale | Network access phone → laptop | System install | Critical | [tailscale.com/kb](https://tailscale.com/kb) |
+| Groq | Voice transcription (Whisper) | REST API | Important | [console.groq.com/docs](https://console.groq.com/docs) |
+| Claude Code | Core functionality | CLI + filesystem | Critical | [docs.anthropic.com](https://docs.anthropic.com) |
+| Git | Diff generation | CLI | Important | Built-in |
 
 ### 6.2 Integration Details
 
-#### Integration: {{SERVICE_NAME}}
+#### Integration: Tailscale
 
-**Purpose:** {{WHAT_IT_DOES}}
+**Purpose:** Enables secure access to laptop server from phone over any network.
 
-**Integration Pattern:** {{SDK | REST_API | WEBHOOK | OAUTH}}
+**Integration Pattern:** System-level VPN
+
+**Setup:**
+1. Install Tailscale on laptop: `brew install tailscale`
+2. Install Tailscale app on iPhone
+3. Sign in with same account on both
+4. Laptop gets hostname like `your-macbook.tailnet-name.ts.net`
 
 **Configuration:**
-```typescript
-// Required environment variables
-{{ENV_VAR_1}}={{DESCRIPTION}}
-{{ENV_VAR_2}}={{DESCRIPTION}}
+```bash
+# No app-level config needed
+# Tailscale runs as system service
 ```
 
-**Implementation Location:** `{{FILE_PATH}}`
-
-**Error Handling:**
-- {{ERROR_SCENARIO_1}}: {{HANDLING}}
-- {{ERROR_SCENARIO_2}}: {{HANDLING}}
-
-**Testing Strategy:** {{HOW_TO_TEST — e.g., mock SDK, sandbox environment}}
+**Testing:** `curl http://your-macbook.tailnet-name.ts.net:3456/api/status`
 
 ---
 
-*{{Repeat for each integration}}*
+#### Integration: Groq Whisper API
+
+**Purpose:** Transcribe voice input to text with high accuracy.
+
+**Integration Pattern:** REST API
+
+**Configuration:**
+```bash
+# Required environment variable
+GROQ_API_KEY=gsk_xxxxxxxxxxxxx
+```
+
+**Implementation Location:** `server/src/services/transcriptionService.ts`
+
+**API Usage:**
+```typescript
+// POST https://api.groq.com/openai/v1/audio/transcriptions
+// Content-Type: multipart/form-data
+// - file: audio file (webm, mp3, wav, etc.)
+// - model: "whisper-large-v3"
+```
+
+**Fallback:** Web Speech API in browser if Groq fails.
+
+**Error Handling:**
+- Rate limit exceeded: Return error, client uses Web Speech API fallback
+- Invalid audio: Return error with "Try again" message
+- Network error: Return error, client uses fallback
+
+---
+
+#### Integration: Claude Code CLI
+
+**Purpose:** Send prompts to Claude Code, manage sessions.
+
+**Integration Pattern:** CLI spawning via execa
+
+**Key Commands:**
+```bash
+# Send prompt to existing session
+claude -p "your prompt" --continue
+
+# Start new session in directory
+cd /path/to/project && claude -p "initial prompt"
+
+# Resume specific session (if needed)
+claude --continue --session-id <id>
+```
+
+**Implementation Location:** `server/src/services/claudeService.ts`
+
+**Process Management:**
+- Use `execa` for spawning
+- Store PID for stop functionality
+- Send SIGINT for graceful stop
+
+---
+
+#### Integration: macOS AppleScript (Notifications)
+
+**Purpose:** Send iMessage notifications when Claude completes tasks.
+
+**Integration Pattern:** CLI (`osascript`)
+
+**Implementation:**
+```bash
+# Send iMessage via AppleScript
+osascript -e 'tell application "Messages" to send "🤖 Task complete in ProjectName" to buddy "+1234567890"'
+```
+
+**Configuration:**
+```bash
+# In settings.json
+{
+  "notificationPhoneNumber": "+1234567890"
+}
+```
+
+**Implementation Location:** `server/src/services/notificationService.ts`
+
+**Claude Code Hook Setup:**
+```json
+// ~/.claude/settings.json (or equivalent)
+{
+  "hooks": {
+    "Stop": ["curl -X POST http://localhost:3456/api/hooks/task-complete"]
+  }
+}
+```
 
 ---
 
@@ -520,12 +621,23 @@ Example:
 
 | Variable | Service | Required In | Description |
 |----------|---------|-------------|-------------|
-| `{{VAR_NAME}}` | {{SERVICE}} | {{ENVS}} | {{DESCRIPTION}} |
+| `GROQ_API_KEY` | Groq | Server | API key for Whisper transcription |
+| `PORT` | Server | Server | Server port (default: 3456) |
 
 #### Environment Variable Template
 ```bash
-# {{CATEGORY}}
-{{VAR_NAME}}={{EXAMPLE_OR_PLACEHOLDER}}
+# .env.example
+
+# Server Configuration
+PORT=3456
+NODE_ENV=development
+
+# Groq API (Voice Transcription)
+# Get your key at: https://console.groq.com/keys
+GROQ_API_KEY=gsk_your_api_key_here
+
+# Notification Settings (optional, can be set in UI)
+# NOTIFICATION_PHONE=+1234567890
 ```
 
 ---
@@ -536,57 +648,131 @@ Example:
 
 | Pattern | Where Used | Implementation |
 |---------|------------|----------------|
-| {{PATTERN — e.g., Repository Pattern}} | {{WHERE}} | {{HOW}} |
-| {{PATTERN — e.g., Service Layer}} | {{WHERE}} | {{HOW}} |
-| {{PATTERN — e.g., Factory Pattern}} | {{WHERE}} | {{HOW}} |
+| Service Layer | Backend | All business logic in `services/`, routes are thin |
+| Repository Pattern (lite) | Backend | Services abstract data access (JSONL, git, etc.) |
+| Custom Hooks | Frontend | Data fetching and state logic in `hooks/` |
+| Container/Presentational | Frontend | Smart components use hooks, dumb components render |
 
 ### 7.2 Code Style Guidelines
 
-**Language Style Guide:** {{STYLE_GUIDE — e.g., Airbnb, Standard, Custom}}
+**Language Style Guide:** ESLint recommended + Prettier
 
 **Key Conventions:**
-- {{CONVENTION_1}}
-- {{CONVENTION_2}}
-- {{CONVENTION_3}}
+- Use `const` by default, `let` only when reassignment needed
+- Prefer named exports over default exports (except pages/components)
+- Use async/await over raw Promises
+- Destructure props and function arguments
+- Use early returns to reduce nesting
 
 ### 7.3 Error Handling Patterns
 
 **Frontend:**
 ```typescript
-{{ERROR_HANDLING_PATTERN}}
+// Using SWR for data fetching with error handling
+const { data, error, isLoading } = useSWR('/api/sessions', fetcher);
+
+if (error) return <ErrorState message="Failed to load sessions" onRetry={mutate} />;
+if (isLoading) return <LoadingState />;
+return <SessionList sessions={data} />;
 ```
 
 **Backend:**
 ```typescript
-{{ERROR_HANDLING_PATTERN}}
+// Service layer throws typed errors
+class AppError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public statusCode: number = 500
+  ) {
+    super(message);
+  }
+}
+
+// Route handler catches and formats
+app.get('/api/sessions/:id', async (req, res, next) => {
+  try {
+    const session = await sessionManager.getSession(req.params.id);
+    res.json({ data: session });
+  } catch (error) {
+    next(error); // Handled by error middleware
+  }
+});
 ```
 
 ### 7.4 State Management Patterns
 
-**Global State:**
-- Tool: {{TOOL}}
-- Pattern: {{PATTERN}}
-- Location: `{{PATH}}`
+**Global State (Zustand):**
+```typescript
+// stores/appStore.ts
+interface AppState {
+  currentProjectPath: string | null;
+  setCurrentProject: (path: string) => void;
+  theme: 'light' | 'dark' | 'system';
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+}
 
-**Server State:**
-- Tool: {{TOOL}}
-- Pattern: {{PATTERN}}
-- Caching Strategy: {{STRATEGY}}
+export const useAppStore = create<AppState>((set) => ({
+  currentProjectPath: localStorage.getItem('lastProject'),
+  setCurrentProject: (path) => {
+    localStorage.setItem('lastProject', path);
+    set({ currentProjectPath: path });
+  },
+  theme: 'system',
+  setTheme: (theme) => set({ theme }),
+}));
+```
 
-**Form State:**
-- Tool: {{TOOL}}
-- Validation: {{APPROACH}}
+**Server State (SWR):**
+```typescript
+// hooks/useConversation.ts
+export function useConversation(sessionId: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    sessionId ? `/api/sessions/${sessionId}/messages` : null,
+    fetcher,
+    { refreshInterval: 2000 } // Poll every 2 seconds
+  );
+
+  return { messages: data, error, isLoading, refresh: mutate };
+}
+```
 
 ### 7.5 Component Patterns
 
 **Component Structure:**
 ```typescript
-{{COMPONENT_TEMPLATE}}
+// components/conversation/MessageBubble.tsx
+import { cn } from '@/lib/cn';
+import type { Message } from '@/types';
+
+interface MessageBubbleProps {
+  message: Message;
+  className?: string;
+}
+
+export function MessageBubble({ message, className }: MessageBubbleProps) {
+  const isUser = message.type === 'user';
+  
+  return (
+    <div
+      className={cn(
+        'rounded-lg p-3 max-w-[85%]',
+        isUser ? 'bg-accent text-white ml-auto' : 'bg-surface',
+        className
+      )}
+    >
+      <p className="text-body">{message.content}</p>
+      <time className="text-caption text-tertiary">
+        {formatRelativeTime(message.timestamp)}
+      </time>
+    </div>
+  );
+}
 ```
 
-**Props Interface Naming:** `{{CONVENTION}}`
+**Props Interface Naming:** `ComponentNameProps`
 
-**Component Composition:** {{APPROACH}}
+**Component Composition:** Prefer composition over props drilling. Use children and render props where appropriate.
 
 ---
 
@@ -595,21 +781,18 @@ Example:
 ### 8.1 Security Layers
 
 ```
-{{SECURITY_LAYER_DIAGRAM}}
-
-Example:
 ┌─────────────────────────────────────────┐
-│           Edge Security                  │
-│  (WAF, DDoS Protection, Bot Detection)  │
+│         Network Security                 │
+│    (Tailscale encrypted tunnel)          │
 ├─────────────────────────────────────────┤
-│         Transport Security               │
-│      (TLS 1.3, Certificate Pinning)     │
+│        Transport Security                │
+│   (WireGuard encryption via Tailscale)   │
 ├─────────────────────────────────────────┤
-│        Application Security              │
-│  (Auth, CORS, Rate Limiting, Validation)│
+│       Application Security               │
+│  (Input validation, path sanitization)   │
 ├─────────────────────────────────────────┤
 │          Data Security                   │
-│   (Encryption, Access Control, Audit)   │
+│     (Local only, no cloud storage)       │
 └─────────────────────────────────────────┘
 ```
 
@@ -617,24 +800,31 @@ Example:
 
 | Threat | Mitigation | Implementation |
 |--------|------------|----------------|
-| SQL Injection | {{MITIGATION}} | {{IMPLEMENTATION}} |
-| XSS | {{MITIGATION}} | {{IMPLEMENTATION}} |
-| CSRF | {{MITIGATION}} | {{IMPLEMENTATION}} |
-| Broken Auth | {{MITIGATION}} | {{IMPLEMENTATION}} |
-| Data Exposure | {{MITIGATION}} | {{IMPLEMENTATION}} |
-| Rate Limiting Bypass | {{MITIGATION}} | {{IMPLEMENTATION}} |
+| Unauthorized Access | Tailscale network auth | Only Tailscale network members can reach server |
+| Path Traversal | Sanitize file paths | Validate paths stay within allowed directories |
+| Command Injection | Parameterized commands | Use execa with array args, not shell strings |
+| XSS | React auto-escaping | Default React behavior, sanitize markdown |
+| Sensitive Data Exposure | Local only | No cloud transmission of conversation data |
 
 ### 8.3 Sensitive Data Handling
 
 | Data Type | Classification | Storage | Encryption | Retention |
 |-----------|---------------|---------|------------|-----------|
-| {{DATA}} | {{PII/SENSITIVE/PUBLIC}} | {{WHERE}} | {{METHOD}} | {{POLICY}} |
+| Conversations | Personal | Local filesystem | At-rest (OS-level) | User-controlled |
+| Voice recordings | Personal | Transient (not stored) | In-transit (HTTPS to Groq) | Not retained |
+| API keys | Sensitive | .env file | None (local only) | Indefinite |
+| Phone number | Personal | settings.json | None (local only) | User-controlled |
 
 ### 8.4 Secret Management
 
-**Tool:** {{SECRET_MANAGER}}
-**Rotation Policy:** {{POLICY}}
-**Access Control:** {{WHO_CAN_ACCESS}}
+**Tool:** dotenv + .env file  
+**Rotation Policy:** Manual (API keys)  
+**Access Control:** File system permissions (user-only read)
+
+**Security Notes:**
+- `.env` is gitignored
+- API keys never sent to frontend
+- All external API calls made server-side
 
 ---
 
@@ -644,11 +834,11 @@ Example:
 
 ```
         ┌─────────┐
-        │  E2E    │  ← {{COUNT}} tests
+        │  E2E    │  ← Manual for MVP
         ├─────────┤
-        │ Integr. │  ← {{COUNT}} tests
+        │ Integr. │  ← API endpoint tests
         ├─────────┤
-        │  Unit   │  ← {{COUNT}} tests
+        │  Unit   │  ← Services, utilities
         └─────────┘
 ```
 
@@ -656,34 +846,41 @@ Example:
 
 | Layer | Test Type | Tools | Coverage Target |
 |-------|-----------|-------|-----------------|
-| Frontend Components | {{TYPE}} | {{TOOLS}} | {{TARGET}}% |
-| Frontend Hooks | {{TYPE}} | {{TOOLS}} | {{TARGET}}% |
-| API Endpoints | {{TYPE}} | {{TOOLS}} | {{TARGET}}% |
-| Services | {{TYPE}} | {{TOOLS}} | {{TARGET}}% |
-| Database | {{TYPE}} | {{TOOLS}} | {{TARGET}}% |
-| E2E Flows | {{TYPE}} | {{TOOLS}} | {{CRITICAL_PATHS}} |
+| Frontend Components | Unit | Vitest + Testing Library | Key interactions |
+| Frontend Hooks | Unit | Vitest + Testing Library | Data transformation |
+| API Endpoints | Integration | Vitest + Supertest | All endpoints |
+| Services | Unit | Vitest | Business logic |
+| JSONL Parser | Unit | Vitest | All edge cases |
+| E2E Flows | Manual | Real device | Critical paths |
 
 ### 9.3 Test File Organization
 
 ```
-tests/
-├── unit/
-│   └── {{STRUCTURE}}
-├── integration/
-│   └── {{STRUCTURE}}
-├── e2e/
-│   └── {{STRUCTURE}}
-├── fixtures/
-│   └── {{STRUCTURE}}
-└── helpers/
-    └── {{STRUCTURE}}
+client/
+└── src/
+    ├── components/
+    │   └── __tests__/           # Component tests
+    ├── hooks/
+    │   └── __tests__/           # Hook tests
+    └── lib/
+        └── __tests__/           # Utility tests
+
+server/
+└── src/
+    ├── services/
+    │   └── __tests__/           # Service tests
+    ├── api/
+    │   └── __tests__/           # API integration tests
+    └── lib/
+        └── __tests__/           # Parser/utility tests
 ```
 
 ### 9.4 Test Data Strategy
 
-**Approach:** {{FACTORIES | FIXTURES | MOCKS | COMBINATION}}
-**Database:** {{STRATEGY — e.g., "Test database reset between suites"}}
-**External Services:** {{STRATEGY — e.g., "MSW for API mocking"}}
+**Approach:** Fixtures + Mocks  
+**JSONL Fixtures:** Sample JSONL files in `server/src/__fixtures__/`  
+**API Mocking:** MSW for frontend tests  
+**Git Mocking:** Mock simple-git in tests
 
 ---
 
@@ -691,48 +888,64 @@ tests/
 
 ### 10.1 Environments
 
-| Environment | Purpose | URL | Branch | Data |
-|-------------|---------|-----|--------|------|
-| Local | {{PURPOSE}} | `{{URL}}` | — | {{DATA_SOURCE}} |
-| Development | {{PURPOSE}} | `{{URL}}` | `{{BRANCH}}` | {{DATA_SOURCE}} |
-| Staging | {{PURPOSE}} | `{{URL}}` | `{{BRANCH}}` | {{DATA_SOURCE}} |
-| Production | {{PURPOSE}} | `{{URL}}` | `{{BRANCH}}` | Live |
+| Environment | Purpose | URL | Data |
+|-------------|---------|-----|------|
+| Development | Local dev | `localhost:3456` | Real JSONL files |
+| Production | User's laptop | `[tailscale]:3456` | Real JSONL files |
 
-### 10.2 CI/CD Pipeline
+Note: No staging environment needed for single-user local app.
 
+### 10.2 Startup Flow
+
+```bash
+# One-time setup
+git clone <repo>
+cd gogogadgetclaude
+pnpm install
+cp .env.example .env
+# Edit .env to add GROQ_API_KEY
+
+# Configure Claude Code hooks (one-time)
+./scripts/setup-hooks.sh
+
+# Start development
+pnpm dev          # Runs both client and server in dev mode
+
+# Start production
+pnpm build        # Build client
+pnpm start        # Run server serving built client
 ```
-{{PIPELINE_DIAGRAM}}
 
-Example:
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│  Push    │───▶│  Build   │───▶│  Test    │───▶│  Deploy  │
-│          │    │  & Lint  │    │  Suite   │    │  Preview │
-└──────────┘    └──────────┘    └──────────┘    └──────────┘
-                                                      │
-                                                      ▼
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│  Prod    │◀───│  Manual  │◀───│  Staging │◀───│  Merge   │
-│  Deploy  │    │  Approve │    │  Deploy  │    │  to Main │
-└──────────┘    └──────────┘    └──────────┘    └──────────┘
+### 10.3 Process Management
+
+**Development:** `pnpm dev` runs both client (Vite) and server (tsx watch)
+
+**Production Options:**
+1. **Manual:** `pnpm start` in terminal
+2. **LaunchAgent:** Auto-start on login (setup script provided)
+3. **PM2:** `pm2 start server/dist/index.js` for process management
+
+**LaunchAgent Setup (optional):**
+```xml
+<!-- ~/Library/LaunchAgents/com.gogogadgetclaude.server.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.gogogadgetclaude.server</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/path/to/gogogadgetclaude/server/dist/index.js</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
 ```
-
-### 10.3 Deployment Strategy
-
-**Method:** {{BLUE_GREEN | CANARY | ROLLING | RECREATE}}
-
-**Rollback Process:**
-1. {{STEP_1}}
-2. {{STEP_2}}
-3. {{STEP_3}}
-
-**Feature Flags:**
-- Tool: {{TOOL}}
-- Strategy: {{STRATEGY}}
-
-### 10.4 Infrastructure as Code
-
-**Tool:** {{TERRAFORM | PULUMI | CDK | CLOUDFORMATION | NONE}}
-**Location:** `{{PATH}}`
 
 ---
 
@@ -742,29 +955,25 @@ Example:
 
 | Metric | Target | Optimization Strategy |
 |--------|--------|----------------------|
-| LCP | {{TARGET}} | {{STRATEGY}} |
-| FID/INP | {{TARGET}} | {{STRATEGY}} |
-| CLS | {{TARGET}} | {{STRATEGY}} |
-| Bundle Size | {{TARGET}} | {{STRATEGY}} |
-| TTI | {{TARGET}} | {{STRATEGY}} |
+| Initial Load | < 1s | Vite code splitting, minimal bundle |
+| Conversation Update | < 3s | SWR polling with 2s interval |
+| Voice Transcription | < 5s | Groq API is fast, show loading state |
+| Bundle Size | < 200KB | Tree shaking, minimal dependencies |
 
 ### 11.2 Backend Performance
 
 | Metric | Target | Optimization Strategy |
 |--------|--------|----------------------|
-| API Response (p50) | {{TARGET}} | {{STRATEGY}} |
-| API Response (p99) | {{TARGET}} | {{STRATEGY}} |
-| Database Query | {{TARGET}} | {{STRATEGY}} |
-| Memory Usage | {{TARGET}} | {{STRATEGY}} |
+| API Response (p50) | < 100ms | JSONL parsing is fast, cache parsed sessions |
+| File Watching | Real-time | chokidar is efficient |
+| Git Diff | < 500ms | simple-git is fast for typical repos |
 
 ### 11.3 Caching Strategy
 
 | Layer | Cache Type | TTL | Invalidation |
 |-------|------------|-----|--------------|
-| CDN | {{TYPE}} | {{TTL}} | {{STRATEGY}} |
-| API | {{TYPE}} | {{TTL}} | {{STRATEGY}} |
-| Database | {{TYPE}} | {{TTL}} | {{STRATEGY}} |
-| Client | {{TYPE}} | {{TTL}} | {{STRATEGY}} |
+| Browser | SWR cache | 2s refresh | Manual mutate or refetch |
+| Server | In-memory session cache | 30s | File watcher triggers invalidation |
 
 ---
 
@@ -772,110 +981,80 @@ Example:
 
 ### 12.1 Current Capacity
 
-| Dimension | Current | Headroom |
-|-----------|---------|----------|
-| Concurrent Users | {{NUMBER}} | {{PERCENTAGE}}% |
-| Requests/Second | {{NUMBER}} | {{PERCENTAGE}}% |
-| Database Connections | {{NUMBER}} | {{PERCENTAGE}}% |
-| Storage | {{SIZE}} | {{PERCENTAGE}}% |
+| Dimension | Current | Notes |
+|-----------|---------|-------|
+| Concurrent Users | 1 | Single-user local app |
+| Projects | Unlimited | Limited by filesystem |
+| Sessions per Project | Unlimited | Limited by ~/.claude storage |
+| Message History | 10,000+ | JSONL scales well |
 
-### 12.2 Scaling Strategy
+### 12.2 Scaling Considerations
 
-| Component | Scaling Type | Trigger | Max Scale |
-|-----------|--------------|---------|-----------|
-| {{COMPONENT}} | {{HORIZONTAL/VERTICAL}} | {{TRIGGER}} | {{MAX}} |
-
-### 12.3 Bottleneck Identification
-
-| Potential Bottleneck | Mitigation | Priority |
-|---------------------|------------|----------|
-| {{BOTTLENECK}} | {{MITIGATION}} | {{P0/P1/P2}} |
+This is a single-user local application. Scalability is not a concern. If future versions support multiple users (V2 work accounts), that would be a separate deployment with different architecture.
 
 ---
 
-## 13. Disaster Recovery
-
-### 13.1 Backup Strategy
-
-| Data Type | Frequency | Retention | Storage | Recovery Time |
-|-----------|-----------|-----------|---------|---------------|
-| {{DATA}} | {{FREQUENCY}} | {{RETENTION}} | {{LOCATION}} | {{RTO}} |
-
-### 13.2 Recovery Procedures
-
-**Database Recovery:**
-```bash
-{{RECOVERY_COMMANDS}}
-```
-
-**Application Recovery:**
-1. {{STEP_1}}
-2. {{STEP_2}}
-3. {{STEP_3}}
-
-### 13.3 Incident Response
-
-**Runbook Location:** `{{PATH}}`
-
-**Escalation Path:**
-1. {{LEVEL_1}}
-2. {{LEVEL_2}}
-3. {{LEVEL_3}}
-
----
-
-## 14. AI/LLM Integration Guidelines
+## 13. AI/LLM Integration Guidelines
 
 > This section provides context for AI coding assistants (like Claude) working on this codebase.
 
-### 14.1 Code Generation Preferences
+### 13.1 Code Generation Preferences
 
 **Preferred Patterns:**
-- {{PATTERN_1}}
-- {{PATTERN_2}}
-- {{PATTERN_3}}
+- Functional components with hooks
+- Named exports
+- Service layer for business logic
+- Zod for validation
+- Early returns over nested conditionals
 
 **Avoid:**
-- {{ANTI_PATTERN_1}}
-- {{ANTI_PATTERN_2}}
-- {{ANTI_PATTERN_3}}
+- Class components
+- `any` type (use `unknown` and narrow)
+- Direct DOM manipulation
+- Inline styles (use Tailwind)
+- Default exports (except for pages)
 
-### 14.2 File Organization Rules
+### 13.2 File Organization Rules
 
-- New components go in: `{{PATH}}`
-- New API routes go in: `{{PATH}}`
-- New types go in: `{{PATH}}`
-- Tests co-located: {{YES/NO}}
-- Test location: `{{PATH}}`
+- New components go in: `client/src/components/[feature]/`
+- New API routes go in: `server/src/api/`
+- New services go in: `server/src/services/`
+- New types go in: `shared/types/` or local `types/` folder
+- Tests co-located: Yes, in `__tests__/` subfolder
 
-### 14.3 Import Conventions
+### 13.3 Import Conventions
 
 **Path Aliases:**
 ```typescript
-{{ALIAS_CONFIGURATION}}
+// tsconfig.json paths
+{
+  "@/*": ["./src/*"],
+  "@shared/*": ["../shared/*"]
+}
 ```
 
 **Import Order:**
-1. {{ORDER_1 — e.g., "External packages"}}
-2. {{ORDER_2 — e.g., "Internal packages"}}
-3. {{ORDER_3 — e.g., "Relative imports"}}
+1. External packages (`react`, `express`, etc.)
+2. Internal packages (`@shared/*`)
+3. Absolute imports (`@/*`)
+4. Relative imports (`./`, `../`)
 
-### 14.4 Common Tasks Reference
+### 13.4 Common Tasks Reference
 
 | Task | Files to Modify | Pattern to Follow |
 |------|-----------------|-------------------|
-| Add new API endpoint | {{FILES}} | {{PATTERN_REF}} |
-| Add new component | {{FILES}} | {{PATTERN_REF}} |
-| Add new database table | {{FILES}} | {{PATTERN_REF}} |
-| Add new page/route | {{FILES}} | {{PATTERN_REF}} |
-| Add new service | {{FILES}} | {{PATTERN_REF}} |
+| Add new API endpoint | `server/src/api/[name].ts`, `server/src/index.ts` | See existing routes |
+| Add new component | `client/src/components/[feature]/[Name].tsx` | See `MessageBubble.tsx` |
+| Add new service | `server/src/services/[name]Service.ts` | See `sessionManager.ts` |
+| Add new hook | `client/src/hooks/use[Name].ts` | See `useConversation.ts` |
+| Add shared type | `shared/types/index.ts` | Add to existing file |
 
-### 14.5 Testing Requirements
+### 13.5 Testing Requirements
 
-- Unit tests required for: {{WHAT}}
-- Integration tests required for: {{WHAT}}
-- Test file naming: `{{PATTERN}}`
-- Minimum coverage: {{PERCENTAGE}}%
+- Unit tests required for: Services, utilities, complex hooks
+- Integration tests required for: API endpoints
+- Test file naming: `[name].test.ts`
+- Minimum coverage: Focus on business logic, not UI
 
 ---
 
@@ -884,9 +1063,10 @@ Example:
 For architecture decisions and their rationale, see `decision_log.md`.
 
 Key decisions affecting this architecture:
-- {{DECISION_1_REFERENCE}}
-- {{DECISION_2_REFERENCE}}
-- {{DECISION_3_REFERENCE}}
+- **Tailscale over cloud hosting:** Keeps data local, free, simple
+- **Polling over WebSockets:** Simpler, "good enough" for 2-3s updates
+- **No database:** Claude manages data, we just read it
+- **AppleScript for notifications:** Native, free, reliable on macOS
 
 ---
 
@@ -894,7 +1074,11 @@ Key decisions affecting this architecture:
 
 | Term | Definition |
 |------|------------|
-| {{TERM}} | {{DEFINITION}} |
+| JSONL | JSON Lines format - one JSON object per line |
+| Tailscale | VPN service that creates private networks between devices |
+| Claude Code | Anthropic's CLI-based AI coding assistant |
+| Session | A conversation with Claude Code (stored as one JSONL file) |
+| Project | A directory with code that Claude Code works on |
 
 ---
 
@@ -905,6 +1089,8 @@ Key decisions affecting this architecture:
 | Product Spec | What we're building | `product_spec.md` |
 | Decision Log | Why we chose things | `decision_log.md` |
 | Changelog | What changed | `changelog.md` |
-| API Docs | API reference | `{{LOCATION}}` |
-| Runbooks | Operational guides | `{{LOCATION}}` |
+| Project Status | Current progress | `project_status.md` |
 
+---
+
+*Last Updated: 2026-01-13*

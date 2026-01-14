@@ -1,4 +1,4 @@
-# Decision Log: {{PROJECT_NAME}}
+# Decision Log: GoGoGadgetClaude
 
 > **Purpose:** This is the Architectural Decision Record (ADR) — the "Why" behind architectural changes, error resolutions, and pattern evolutions. It serves as institutional memory for AI assistants and developers to understand context, avoid repeating mistakes, and maintain consistency.
 
@@ -13,7 +13,11 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
-| {{ID}} | {{DATE}} | {{CATEGORY}} | {{STATUS}} | {{ONE_LINE_SUMMARY}} |
+| ADR-001 | 2026-01-13 | arch | active | Local-first architecture via Tailscale |
+| ADR-002 | 2026-01-13 | data | active | File-based storage (no database) |
+| ADR-003 | 2026-01-13 | infra | active | Polling over WebSockets for conversation updates |
+| ADR-004 | 2026-01-13 | infra | active | AppleScript for iMessage notifications |
+| ADR-005 | 2026-01-13 | arch | active | pnpm + single repo structure |
 
 **Categories:** `arch` | `data` | `api` | `ui` | `test` | `infra` | `error`
 
@@ -21,62 +25,188 @@
 
 ---
 
-## Entry Format
-
-```
-### {{ID}}: {{TITLE}}
-**Date:** {{YYYY-MM-DD}} | **Category:** {{CATEGORY}} | **Status:** {{STATUS}}
-
-#### Trigger
-{{What prompted this change — error encountered, limitation hit, requirement change, performance issue, etc.}}
-
-#### Decision
-{{What changed — be specific about files, patterns, or configurations modified}}
-
-#### Rationale
-{{Why this approach was chosen over alternatives}}
-
-#### Supersedes
-{{Previous decision ID this replaces, or "N/A" if new}}
-
-#### Migration
-- **Affected files:** {{glob pattern or specific paths}}
-- **Find:** {{exact code pattern, function name, or import to locate}}
-- **Replace with:** {{new pattern or approach}}
-- **Verify:** {{command to run or test to confirm migration complete}}
-
-#### AI Instructions
-{{Specific rules for AI when working in this area — what to do, what NOT to do}}
-```
-
----
-
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
 
-### {{ID}}: {{TITLE}}
-**Date:** {{YYYY-MM-DD}} | **Category:** {{CATEGORY}} | **Status:** active
+### ADR-005: pnpm + Single Repo Structure
+**Date:** 2026-01-13 | **Category:** arch | **Status:** active
 
 #### Trigger
-{{DESCRIPTION}}
+Need to decide on package manager and repository structure for the project containing both a React client and Node.js server.
 
 #### Decision
-{{DESCRIPTION}}
+Use **pnpm** as package manager with a **single repository** containing `/client` and `/server` directories. No monorepo tooling (Turborepo, Nx) needed—simple npm scripts will orchestrate dev/build commands.
 
 #### Rationale
-{{DESCRIPTION}}
+- **pnpm:** Faster than npm, disk-efficient through hard links, strict dependency resolution catches issues early
+- **Single repo:** This is one product with two components, not separate products. Monorepo tooling adds complexity without benefit for this scale
+- **No workspaces needed:** Client and server have separate node_modules, simple to understand and debug
 
 #### Supersedes
 N/A
 
 #### Migration
-- **Affected files:** N/A (new implementation)
+- **Affected files:** Root `package.json`, `pnpm-workspace.yaml`
+- **Find:** N/A
+- **Replace with:** N/A
+- **Verify:** `pnpm install` succeeds in root, client, and server
+
+#### AI Instructions
+- Always use `pnpm` for package management commands, never `npm` or `yarn`
+- Client and server have separate package.json files—install dependencies in the correct directory
+- Shared types go in `/shared/types/` and are imported via path alias
+
+---
+
+### ADR-004: AppleScript for iMessage Notifications
+**Date:** 2026-01-13 | **Category:** infra | **Status:** active
+
+#### Trigger
+Need a way to notify the user's phone when Claude Code completes a task. User wanted free, reliable, no-extra-app solution.
+
+#### Decision
+Use **macOS AppleScript** via `osascript` to send iMessages to the user's phone number. Triggered by Claude Code's hook system when tasks complete.
+
+#### Rationale
+- **Free:** No paid services (Twilio, etc.)
+- **No extra app:** Uses built-in Messages.app, no installation on phone
+- **Reliable:** Local execution, no network dependencies beyond iMessage itself
+- **Simple:** ~10 lines of code to implement
+
+Alternatives considered:
+- **Twilio SMS:** Costs money (~$0.01/message)
+- **Pushover/ntfy.sh:** Requires installing an app
+- **Email:** Too slow, easy to miss
+- **macOS Shortcuts:** More complex setup for same result
+
+#### Supersedes
+N/A
+
+#### Migration
+- **Affected files:** `server/src/services/notificationService.ts`
+- **Find:** N/A
+- **Replace with:** N/A
+- **Verify:** Run `osascript -e 'tell application "Messages" to send "test" to buddy "+PHONE"'` manually
+
+#### AI Instructions
+- Notification service uses `execa` to run `osascript`
+- Phone number stored in settings.json, never hardcoded
+- Always check `notificationsEnabled` setting before sending
+- Rate limit to max 1 notification per minute to avoid spam
+
+---
+
+### ADR-003: Polling over WebSockets for Conversation Updates
+**Date:** 2026-01-13 | **Category:** infra | **Status:** active
+
+#### Trigger
+Need to keep the mobile UI updated with the latest conversation state from Claude Code. Considered real-time streaming vs polling.
+
+#### Decision
+Use **HTTP polling** with SWR (2-3 second interval) instead of WebSockets for conversation updates.
+
+#### Rationale
+- **Simpler:** No WebSocket server setup, connection management, or reconnection logic
+- **Good enough:** 2-3 second latency is acceptable—user doesn't need millisecond updates
+- **Mobile-friendly:** Polling works better with mobile network switches and app backgrounding
+- **SWR handles it:** Built-in revalidation, caching, and error handling
+
+Alternatives considered:
+- **WebSockets:** More complex, harder to debug, benefits don't justify complexity
+- **Server-Sent Events:** Similar complexity to WebSockets for this use case
+- **Longer polling:** 5+ seconds would feel sluggish
+
+#### Supersedes
+N/A
+
+#### Migration
+- **Affected files:** `client/src/hooks/useConversation.ts`
+- **Find:** N/A
+- **Replace with:** N/A
+- **Verify:** Messages appear within 3 seconds of JSONL update
+
+#### AI Instructions
+- Use SWR with `refreshInterval: 2000` (2 seconds)
+- Disable polling when app is backgrounded (SWR handles this automatically)
+- If latency becomes a problem in V1, can add WebSockets—but start simple
+
+---
+
+### ADR-002: File-Based Storage (No Database)
+**Date:** 2026-01-13 | **Category:** data | **Status:** active
+
+#### Trigger
+Need to decide on data storage strategy. Considered traditional database vs file-based approach.
+
+#### Decision
+Use **file-based storage** exclusively:
+- Conversation data: Claude Code's JSONL files in `~/.claude/projects/` (read-only)
+- App settings: JSON file in `~/.gogogadgetclaude/settings.json`
+- UI state: Browser localStorage
+
+No traditional database (SQLite, PostgreSQL, etc.) will be used.
+
+#### Rationale
+- **Claude owns conversation data:** We should not duplicate or modify Claude's data—just read it
+- **Single user:** No multi-tenancy, no need for ACID transactions or complex queries
+- **Simplicity:** No database setup, migrations, or connection management
+- **Portability:** User's data is in readable files, easy to backup or inspect
+
+#### Supersedes
+N/A
+
+#### Migration
+- **Affected files:** N/A (initial decision)
 - **Find:** N/A
 - **Replace with:** N/A
 - **Verify:** N/A
 
 #### AI Instructions
-{{SPECIFIC_RULES}}
+- NEVER write to `~/.claude/` directory—only read
+- App settings go in `~/.gogogadgetclaude/settings.json`
+- For any "database-like" needs, consider if a JSON file or localStorage would suffice
+- If we ever need a database (V2 work accounts?), it would be a separate deployment
+
+---
+
+### ADR-001: Local-First Architecture via Tailscale
+**Date:** 2026-01-13 | **Category:** arch | **Status:** active
+
+#### Trigger
+Need to access a server running on the user's laptop from their phone while away from the desk. Considered cloud hosting vs local hosting options.
+
+#### Decision
+Run the server **locally on the user's laptop** and use **Tailscale** for secure network access from the phone.
+
+#### Rationale
+- **Free:** No cloud hosting costs (Tailscale free tier is sufficient)
+- **Data stays local:** Conversation data never leaves the laptop
+- **Simple security:** Tailscale provides encrypted tunnel + authentication; no app-level auth needed
+- **Low latency:** Direct connection over Tailscale mesh, no cloud round-trip
+
+Trade-offs accepted:
+- **Laptop must be awake:** If laptop sleeps, app is unreachable (acceptable for MVP)
+- **Initial setup:** User must install Tailscale on both devices (one-time)
+
+Alternatives rejected:
+- **Cloud hosting:** Costs money, data leaves local machine, more complex
+- **Port forwarding:** Security risk, requires static IP or DDNS
+- **ngrok/localtunnel:** Public URLs, security concerns, rate limits
+
+#### Supersedes
+N/A
+
+#### Migration
+- **Affected files:** N/A (initial decision)
+- **Find:** N/A
+- **Replace with:** N/A
+- **Verify:** `curl http://[tailscale-hostname]:3456/api/status` returns success
+
+#### AI Instructions
+- Server binds to `0.0.0.0:3456` (not localhost) so Tailscale can reach it
+- No CORS restrictions needed—same Tailscale network is trusted
+- No authentication middleware—Tailscale IS the auth layer
+- Document Tailscale setup in README for first-time users
 
 ---

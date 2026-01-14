@@ -1,0 +1,166 @@
+/**
+ * Shared types for GoGoGadgetClaude
+ * Used by both client and server packages
+ * Data models from architecture.md Section 4.3
+ */
+
+// =============================================================================
+// Session Types
+// =============================================================================
+
+/** Session status indicator */
+export type SessionStatus = 'working' | 'waiting' | 'idle';
+
+/** Session derived from JSONL files */
+export interface Session {
+  /** UUID from JSONL filename */
+  id: string;
+  /** Decoded from folder path */
+  projectPath: string;
+  /** Derived from projectPath (basename) */
+  projectName: string;
+  /** First message timestamp */
+  startedAt: Date;
+  /** Last message timestamp */
+  lastActivityAt: Date;
+  /** Total messages in session */
+  messageCount: number;
+  /** Current session status */
+  status: SessionStatus;
+}
+
+// =============================================================================
+// Message Types
+// =============================================================================
+
+/** Message sender type */
+export type MessageType = 'user' | 'assistant';
+
+/** Tool use event status */
+export type ToolUseStatus = 'pending' | 'complete' | 'error';
+
+/** Tool use event from JSONL tool_use entries */
+export interface ToolUseEvent {
+  /** Tool name, e.g., 'write_file', 'run_command' */
+  tool: string;
+  /** Tool input parameters */
+  input: Record<string, unknown>;
+  /** Tool output (if complete) */
+  output?: string;
+  /** Execution status */
+  status: ToolUseStatus;
+}
+
+/** Message parsed from JSONL */
+export interface Message {
+  /** Generated or from JSONL */
+  id: string;
+  /** Parent session ID */
+  sessionId: string;
+  /** Sender type */
+  type: MessageType;
+  /** Message content (may contain markdown) */
+  content: string;
+  /** Message timestamp */
+  timestamp: Date;
+  /** File edits, commands, etc. */
+  toolUse?: ToolUseEvent[];
+}
+
+// =============================================================================
+// Project Types
+// =============================================================================
+
+/** Project derived from ~/.claude/projects/ structure */
+export interface Project {
+  /** Full path to project */
+  path: string;
+  /** Basename of path */
+  name: string;
+  /** Claude's encoded folder name */
+  encodedPath: string;
+  /** Number of sessions */
+  sessionCount: number;
+  /** Most recent session ID */
+  lastSessionId?: string;
+  /** Last activity timestamp */
+  lastActivityAt?: Date;
+}
+
+// =============================================================================
+// Template Types
+// =============================================================================
+
+/** Prompt template from .claude/templates.yaml */
+export interface Template {
+  /** Display label */
+  label: string;
+  /** Icon identifier or emoji */
+  icon: string;
+  /** The prompt text to send */
+  prompt: string;
+}
+
+// =============================================================================
+// File Change Types
+// =============================================================================
+
+/** File change status from git diff */
+export type FileChangeStatus = 'added' | 'modified' | 'deleted';
+
+/** File change from git diff */
+export interface FileChange {
+  /** File path relative to repo root */
+  path: string;
+  /** Change type */
+  status: FileChangeStatus;
+  /** Lines added */
+  additions: number;
+  /** Lines removed */
+  deletions: number;
+}
+
+// =============================================================================
+// Settings Types
+// =============================================================================
+
+/** App theme preference */
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+/** App settings stored in ~/.gogogadgetclaude/settings.json */
+export interface AppSettings {
+  /** Whether notifications are enabled */
+  notificationsEnabled: boolean;
+  /** Phone number for iMessage notifications */
+  notificationPhoneNumber?: string;
+  /** User's custom templates */
+  defaultTemplates: Template[];
+  /** Theme preference */
+  theme: ThemePreference;
+}
+
+// =============================================================================
+// API Response Types
+// =============================================================================
+
+/** Standard API success response wrapper */
+export interface ApiResponse<T> {
+  data: T;
+  meta?: {
+    timestamp: string;
+  };
+}
+
+/** Standard API error response */
+export interface ApiErrorResponse {
+  error: {
+    code: string;
+    message: string;
+  };
+}
+
+/** Health check response */
+export interface StatusResponse {
+  healthy: boolean;
+  claudeRunning: boolean;
+}
