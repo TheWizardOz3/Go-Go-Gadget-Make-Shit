@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-012 | 2026-01-14 | ui | active | Pure CSS animations for modal transitions |
 | ADR-011 | 2026-01-14 | infra | active | Signal escalation for stopping Claude processes |
 | ADR-010 | 2026-01-14 | infra | active | Detached process spawning for Claude CLI |
 | ADR-009 | 2026-01-14 | ui | active | Cursor-style layout for conversation view |
@@ -34,6 +35,55 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-012: Pure CSS Animations for Modal Transitions
+**Date:** 2026-01-14 | **Category:** ui | **Status:** active
+
+#### Trigger
+Implementing the Project Switcher modal required smooth slide-up/fade-in animations. Initial consideration was using `tailwindcss-animate` plugin.
+
+#### Decision
+Use **custom CSS keyframe animations** defined in `index.css` instead of adding a dependency:
+
+```css
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+```
+
+Also added `prefers-reduced-motion` media query to disable animations for users who prefer reduced motion.
+
+#### Rationale
+- **Minimal dependencies:** `tailwindcss-animate` is small but adds unnecessary package management overhead for ~20 lines of CSS
+- **Full control:** Custom animations can be tuned exactly to our needs (0.2s for fade, 0.3s for slide)
+- **Accessibility:** Built-in `prefers-reduced-motion` support is essential for motion-sensitive users
+- **Simplicity:** Animations are scoped to this one modal; don't need a generic animation library
+- **Performance:** Native CSS animations are hardware-accelerated
+
+Alternatives considered:
+- **tailwindcss-animate:** Would add a dependency for simple use case
+- **Framer Motion:** Overkill for one modal; adds significant bundle size
+- **No animation:** Would feel jarring and less polished
+
+#### AI Instructions
+- For simple modal/slide animations, prefer custom CSS keyframes over adding dependencies
+- Always include `prefers-reduced-motion` support for any animation
+- Use `forwards` fill mode so elements stay in final state
+- Keep animation durations short (0.2-0.3s) for responsiveness
+
+---
 
 ### ADR-011: Signal Escalation for Stopping Claude Processes
 **Date:** 2026-01-14 | **Category:** infra | **Status:** active

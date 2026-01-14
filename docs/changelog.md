@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.8.0 | 2026-01-14 | prerelease | Project Switcher complete |
 | 0.7.0 | 2026-01-14 | prerelease | Stop Button complete |
 | 0.6.0 | 2026-01-14 | prerelease | Text Input & Send complete |
 | 0.5.0 | 2026-01-14 | prerelease | Status Indicator complete |
@@ -34,6 +35,52 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.8.0] - 2026-01-14
+
+### Added
+- **Project Switcher** — Switch between multiple Claude Code projects from mobile
+  - Tappable project name in header with chevron dropdown indicator
+  - Full-screen modal with slide-up animation and dark backdrop
+  - Project list showing folder icon, name, last activity (relative time), session count
+  - Selected project highlighted with blue background and checkmark
+  - Search input when >10 projects (case-insensitive filtering)
+  - Keyboard accessibility (Escape to close, Enter/Space to select)
+  - Body scroll lock when modal is open
+
+- **localStorage Persistence** — Selected project remembered across sessions
+  - Key: `gogogadgetclaude:lastProject`
+  - Graceful fallback when stored project no longer exists
+  - Handles localStorage unavailability (private browsing)
+
+- **Custom CSS Animations** — Modal transitions without external dependencies
+  - `animate-fade-in` / `animate-fade-out` for backdrop
+  - `animate-slide-up` / `animate-slide-down` for modal
+  - Full `prefers-reduced-motion` support
+
+- **Unit Tests** — 35 new tests for the feature
+  - `ProjectListItem.test.tsx` (13 tests): Rendering, selection states, interaction
+  - `ProjectPicker.test.tsx` (22 tests): Visibility, closing behavior, search, accessibility
+
+### Files Created
+- `client/src/components/project/ProjectListItem.tsx` — Single project row component
+- `client/src/components/project/ProjectListItem.test.tsx` — Unit tests
+- `client/src/components/project/ProjectPicker.tsx` — Full modal component with search
+- `client/src/components/project/ProjectPicker.test.tsx` — Unit tests
+- `client/src/components/project/index.ts` — Barrel export
+
+### Files Modified
+- `client/src/App.tsx` — Modal state, tappable header, localStorage persistence
+- `client/src/index.css` — Custom modal animations with reduced-motion support
+
+### Verified
+- All 6 implementation tasks complete
+- `pnpm lint` passes with 0 errors
+- `pnpm typecheck` passes with 0 errors
+- `pnpm test` passes with 195 tests (106 client + 89 server)
+- Manual UI testing verified: modal opens, project selection works, persistence works
 
 ---
 

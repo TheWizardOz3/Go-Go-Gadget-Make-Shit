@@ -13,22 +13,56 @@ import { ConversationView } from '@/components/conversation/ConversationView';
 import { ConversationSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { StatusIndicator, StatusIndicatorSkeleton } from '@/components/ui/StatusIndicator';
+import { ProjectPicker } from '@/components/project';
 import type { SessionStatus } from '@shared/types';
+
+/** localStorage key for persisting selected project */
+const STORAGE_KEY_LAST_PROJECT = 'gogogadgetclaude:lastProject';
+
+/**
+ * Read the last selected project from localStorage
+ */
+function getStoredProject(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY_LAST_PROJECT);
+  } catch {
+    // localStorage might be unavailable (private browsing, etc.)
+    return null;
+  }
+}
+
+/**
+ * Save the selected project to localStorage
+ */
+function setStoredProject(encodedPath: string | null): void {
+  try {
+    if (encodedPath) {
+      localStorage.setItem(STORAGE_KEY_LAST_PROJECT, encodedPath);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_LAST_PROJECT);
+    }
+  } catch {
+    // localStorage might be unavailable
+  }
+}
 
 /**
  * Main App component
  *
  * For MVP:
- * - Auto-selects the most recently active project
+ * - Restores last selected project from localStorage
+ * - Auto-selects most recent project if no stored selection
  * - Auto-selects the most recent session
  * - Full-screen conversation view
- *
- * Project/Session picker will be added as separate features.
  */
 export default function App() {
   // Selected project and session state
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  // Initialize from localStorage if available
+  const [selectedProject, setSelectedProject] = useState<string | null>(() => getStoredProject());
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
+
+  // Project picker modal state
+  const [isProjectPickerOpen, setIsProjectPickerOpen] = useState(false);
 
   // Fetch projects
   const {
@@ -49,17 +83,30 @@ export default function App() {
   // Fetch conversation status for selected session
   const { status, isLoading: statusLoading } = useConversation(selectedSession);
 
-  // Auto-select most recent project when projects load
+  // Persist selected project to localStorage
   useEffect(() => {
-    if (projects && projects.length > 0 && !selectedProject) {
-      // Sort by last activity (most recent first)
-      const sorted = [...projects].sort((a, b) => {
-        const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
-        const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
-        return bTime - aTime;
-      });
-      setSelectedProject(sorted[0].encodedPath);
+    setStoredProject(selectedProject);
+  }, [selectedProject]);
+
+  // Auto-select project when projects load
+  // Priority: 1) stored project (if still exists), 2) most recent project
+  useEffect(() => {
+    if (!projects || projects.length === 0) return;
+
+    // If we already have a valid selection, keep it
+    if (selectedProject) {
+      const stillExists = projects.some((p) => p.encodedPath === selectedProject);
+      if (stillExists) return;
+      // Stored project no longer exists, fall through to auto-select
     }
+
+    // Auto-select most recent project
+    const sorted = [...projects].sort((a, b) => {
+      const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+      const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+      return bTime - aTime;
+    });
+    setSelectedProject(sorted[0].encodedPath);
   }, [projects, selectedProject]);
 
   // Auto-select most recent session when sessions load
@@ -143,6 +190,11 @@ export default function App() {
   // Get current project name for header
   const currentProject = projects.find((p) => p.encodedPath === selectedProject);
 
+  // Handle project selection from picker
+  const handleSelectProject = (encodedPath: string) => {
+    setSelectedProject(encodedPath);
+  };
+
   // Main app with conversation view
   return (
     <div className={cn('dark', 'min-h-screen', 'flex', 'flex-col', 'bg-background')}>
@@ -152,16 +204,43 @@ export default function App() {
         statusLoading={statusLoading}
         sessionLoading={sessionsLoading}
         sessionError={sessionsError}
+        onProjectClick={() => setIsProjectPickerOpen(true)}
+        hasProjects={projects.length > 0}
       />
       <ConversationView sessionId={selectedSession} className="flex-1" />
+
+      {/* Project Picker Modal */}
+      <ProjectPicker
+        isOpen={isProjectPickerOpen}
+        onClose={() => setIsProjectPickerOpen(false)}
+        projects={projects}
+        selectedProject={selectedProject}
+        onSelectProject={handleSelectProject}
+      />
     </div>
   );
 }
 
 /**
+ * Chevron down icon
+ */
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-4 w-4', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+/**
  * App header with project name and status indicator
- *
- * Project/session picker will be added as separate feature.
  */
 interface HeaderProps {
   projectName: string | null;
@@ -169,17 +248,49 @@ interface HeaderProps {
   statusLoading?: boolean;
   sessionLoading?: boolean;
   sessionError?: Error;
+  onProjectClick?: () => void;
+  hasProjects?: boolean;
 }
 
-function Header({ projectName, status, statusLoading, sessionLoading, sessionError }: HeaderProps) {
+function Header({
+  projectName,
+  status,
+  statusLoading,
+  sessionLoading,
+  sessionError,
+  onProjectClick,
+  hasProjects,
+}: HeaderProps) {
+  const isClickable = hasProjects && onProjectClick;
+
   return (
     <header className="flex-shrink-0 px-4 py-3 border-b border-text-primary/10 bg-surface safe-top">
       <div className="flex items-center justify-between gap-3">
-        {/* Project name / title */}
+        {/* Project name / title - tappable when projects exist */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <h1 className="text-lg font-semibold text-text-primary truncate">
-            {projectName || 'GoGoGadgetClaude'}
-          </h1>
+          {isClickable ? (
+            <button
+              type="button"
+              onClick={onProjectClick}
+              className={cn(
+                'flex items-center gap-1 min-w-0',
+                'rounded-lg -ml-2 pl-2 pr-1 py-1',
+                'hover:bg-text-primary/5 active:bg-text-primary/10',
+                'transition-colors duration-150',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              )}
+              aria-label="Select project"
+            >
+              <span className="text-lg font-semibold text-text-primary truncate">
+                {projectName || 'GoGoGadgetClaude'}
+              </span>
+              <ChevronDownIcon className="flex-shrink-0 text-text-muted" />
+            </button>
+          ) : (
+            <h1 className="text-lg font-semibold text-text-primary truncate">
+              {projectName || 'GoGoGadgetClaude'}
+            </h1>
+          )}
           {sessionLoading && (
             <span className="flex-shrink-0 w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
           )}
@@ -190,27 +301,6 @@ function Header({ projectName, status, statusLoading, sessionLoading, sessionErr
         <div className="flex-shrink-0">
           {statusLoading ? <StatusIndicatorSkeleton /> : <StatusIndicator status={status} />}
         </div>
-
-        {/* Placeholder for future project/session picker */}
-        <button
-          className="flex-shrink-0 p-2 -mr-2 rounded-lg text-text-muted hover:text-text-secondary hover:bg-text-primary/5 transition-colors"
-          aria-label="Settings (coming soon)"
-          disabled
-        >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z"
-            />
-          </svg>
-        </button>
       </div>
     </header>
   );
