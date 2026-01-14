@@ -64,7 +64,7 @@ interface ContentBlock {
 /** Raw user message from JSONL */
 interface RawUserMessage {
   role: 'user';
-  content: string;
+  content: string | ContentBlock[];
 }
 
 /** Raw assistant message from JSONL */
@@ -247,12 +247,13 @@ export function transformToMessages(entries: RawJsonlEntry[], sessionId: string)
 
     if (entry.type === 'user' && 'message' in entry) {
       const userEntry = entry as UserJsonlEntry;
+      const content = extractTextFromContent(userEntry.message.content);
 
       messages.push({
         id: userEntry.uuid,
         sessionId,
         type: 'user',
-        content: userEntry.message.content,
+        content,
         timestamp: new Date(userEntry.timestamp),
       });
     } else if (entry.type === 'assistant' && 'message' in entry) {

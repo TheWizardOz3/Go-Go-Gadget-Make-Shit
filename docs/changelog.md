@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.4.0 | 2026-01-14 | prerelease | Conversation View UI complete |
 | 0.3.0 | 2026-01-14 | prerelease | JSONL Watcher Service complete |
 | 0.2.0 | 2026-01-14 | prerelease | API Server Setup complete |
 | 0.1.0 | 2026-01-13 | prerelease | Project scaffolding complete |
@@ -30,6 +31,91 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.4.0] - 2026-01-14
+
+### Added
+- **Conversation View UI** — Primary mobile interface for viewing Claude Code conversations
+  - Cursor-style document layout with full-width messages
+  - Message turns with distinct user/assistant styling (icons, headers, borders)
+  - Markdown rendering with `react-markdown` for headers, lists, links, etc.
+  - Syntax-highlighted code blocks using Shiki with copy button
+  - Collapsible tool usage cards showing tool inputs/outputs
+  - Auto-scroll to latest messages (pauses when user scrolls up)
+  - "Jump to Latest" floating button for quick navigation
+  - Pull-to-refresh gesture for manual refresh on iOS Safari
+  - Loading skeletons and error states
+  - Status badge (Working/Waiting/Idle) with refresh indicator
+  - Empty states for no session selected or no messages
+
+- **Data Fetching** — SWR-based hook for efficient conversation polling
+  - `useConversation` hook with 2.5s polling interval
+  - Automatic cache revalidation on focus
+  - Error retry with exponential backoff
+  - Refresh function for manual invalidation
+
+- **Utilities** — Supporting functions and configuration
+  - `formatters.ts` — Relative time formatting (e.g., "2m ago")
+  - `markdown.tsx` — React-markdown component configuration
+  - Path aliases (`@/` and `@shared/`) for clean imports
+
+- **Testing Infrastructure** — Vitest setup for client and server packages
+  - Client: `formatters.test.ts` with 24 unit tests
+  - Server: `jsonlParser.test.ts` with 21 unit tests
+  - Server: `pathEncoder.test.ts` with 29 unit tests
+  - Server: `sessionManager.test.ts` with 14 unit tests
+  - **Total: 88 unit tests across both packages**
+
+### Fixed
+- **User message parsing bug** — Claude Code JSONL stores user message content as arrays of content blocks (not just strings). Updated `server/src/lib/jsonlParser.ts` to handle both formats correctly.
+
+### Dependencies Added
+
+**Client:**
+- `swr@^2.3.8` — Data fetching with caching and polling
+- `react-markdown@^10.1.0` — Markdown rendering
+- `shiki@^3.21.0` — Syntax highlighting
+- `date-fns@^4.1.0` — Date formatting
+- `vitest@^4.0.17` — Unit testing framework
+- `@testing-library/react@^16.3.1` — React testing utilities
+- `@testing-library/jest-dom@^6.9.1` — DOM assertions
+- `jsdom@^27.4.0` — DOM environment for tests
+
+**Server:**
+- `vitest@^4.0.17` — Unit testing framework
+
+### Files Created
+- `client/src/hooks/useConversation.ts`
+- `client/src/hooks/useProjects.ts`
+- `client/src/hooks/useSessions.ts`
+- `client/src/lib/formatters.ts`
+- `client/src/lib/markdown.tsx`
+- `client/src/components/conversation/ConversationView.tsx`
+- `client/src/components/conversation/MessageList.tsx`
+- `client/src/components/conversation/MessageTurn.tsx`
+- `client/src/components/conversation/CodeBlock.tsx`
+- `client/src/components/conversation/ToolUseCard.tsx`
+- `client/src/components/conversation/JumpToLatest.tsx`
+- `client/src/components/conversation/EmptyState.tsx`
+- `client/src/components/conversation/PullToRefresh.tsx`
+- `client/src/components/ui/Skeleton.tsx`
+- `client/src/components/ui/ErrorState.tsx`
+- `client/src/lib/formatters.test.ts`
+- `client/vitest.config.ts`
+- `client/src/test/setup.ts`
+- `server/vitest.config.ts`
+- `server/src/lib/jsonlParser.test.ts`
+- `server/src/lib/pathEncoder.test.ts`
+- `server/src/services/sessionManager.test.ts`
+
+### Verified
+- All 12 implementation tasks complete
+- `pnpm lint` passes with 0 errors
+- `pnpm typecheck` passes with 0 errors
+- `pnpm -r test` passes with 88 tests (24 client + 64 server)
+- Components ready for integration testing
 
 ---
 

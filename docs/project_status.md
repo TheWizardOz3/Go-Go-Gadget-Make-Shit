@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-14 (JSONL Watcher Service Complete)
+**Last Updated**: 2026-01-14 (Conversation View UI Complete)
 
 ---
 
@@ -53,11 +53,12 @@
 | Environment Setup | 2026-01-13 | `.env` files, README, setup scripts, Tailscale/Groq docs |
 | API Server Setup | 2026-01-14 | [Feature doc](Features/api-server-setup.md) - Middleware, routes, validation |
 | JSONL Watcher Service | 2026-01-14 | [Feature doc](Features/jsonl-watcher-service.md) - Parser, scanner, watcher, caching |
+| Conversation View UI | 2026-01-14 | [Feature doc](Features/conversation-view-ui.md) - All 12 tasks complete |
 
 ### In Progress
 | Feature/Task | Started | Feature Doc | Notes |
 |--------------|---------|-------------|-------|
-| — | — | — | Ready for Conversation View UI |
+| — | — | — | — |
 
 ### MVP Build Order (Sequenced)
 
@@ -65,9 +66,9 @@
 |---|---------|--------------|------------|-------|
 | 1 | ~~API Server Setup~~ | Scaffold ✅ | MEDIUM | ✅ Complete |
 | 2 | ~~JSONL Watcher Service~~ | #1 ✅ | MEDIUM | ✅ Complete |
-| 3 | **Conversation View UI** | #1 ✅, #2 ✅ | MEDIUM | **NEXT** - Primary interface - see what Claude is doing |
-| 4 | **Status Indicator** | #2 ✅ | LOW | Working/Waiting/Idle at a glance |
-| 5 | **Text Input & Send** | #1 ✅ | LOW | Primary interaction - send prompts to Claude |
+| 3 | ~~Conversation View UI~~ | #1 ✅, #2 ✅ | MEDIUM | ✅ Complete |
+| 4 | **Status Indicator** | #2 ✅, #3 ✅ | LOW | Working/Waiting/Idle at a glance |
+| 5 | **Text Input & Send** | #1 ✅, #3 ✅ | LOW | Primary interaction - send prompts to Claude |
 | 6 | **Stop Button** | #1 ✅ | LOW | Safety - kill runaway agent |
 | 7 | **Project Switcher** | #1 ✅ | MEDIUM | Navigation - switch between codebases |
 | 8 | **Session Picker** | #2 ✅, #7 | MEDIUM | Navigation - resume/start sessions |
@@ -88,9 +89,9 @@
 ## Upcoming Work
 
 ### Next Up
-1. **Conversation View UI** - Primary mobile interface for viewing Claude conversations (depends on #1 ✅, #2 ✅)
-2. **Status Indicator** - Working/Waiting/Idle at a glance (depends on #2 ✅)
-3. **Text Input & Send** - Send prompts to Claude from phone (depends on #1 ✅)
+1. **Status Indicator** - Working/Waiting/Idle at a glance (depends on #2 ✅)
+2. **Text Input & Send** - Send prompts to Claude from phone (depends on #1 ✅)
+3. **Stop Button** - Kill runaway agent immediately (depends on #1 ✅)
 
 ---
 
@@ -159,7 +160,7 @@
 ### High Priority
 | Debt Item | Description | Impact | Estimated Effort | Target Resolution |
 |-----------|-------------|--------|------------------|-------------------|
-| None yet | — | — | — | — |
+| None | — | — | — | — |
 
 ### Low Priority / Improvements
 | Debt Item | Description | Impact | Estimated Effort | Target Resolution |

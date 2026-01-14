@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-009 | 2026-01-14 | ui | active | Cursor-style layout for conversation view |
 | ADR-008 | 2026-01-14 | data | active | Extract project paths from JSONL cwd field |
 | ADR-007 | 2026-01-14 | api | active | Standardized API response format |
 | ADR-001 | 2026-01-13 | arch | active | Local-first architecture via Tailscale |
@@ -31,6 +32,43 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-009: Cursor-Style Layout for Conversation View
+**Date:** 2026-01-14 | **Category:** ui | **Status:** active
+
+#### Trigger
+Initial design for the conversation view used a traditional "chat bubble" layout (user messages right-aligned, assistant messages left-aligned). User feedback indicated this felt too much like text messaging and not appropriate for a code assistant interface.
+
+#### Decision
+Adopt a **Cursor-style document layout** for the conversation view:
+- All messages left-aligned, full width
+- Distinct headers for each turn: icon + sender label + timestamp
+- User turns have a subtle left border accent and light background tint
+- Assistant turns have transparent/default background
+- Tool usage shown as inline collapsible cards, not separate bubbles
+- Code blocks span full width of the message area
+
+#### Rationale
+- **Professional feel:** Document-style layout feels more appropriate for code conversations
+- **Readability:** Full-width content uses screen real estate efficiently, especially on mobile
+- **Consistency with tools:** Matches how users experience conversations in Cursor/VS Code
+- **Scannable:** Distinct headers make it easy to identify who said what when scrolling
+- **Tool integration:** Tool usage cards fit naturally in the content flow
+
+Alternatives considered:
+- **Chat bubbles:** Feels too casual for code review, wastes horizontal space
+- **Slack-style:** Messages floating in from sides, hard to scan
+- **Terminal-style:** Too technical, poor markdown rendering
+
+#### AI Instructions
+- Never use chat bubble styling for messages—always full-width
+- Each message turn gets a `MessageHeader` with icon, label, timestamp
+- User messages: `border-l-2 border-accent/40 bg-accent/5`
+- Assistant messages: `bg-transparent`
+- Tool usage cards are children of the message content, not separate messages
+- Code blocks should have `overflow-x-auto` for horizontal scroll on mobile
+
+---
 
 ### ADR-008: Extract Project Paths from JSONL cwd Field
 **Date:** 2026-01-14 | **Category:** data | **Status:** active

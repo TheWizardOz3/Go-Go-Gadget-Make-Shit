@@ -1,6 +1,6 @@
-# Update Task
+# Fix or Update Task
 
-Implement an update or fix for **[ISSUE]** related to the feature **[FEATURE NAME]**: **[TASK DESCRIPTION]**
+Implement an update or fix for the issue **[ISSUE]** related to the feature **[FEATURE NAME]**: **[TASK DESCRIPTION]**
 
 1. Read any relevant `docs/Features/[feature-name].md` docs for background on the features architecture.
 2. Do any debugging necessary, checking the logs if needed to identify what's going on.

@@ -1,6 +1,6 @@
 # Test
 
-Test the **[FEATURE/COMPONENT]** we just built:
+Test the feature **[FEATURE/COMPONENT]** we just built:
 
 1. Read `docs/Features/[feature-name].md`
 2. Identify what tests should exist for the overall feature (unit, integration, e2e)

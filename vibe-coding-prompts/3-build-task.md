@@ -1,6 +1,6 @@
 # Build Task
 
-Implement task **[TASK NUMBER]** for the feature **[FEATURE NAME]**: **[TASK DESCRIPTION]**
+Implement the next task, task **[TASK NUMBER]** for the feature **[FEATURE NAME]**: **[TASK DESCRIPTION]**
 
 1. Read `docs/Features/[feature-name].md` for any relevant feature docs
 2. Implement the next incomplete task in the feature. Follow existing patterns in the codebase and keep changes minimal and focused.
