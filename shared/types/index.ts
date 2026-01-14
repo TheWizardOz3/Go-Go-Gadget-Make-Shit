@@ -52,6 +52,8 @@ export interface SessionSummary {
   lastActivityAt: Date | null;
   /** Number of messages */
   messageCount: number;
+  /** First user message preview (truncated to 100 chars) */
+  preview: string | null;
 }
 
 /** SessionSummary with ISO string dates (for API responses) */
@@ -61,6 +63,8 @@ export interface SessionSummarySerialized {
   startedAt: string | null;
   lastActivityAt: string | null;
   messageCount: number;
+  /** First user message preview (truncated to 100 chars) */
+  preview: string | null;
 }
 
 // =============================================================================

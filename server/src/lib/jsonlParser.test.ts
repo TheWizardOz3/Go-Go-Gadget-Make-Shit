@@ -8,6 +8,7 @@ import {
   getSessionMetadata,
   filterMessagesSince,
   extractProjectPath,
+  getFirstUserMessagePreview,
   type RawJsonlEntry,
   type UserJsonlEntry,
   type AssistantJsonlEntry,
@@ -381,5 +382,130 @@ describe('extractProjectPath', () => {
     const path = extractProjectPath(entries);
 
     expect(path).toBe('/Users/found/path');
+  });
+});
+
+// ============================================================
+// getFirstUserMessagePreview Tests
+// ============================================================
+
+describe('getFirstUserMessagePreview', () => {
+  it('returns the first user message content', () => {
+    const entries: RawJsonlEntry[] = [
+      createUserEntry({ message: { role: 'user', content: 'Hello Claude!' } }),
+      createAssistantEntry(),
+    ];
+    const preview = getFirstUserMessagePreview(entries);
+
+    expect(preview).toBe('Hello Claude!');
+  });
+
+  it('returns null for empty entries', () => {
+    const preview = getFirstUserMessagePreview([]);
+    expect(preview).toBeNull();
+  });
+
+  it('returns null when no user messages exist', () => {
+    const entries: RawJsonlEntry[] = [createAssistantEntry()];
+    const preview = getFirstUserMessagePreview(entries);
+
+    expect(preview).toBeNull();
+  });
+
+  it('truncates long messages with ellipsis', () => {
+    const longMessage = 'A'.repeat(150);
+    const entries: RawJsonlEntry[] = [
+      createUserEntry({ message: { role: 'user', content: longMessage } }),
+    ];
+    const preview = getFirstUserMessagePreview(entries, 100);
+
+    expect(preview).toHaveLength(100);
+    expect(preview?.endsWith('…')).toBe(true);
+  });
+
+  it('does not truncate messages at or under maxLength', () => {
+    const shortMessage = 'A'.repeat(50);
+    const entries: RawJsonlEntry[] = [
+      createUserEntry({ message: { role: 'user', content: shortMessage } }),
+    ];
+    const preview = getFirstUserMessagePreview(entries, 100);
+
+    expect(preview).toBe(shortMessage);
+    expect(preview?.endsWith('…')).toBe(false);
+  });
+
+  it('respects custom maxLength parameter', () => {
+    const message = 'A'.repeat(100);
+    const entries: RawJsonlEntry[] = [
+      createUserEntry({ message: { role: 'user', content: message } }),
+    ];
+    const preview = getFirstUserMessagePreview(entries, 50);
+
+    expect(preview).toHaveLength(50);
+    expect(preview?.endsWith('…')).toBe(true);
+  });
+
+  it('cleans up extra whitespace in messages', () => {
+    const entries: RawJsonlEntry[] = [
+      createUserEntry({
+        message: { role: 'user', content: '  Hello    World  \n\n  Test  ' },
+      }),
+    ];
+    const preview = getFirstUserMessagePreview(entries);
+
+    expect(preview).toBe('Hello World Test');
+  });
+
+  it('skips empty user messages and finds the next one', () => {
+    const entries: RawJsonlEntry[] = [
+      createUserEntry({
+        uuid: 'user-1',
+        timestamp: '2026-01-14T10:00:00Z',
+        message: { role: 'user', content: '   ' }, // Empty after trimming
+      }),
+      createUserEntry({
+        uuid: 'user-2',
+        timestamp: '2026-01-14T10:00:05Z',
+        message: { role: 'user', content: 'Actual content' },
+      }),
+    ];
+    const preview = getFirstUserMessagePreview(entries);
+
+    expect(preview).toBe('Actual content');
+  });
+
+  it('handles content as array of text blocks', () => {
+    const entries: RawJsonlEntry[] = [
+      createUserEntry({
+        message: {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'First part.' },
+            { type: 'text', text: 'Second part.' },
+          ],
+        },
+      }),
+    ];
+    const preview = getFirstUserMessagePreview(entries);
+
+    expect(preview).toBe('First part. Second part.');
+  });
+
+  it('returns first user message by timestamp order', () => {
+    const entries: RawJsonlEntry[] = [
+      createUserEntry({
+        uuid: 'user-late',
+        timestamp: '2026-01-14T10:00:10Z',
+        message: { role: 'user', content: 'Later message' },
+      }),
+      createUserEntry({
+        uuid: 'user-early',
+        timestamp: '2026-01-14T10:00:00Z',
+        message: { role: 'user', content: 'Earlier message' },
+      }),
+    ];
+    const preview = getFirstUserMessagePreview(entries);
+
+    expect(preview).toBe('Earlier message');
   });
 });

@@ -14,7 +14,12 @@ import {
   getProjectsBasePath,
   isEncodedPath,
 } from '../lib/pathEncoder.js';
-import { parseJsonlFile, getSessionMetadata, extractProjectPath } from '../lib/jsonlParser.js';
+import {
+  parseJsonlFile,
+  getSessionMetadata,
+  extractProjectPath,
+  getFirstUserMessagePreview,
+} from '../lib/jsonlParser.js';
 
 // ============================================================
 // Types
@@ -48,6 +53,8 @@ export interface SessionSummary {
   lastActivityAt: Date | null;
   /** Number of messages */
   messageCount: number;
+  /** First user message preview (truncated to 100 chars) */
+  preview: string | null;
 }
 
 // ============================================================
@@ -308,6 +315,7 @@ export async function getSessionsForProject(encodedPath: string): Promise<Sessio
     try {
       const entries = await parseJsonlFile(filePath);
       const metadata = getSessionMetadata(entries);
+      const preview = getFirstUserMessagePreview(entries);
 
       sessions.push({
         id: sessionId,
@@ -315,6 +323,7 @@ export async function getSessionsForProject(encodedPath: string): Promise<Sessio
         startedAt: metadata.startedAt,
         lastActivityAt: metadata.lastActivityAt,
         messageCount: metadata.messageCount,
+        preview,
       });
     } catch (error) {
       logger.warn('Failed to parse session file', { file: filePath, error });
@@ -325,6 +334,7 @@ export async function getSessionsForProject(encodedPath: string): Promise<Sessio
         startedAt: null,
         lastActivityAt: null,
         messageCount: 0,
+        preview: null,
       });
     }
   }

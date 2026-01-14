@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.9.0 | 2026-01-14 | prerelease | Session Picker complete |
 | 0.8.0 | 2026-01-14 | prerelease | Project Switcher complete |
 | 0.7.0 | 2026-01-14 | prerelease | Stop Button complete |
 | 0.6.0 | 2026-01-14 | prerelease | Text Input & Send complete |
@@ -35,6 +36,49 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.9.0] - 2026-01-14
+
+### Added
+- **Session Picker** — Switch between multiple sessions within a project
+  - Tappable "Select session" row in header below project name
+  - Full-screen modal with slide-up animation and dark backdrop (matches ProjectPicker)
+  - Session list showing chat bubble icon, preview text (first user message), relative timestamp, message count
+  - Selected session highlighted with accent color and checkmark
+  - Search input when >10 sessions (case-insensitive filtering on preview text)
+  - Empty states for no sessions and no search results
+  - Keyboard accessibility (Escape to close, Enter/Space to select)
+
+- **Session Preview** — Show first user message as session identifier
+  - `getFirstUserMessagePreview()` extracts and truncates first user message to 100 chars
+  - `preview` field added to `SessionSummary` type (shared types)
+  - Displays "Empty session" (italic, muted) for sessions without user messages
+
+- **New Session API** — Start fresh Claude Code sessions from mobile
+  - `POST /api/sessions/new` endpoint with `projectPath` and optional `prompt`
+  - `startNewSession()` in claudeService spawns `claude -p` process
+  - Prominent "New Session" button with accent color and plus icon
+  - Loading state with spinner during session creation
+  - Error display on failure
+
+- **Per-Project Session Persistence** — Remember selected session per project
+  - Key: `gogogadgetclaude:lastSession:{encodedPath}`
+  - Auto-selects most recent session when switching projects
+  - Graceful fallback when stored session no longer exists
+
+### Changed
+- Header now has two-row layout: project name (top) + session indicator (bottom)
+- Touch targets verified at 44×44px minimum for all interactive elements
+
+### Technical Details
+- New components: `SessionPicker.tsx`, `SessionListItem.tsx`
+- Barrel export: `client/src/components/session/index.ts`
+- Backend: `getFirstUserMessagePreview()` in `jsonlParser.ts`
+- Backend: `startNewSession()` in `claudeService.ts`
+- API: `POST /sessions/new` with Zod validation
+- **49 new tests** (195 → 244 total)
 
 ---
 

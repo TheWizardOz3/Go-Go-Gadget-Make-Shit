@@ -336,3 +336,51 @@ export function extractProjectPath(entries: RawJsonlEntry[]): string | null {
   }
   return null;
 }
+
+/**
+ * Extract the first user message as a preview string
+ *
+ * Used for session list display. Returns the first user message
+ * content truncated to maxLength characters.
+ *
+ * @param entries - Parsed JSONL entries
+ * @param maxLength - Maximum length of preview (default: 100)
+ * @returns Preview string or null if no user messages found
+ */
+export function getFirstUserMessagePreview(
+  entries: RawJsonlEntry[],
+  maxLength: number = 100
+): string | null {
+  // Sort by timestamp to ensure we get the actual first message
+  const sortedEntries = [...entries].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  for (const entry of sortedEntries) {
+    // Only include valid user messages (not meta, not errors)
+    if (!shouldIncludeEntry(entry)) {
+      continue;
+    }
+
+    if (entry.type === 'user' && 'message' in entry) {
+      const userEntry = entry as UserJsonlEntry;
+      const content = extractTextFromContent(userEntry.message.content);
+
+      // Clean up whitespace and truncate
+      const cleaned = content.replace(/\s+/g, ' ').trim();
+
+      if (cleaned.length === 0) {
+        continue; // Skip empty messages
+      }
+
+      if (cleaned.length <= maxLength) {
+        return cleaned;
+      }
+
+      // Truncate with ellipsis
+      return cleaned.substring(0, maxLength - 1).trim() + '…';
+    }
+  }
+
+  return null;
+}

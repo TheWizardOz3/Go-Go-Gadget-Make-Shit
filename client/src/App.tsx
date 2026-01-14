@@ -14,10 +14,14 @@ import { ConversationSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { StatusIndicator, StatusIndicatorSkeleton } from '@/components/ui/StatusIndicator';
 import { ProjectPicker } from '@/components/project';
-import type { SessionStatus } from '@shared/types';
+import { SessionPicker } from '@/components/session';
+import type { SessionStatus, SessionSummarySerialized } from '@shared/types';
 
 /** localStorage key for persisting selected project */
 const STORAGE_KEY_LAST_PROJECT = 'gogogadgetclaude:lastProject';
+
+/** localStorage key prefix for persisting selected session per project */
+const STORAGE_KEY_SESSION_PREFIX = 'gogogadgetclaude:lastSession:';
 
 /**
  * Read the last selected project from localStorage
@@ -47,6 +51,34 @@ function setStoredProject(encodedPath: string | null): void {
 }
 
 /**
+ * Read the last selected session for a project from localStorage
+ */
+function getStoredSession(encodedPath: string | null): string | null {
+  if (!encodedPath) return null;
+  try {
+    return localStorage.getItem(STORAGE_KEY_SESSION_PREFIX + encodedPath);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save the selected session for a project to localStorage
+ */
+function setStoredSession(encodedPath: string | null, sessionId: string | null): void {
+  if (!encodedPath) return;
+  try {
+    if (sessionId) {
+      localStorage.setItem(STORAGE_KEY_SESSION_PREFIX + encodedPath, sessionId);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_SESSION_PREFIX + encodedPath);
+    }
+  } catch {
+    // localStorage might be unavailable
+  }
+}
+
+/**
  * Main App component
  *
  * For MVP:
@@ -61,8 +93,9 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState<string | null>(() => getStoredProject());
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
-  // Project picker modal state
+  // Modal states
   const [isProjectPickerOpen, setIsProjectPickerOpen] = useState(false);
+  const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
 
   // Fetch projects
   const {
@@ -109,20 +142,41 @@ export default function App() {
     setSelectedProject(sorted[0].encodedPath);
   }, [projects, selectedProject]);
 
-  // Auto-select most recent session when sessions load
+  // When sessions load, try to restore from localStorage or auto-select most recent
   useEffect(() => {
-    if (sessions && sessions.length > 0 && !selectedSession) {
-      // Sort by last activity (most recent first)
-      const sorted = [...sessions].sort((a, b) => {
-        const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
-        const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
-        return bTime - aTime;
-      });
-      setSelectedSession(sorted[0].id);
+    if (!sessions || sessions.length === 0) return;
+    if (selectedSession) {
+      // Validate that selected session still exists
+      const stillExists = sessions.some((s) => s.id === selectedSession);
+      if (stillExists) return;
+      // Selected session no longer exists, fall through to re-select
     }
-  }, [sessions, selectedSession]);
 
-  // Reset session when project changes
+    // Try to restore from localStorage first
+    const storedSessionId = getStoredSession(selectedProject);
+    if (storedSessionId) {
+      const sessionExists = sessions.some((s) => s.id === storedSessionId);
+      if (sessionExists) {
+        setSelectedSession(storedSessionId);
+        return;
+      }
+    }
+
+    // Fall back to most recent session
+    const sorted = [...sessions].sort((a, b) => {
+      const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+      const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+      return bTime - aTime;
+    });
+    setSelectedSession(sorted[0].id);
+  }, [sessions, selectedSession, selectedProject]);
+
+  // Persist selected session to localStorage when it changes
+  useEffect(() => {
+    setStoredSession(selectedProject, selectedSession);
+  }, [selectedProject, selectedSession]);
+
+  // Reset session when project changes (will be restored from localStorage in above effect)
   useEffect(() => {
     setSelectedSession(null);
   }, [selectedProject]);
@@ -190,9 +244,17 @@ export default function App() {
   // Get current project name for header
   const currentProject = projects.find((p) => p.encodedPath === selectedProject);
 
+  // Get current session for header display
+  const currentSession = sessions?.find((s) => s.id === selectedSession);
+
   // Handle project selection from picker
   const handleSelectProject = (encodedPath: string) => {
     setSelectedProject(encodedPath);
+  };
+
+  // Handle session selection from picker
+  const handleSelectSession = (sessionId: string) => {
+    setSelectedSession(sessionId);
   };
 
   // Main app with conversation view
@@ -200,12 +262,15 @@ export default function App() {
     <div className={cn('dark', 'min-h-screen', 'flex', 'flex-col', 'bg-background')}>
       <Header
         projectName={currentProject?.name || null}
+        currentSession={currentSession}
         status={status}
         statusLoading={statusLoading}
         sessionLoading={sessionsLoading}
         sessionError={sessionsError}
         onProjectClick={() => setIsProjectPickerOpen(true)}
+        onSessionClick={() => setIsSessionPickerOpen(true)}
         hasProjects={projects.length > 0}
+        hasSessions={(sessions?.length ?? 0) > 0}
       />
       <ConversationView sessionId={selectedSession} className="flex-1" />
 
@@ -216,6 +281,22 @@ export default function App() {
         projects={projects}
         selectedProject={selectedProject}
         onSelectProject={handleSelectProject}
+      />
+
+      {/* Session Picker Modal */}
+      <SessionPicker
+        isOpen={isSessionPickerOpen}
+        onClose={() => setIsSessionPickerOpen(false)}
+        sessions={sessions ?? []}
+        selectedSession={selectedSession}
+        onSelectSession={handleSelectSession}
+        projectPath={currentProject?.path}
+        onNewSession={() => {
+          // Refresh sessions to discover the new one
+          _refreshSessions();
+          // Clear selected session so auto-select picks up the new one
+          setSelectedSession(null);
+        }}
       />
     </div>
   );
@@ -240,61 +321,95 @@ function ChevronDownIcon({ className }: { className?: string }) {
 }
 
 /**
- * App header with project name and status indicator
+ * App header with project name, session indicator, and status
  */
 interface HeaderProps {
   projectName: string | null;
+  currentSession?: SessionSummarySerialized;
   status?: SessionStatus;
   statusLoading?: boolean;
   sessionLoading?: boolean;
   sessionError?: Error;
   onProjectClick?: () => void;
+  onSessionClick?: () => void;
   hasProjects?: boolean;
+  hasSessions?: boolean;
 }
 
 function Header({
   projectName,
+  currentSession,
   status,
   statusLoading,
   sessionLoading,
   sessionError,
   onProjectClick,
+  onSessionClick,
   hasProjects,
+  hasSessions,
 }: HeaderProps) {
-  const isClickable = hasProjects && onProjectClick;
+  const isProjectClickable = hasProjects && onProjectClick;
+  const isSessionClickable = hasSessions && onSessionClick;
+
+  // Generate session display text
+  const sessionDisplayText = currentSession?.preview || 'Select session';
 
   return (
-    <header className="flex-shrink-0 px-4 py-3 border-b border-text-primary/10 bg-surface safe-top">
+    <header className="flex-shrink-0 px-4 py-2 border-b border-text-primary/10 bg-surface safe-top">
       <div className="flex items-center justify-between gap-3">
-        {/* Project name / title - tappable when projects exist */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {isClickable ? (
+        {/* Left side: Project + Session */}
+        <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+          {/* Project name row */}
+          <div className="flex items-center gap-2">
+            {isProjectClickable ? (
+              <button
+                type="button"
+                onClick={onProjectClick}
+                className={cn(
+                  'flex items-center gap-1 min-w-0',
+                  'rounded-lg -ml-2 pl-2 pr-1 py-0.5',
+                  'hover:bg-text-primary/5 active:bg-text-primary/10',
+                  'transition-colors duration-150',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                )}
+                aria-label="Select project"
+              >
+                <span className="text-base font-semibold text-text-primary truncate">
+                  {projectName || 'GoGoGadgetClaude'}
+                </span>
+                <ChevronDownIcon className="flex-shrink-0 text-text-muted" />
+              </button>
+            ) : (
+              <h1 className="text-base font-semibold text-text-primary truncate">
+                {projectName || 'GoGoGadgetClaude'}
+              </h1>
+            )}
+            {sessionLoading && (
+              <span className="flex-shrink-0 w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+            )}
+            {sessionError && <span className="flex-shrink-0 text-error text-xs">Error</span>}
+          </div>
+
+          {/* Session indicator row */}
+          {isSessionClickable ? (
             <button
               type="button"
-              onClick={onProjectClick}
+              onClick={onSessionClick}
               className={cn(
                 'flex items-center gap-1 min-w-0',
-                'rounded-lg -ml-2 pl-2 pr-1 py-1',
+                'rounded-lg -ml-2 pl-2 pr-1 py-0.5',
                 'hover:bg-text-primary/5 active:bg-text-primary/10',
                 'transition-colors duration-150',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               )}
-              aria-label="Select project"
+              aria-label="Select session"
             >
-              <span className="text-lg font-semibold text-text-primary truncate">
-                {projectName || 'GoGoGadgetClaude'}
-              </span>
-              <ChevronDownIcon className="flex-shrink-0 text-text-muted" />
+              <span className="text-sm text-text-muted truncate">{sessionDisplayText}</span>
+              <ChevronDownIcon className="flex-shrink-0 text-text-muted h-3 w-3" />
             </button>
           ) : (
-            <h1 className="text-lg font-semibold text-text-primary truncate">
-              {projectName || 'GoGoGadgetClaude'}
-            </h1>
+            <span className="text-sm text-text-muted truncate pl-0">{sessionDisplayText}</span>
           )}
-          {sessionLoading && (
-            <span className="flex-shrink-0 w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-          )}
-          {sessionError && <span className="flex-shrink-0 text-error text-xs">Error</span>}
         </div>
 
         {/* Status indicator */}
