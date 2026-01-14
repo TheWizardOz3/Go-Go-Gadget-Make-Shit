@@ -50,11 +50,13 @@ Before any features can be built, the project needs a solid foundation with all 
 
 ### 2.3 Acceptance Criteria
 
-- [ ] **Given** a fresh clone, **when** running `pnpm install && pnpm dev`, **then** both client and server start without errors
-- [ ] **Given** the dev server is running, **when** visiting `localhost:5173`, **then** a "Hello GoGoGadgetClaude" page renders
-- [ ] **Given** the dev server is running, **when** visiting `localhost:3456/api/status`, **then** JSON response `{"healthy": true}` is returned
-- [ ] **Given** a file with lint errors, **when** committing, **then** pre-commit hook blocks the commit
-- [ ] **Given** any TypeScript file, **when** importing with `@/`, **then** path aliases resolve correctly
+- [x] **Given** a fresh clone, **when** running `pnpm install && pnpm dev`, **then** both client and server start without errors ✅
+- [x] **Given** the dev server is running, **when** visiting `localhost:5173`, **then** a "Hello GoGoGadgetClaude" page renders ✅
+- [x] **Given** the dev server is running, **when** visiting `localhost:3456/api/status`, **then** JSON response `{"healthy": true}` is returned ✅
+- [x] **Given** a file with lint errors, **when** committing, **then** pre-commit hook blocks the commit ✅
+- [x] **Given** any TypeScript file, **when** importing with `@/`, **then** path aliases resolve correctly ✅
+
+**Status: COMPLETE** — All acceptance criteria verified 2026-01-13
 
 ### 2.4 Out of Scope
 

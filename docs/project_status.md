@@ -49,11 +49,12 @@
 |--------------|-----------------|-------|
 | Product Specification | 2026-01-13 | Full spec in `docs/product_spec.md` |
 | Architecture Documentation | 2026-01-13 | Full architecture in `docs/architecture.md` |
+| Project Scaffolding | 2026-01-13 | All 10 tasks complete - pnpm, Express, Vite, Tailwind, ESLint, Husky |
 
 ### In Progress
 | Feature/Task | Started | Feature Doc | Notes |
 |--------------|---------|-------------|-------|
-| Project Scaffolding | 2026-01-13 | [project-scaffolding.md](Features/project-scaffolding.md) | Task 9/10 complete - Dev scripts + .env |
+| — | — | — | Ready for API Server Setup |
 
 ### Not Started
 | Feature/Task | Priority | Dependencies | Estimated Complexity |
@@ -76,10 +77,7 @@
 
 ## Upcoming Work (Priority Order)
 
-### Currently Active
-- **Project Scaffolding** - See [feature doc](Features/project-scaffolding.md) for implementation tasks
-
-### Next Up (after scaffolding)
+### Next Up
 1. **API Server Setup** - Express routes, error handling, static file serving
 2. **JSONL Watcher** - Service to monitor ~/.claude/projects/ for conversation updates
 3. **Conversation View UI** - Primary mobile interface for viewing Claude conversations

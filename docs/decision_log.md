@@ -18,6 +18,7 @@
 | ADR-003 | 2026-01-13 | infra | active | Polling over WebSockets for conversation updates |
 | ADR-004 | 2026-01-13 | infra | active | AppleScript for iMessage notifications |
 | ADR-005 | 2026-01-13 | arch | active | pnpm + single repo structure |
+| ADR-006 | 2026-01-13 | infra | active | ESLint 9 flat config |
 
 **Categories:** `arch` | `data` | `api` | `ui` | `test` | `infra` | `error`
 
@@ -28,6 +29,32 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-006: ESLint 9 Flat Config
+**Date:** 2026-01-13 | **Category:** infra | **Status:** active
+
+#### Trigger
+Setting up linting for the project with TypeScript in both client (React) and server (Node.js) packages.
+
+#### Decision
+Use **ESLint 9** with the new flat config format (`eslint.config.js`) instead of the legacy `.eslintrc` format. Configure TypeScript, React, and React Hooks rules in a single config file at the root.
+
+#### Rationale
+- **Future-proof:** Flat config is the new standard, `.eslintrc` is deprecated
+- **Simpler:** Single JS file with explicit imports instead of extends chains
+- **Type-safe:** Config file is plain JavaScript, can use IDE autocomplete
+- **Per-package rules:** Easy to configure different rules for client vs server via file globs
+
+#### AI Instructions
+- Always use `eslint.config.js` (flat config), never `.eslintrc.*`
+- Import plugins directly: `import tseslint from 'typescript-eslint'`
+- Use file glob patterns for package-specific rules: `files: ['client/**/*.tsx']`
+- Put `eslint-config-prettier` last to override formatting rules
+
+#### Supersedes
+N/A — new project
+
+---
 
 ### ADR-005: pnpm + Single Repo Structure
 **Date:** 2026-01-13 | **Category:** arch | **Status:** active
