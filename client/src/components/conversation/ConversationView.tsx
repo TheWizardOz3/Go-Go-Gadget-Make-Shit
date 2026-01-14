@@ -9,6 +9,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { useConversation } from '@/hooks/useConversation';
 import { useSendPrompt } from '@/hooks/useSendPrompt';
+import { useStopAgent } from '@/hooks/useStopAgent';
 import { ConversationSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { MessageList } from './MessageList';
@@ -44,6 +45,10 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
 
   const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId);
   const { sendPrompt, isSending } = useSendPrompt(sessionId);
+  const { stopAgent, isStopping } = useStopAgent(sessionId);
+
+  // Toast state for showing "Agent stopped" message
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   /**
    * Scroll to the bottom of the conversation
@@ -184,6 +189,28 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
     [sendPrompt, scrollToBottom]
   );
 
+  /**
+   * Handle stopping the agent
+   */
+  const handleStop = useCallback(async () => {
+    const success = await stopAgent();
+    if (success) {
+      setToastMessage('Agent stopped');
+    }
+  }, [stopAgent]);
+
+  /**
+   * Auto-dismiss toast after 3 seconds
+   */
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
   // No session selected
   if (!sessionId) {
     return (
@@ -205,7 +232,14 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
         <div className="flex-1 overflow-hidden">
           <ConversationSkeleton />
         </div>
-        <PromptInput onSend={handleSend} isSending={isSending} disabled />
+        <PromptInput
+          onSend={handleSend}
+          isSending={isSending}
+          disabled
+          status={status}
+          onStop={handleStop}
+          isStopping={isStopping}
+        />
       </div>
     );
   }
@@ -221,7 +255,14 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
             onRetry={() => refresh()}
           />
         </div>
-        <PromptInput onSend={handleSend} isSending={isSending} disabled />
+        <PromptInput
+          onSend={handleSend}
+          isSending={isSending}
+          disabled
+          status={status}
+          onStop={handleStop}
+          isStopping={isStopping}
+        />
       </div>
     );
   }
@@ -233,7 +274,14 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
         <div className="flex-1 flex items-center justify-center">
           <EmptyState title="No messages yet" message="Send a message to start the conversation." />
         </div>
-        <PromptInput onSend={handleSend} isSending={isSending} disabled={status === 'working'} />
+        <PromptInput
+          onSend={handleSend}
+          isSending={isSending}
+          disabled={status === 'working'}
+          status={status}
+          onStop={handleStop}
+          isStopping={isStopping}
+        />
       </div>
     );
   }
@@ -289,7 +337,21 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
       </div>
 
       {/* Prompt input */}
-      <PromptInput onSend={handleSend} isSending={isSending} disabled={status === 'working'} />
+      <PromptInput
+        onSend={handleSend}
+        isSending={isSending}
+        disabled={status === 'working'}
+        status={status}
+        onStop={handleStop}
+        isStopping={isStopping}
+      />
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 bg-surface border border-text-primary/10 rounded-lg shadow-lg text-sm text-text-primary animate-in fade-in slide-in-from-bottom-2 duration-200">
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }

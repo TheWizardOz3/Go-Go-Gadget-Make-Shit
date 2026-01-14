@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-14 (Text Input & Send Complete)
+**Last Updated**: 2026-01-14 (Stop Button Complete)
 
 ---
 
@@ -56,11 +56,12 @@
 | Conversation View UI | 2026-01-14 | [Feature doc](Features/conversation-view-ui.md) - All 12 tasks complete |
 | Status Indicator | 2026-01-14 | [Feature doc](Features/status-indicator.md) - All 4 tasks complete |
 | Text Input & Send | 2026-01-14 | [Feature doc](Features/text-input-send.md) - 36 new tests, 133 total |
+| Stop Button | 2026-01-14 | [Feature doc](Features/stop-button.md) - 27 new tests, 160 total |
 
 ### In Progress
 | Feature/Task | Started | Feature Doc | Notes |
 |--------------|---------|-------------|-------|
-| — | — | — | No feature currently in progress |
+| *None* | — | — | — |
 
 ### MVP Build Order (Sequenced)
 
@@ -71,7 +72,7 @@
 | 3 | ~~Conversation View UI~~ | #1 ✅, #2 ✅ | MEDIUM | ✅ Complete |
 | 4 | ~~Status Indicator~~ | #2 ✅, #3 ✅ | LOW | ✅ Complete |
 | 5 | ~~Text Input & Send~~ | #1 ✅, #3 ✅ | LOW | ✅ Complete |
-| 6 | **Stop Button** | #1 ✅ | LOW | Safety - kill runaway agent |
+| 6 | ~~Stop Button~~ | #1 ✅ | LOW | ✅ Complete |
 | 7 | **Project Switcher** | #1 ✅ | MEDIUM | Navigation - switch between codebases |
 | 8 | **Session Picker** | #2 ✅, #7 | MEDIUM | Navigation - resume/start sessions |
 | 9 | **Quick Templates** | #5 ✅, #7 | MEDIUM | Convenience - one-tap common prompts |
@@ -91,9 +92,9 @@
 ## Upcoming Work
 
 ### Next Up
-1. **Stop Button** - Kill runaway agent immediately (depends on #1 ✅)
-2. **Project Switcher** - Navigation between codebases (depends on #1 ✅)
-3. **Session Picker** - Resume previous sessions (depends on #2 ✅, #7)
+1. **Project Switcher** - Navigation between codebases (depends on #1 ✅)
+2. **Session Picker** - Resume previous sessions (depends on #2 ✅, #7)
+3. **Quick Templates** - One-tap common prompts (depends on #5 ✅, #7)
 
 ---
 

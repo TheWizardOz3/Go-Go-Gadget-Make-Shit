@@ -8,7 +8,7 @@ import {
   getSessionStatus,
   getRecentSessions,
 } from '../services/sessionManager.js';
-import { sendPrompt } from '../services/claudeService.js';
+import { sendPrompt, stopAgent } from '../services/claudeService.js';
 
 const router: RouterType = Router();
 
@@ -270,10 +270,51 @@ router.post('/:id/send', validateRequest({ body: sendPromptSchema }), async (req
  * Stop a running session/agent
  * POST /api/sessions/:id/stop
  *
- * TODO: Implement process management
+ * Attempts to gracefully stop the Claude Code process for the session.
+ * Uses escalating signals: SIGINT → SIGTERM → SIGKILL
  */
-router.post('/:id/stop', (_req, res) => {
-  res.status(501).json(error(ErrorCodes.NOT_IMPLEMENTED, 'Stop session not yet implemented'));
+router.post('/:id/stop', async (req, res) => {
+  try {
+    const id = req.params.id as string;
+
+    // Validate session exists
+    const session = await getSession(id);
+    if (!session) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Session not found'));
+      return;
+    }
+
+    // Attempt to stop the agent
+    const result = await stopAgent({ sessionId: id });
+
+    if (!result.success) {
+      logger.error('Failed to stop agent', {
+        sessionId: id,
+        error: result.error,
+      });
+      res
+        .status(500)
+        .json(error(ErrorCodes.INTERNAL_ERROR, result.error || 'Failed to stop agent'));
+      return;
+    }
+
+    res.json(
+      success({
+        success: true,
+        sessionId: id,
+        processKilled: result.processKilled,
+        pid: result.pid,
+        signal: result.signal,
+        message: result.message,
+      })
+    );
+  } catch (err) {
+    logger.error('Failed to stop agent', {
+      sessionId: req.params.id,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to stop agent'));
+  }
 });
 
 export default router;

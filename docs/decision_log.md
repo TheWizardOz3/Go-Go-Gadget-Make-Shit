@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-011 | 2026-01-14 | infra | active | Signal escalation for stopping Claude processes |
 | ADR-010 | 2026-01-14 | infra | active | Detached process spawning for Claude CLI |
 | ADR-009 | 2026-01-14 | ui | active | Cursor-style layout for conversation view |
 | ADR-008 | 2026-01-14 | data | active | Extract project paths from JSONL cwd field |
@@ -33,6 +34,42 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-011: Signal Escalation for Stopping Claude Processes
+**Date:** 2026-01-14 | **Category:** infra | **Status:** active
+
+#### Trigger
+Implementing the Stop Button feature required deciding how to safely terminate a running Claude CLI process.
+
+#### Decision
+Use **escalating signals** with timeouts to stop Claude processes:
+1. **SIGINT** first (Ctrl+C equivalent) — allows Claude to clean up gracefully
+2. Wait 2 seconds for process to exit
+3. **SIGTERM** if still running — forceful termination request
+4. Wait 2 more seconds
+5. **SIGKILL** as last resort — immediate process death
+
+Also track processes in memory (`processManager.ts`) to map sessionId → PID.
+
+#### Rationale
+- **Safety first:** SIGINT allows Claude to save state and exit cleanly
+- **Predictable timeouts:** 2-second intervals balance responsiveness with giving processes time to clean up
+- **Guaranteed termination:** SIGKILL cannot be caught or ignored
+- **In-memory tracking:** Simple and sufficient for single-user app; no persistence needed
+- **Clean interface:** `stopAgent(sessionId)` abstracts all signal handling
+
+Alternatives considered:
+- **SIGKILL immediately:** Would risk data corruption if Claude is mid-write
+- **Longer timeouts:** Would make the stop button feel unresponsive
+- **Process group signals:** Unnecessary complexity for single-process CLI
+
+#### AI Instructions
+- When stopping processes, always try graceful shutdown first (SIGINT)
+- Never skip signal escalation — some processes don't respond to SIGINT
+- Track PIDs immediately after spawn; untrack on exit or error
+- Return `processKilled: false` if no process is tracked (not an error)
+
+---
 
 ### ADR-010: Detached Process Spawning for Claude CLI
 **Date:** 2026-01-14 | **Category:** infra | **Status:** active

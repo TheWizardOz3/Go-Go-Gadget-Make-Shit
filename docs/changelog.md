@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.7.0 | 2026-01-14 | prerelease | Stop Button complete |
 | 0.6.0 | 2026-01-14 | prerelease | Text Input & Send complete |
 | 0.5.0 | 2026-01-14 | prerelease | Status Indicator complete |
 | 0.4.0 | 2026-01-14 | prerelease | Conversation View UI complete |
@@ -33,6 +34,65 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.7.0] - 2026-01-14
+
+### Added
+- **Stop Button** — Emergency stop button for halting Claude Code when it goes off the rails
+  - Red stop button (square icon) replaces send button when Claude is working
+  - Single-tap to stop with no confirmation modal (speed matters)
+  - Haptic feedback on tap via Vibration API
+  - Toast notification "Agent stopped" on successful stop
+  - Optimistic UI update (status changes to idle immediately)
+
+- **Process Management** — Backend service for tracking and stopping Claude processes
+  - `processManager.ts` — In-memory tracking of active Claude processes by session ID
+  - `trackProcess()`, `untrackProcess()`, `getActiveProcess()`, `hasActiveProcess()`
+  - Automatic cleanup when processes exit naturally
+
+- **Stop Agent Function** — Graceful shutdown with escalating signals
+  - `stopAgent()` function in `claudeService.ts`
+  - Signal escalation: SIGINT → SIGTERM (2s timeout) → SIGKILL (2s timeout)
+  - Returns detailed result with `processKilled`, `signal`, and `message`
+
+- **Stop API Endpoint** — New endpoint for stopping sessions
+  - `POST /api/sessions/:id/stop`
+  - Returns 404 for non-existent sessions
+  - Returns `processKilled: false` when no active process
+  - Returns `processKilled: true` with signal used when process was killed
+
+- **useStopAgent Hook** — React hook for stop functionality
+  - Tracks `isStopping` loading state and `error` state
+  - Optimistic UI update with SWR mutation
+  - Automatic conversation refresh after successful stop
+
+- **Unit Tests** — 27 new tests for the feature
+  - `processManager.test.ts` (15 tests): Track, untrack, multi-session handling
+  - `claudeService.test.ts` (3 new tests): stopAgent behavior
+  - `useStopAgent.test.ts` (8 tests): Hook states, error handling, debouncing
+
+### Files Created
+- `server/src/services/processManager.ts` — Process tracking service
+- `server/src/services/processManager.test.ts` — Unit tests
+- `client/src/components/conversation/StopButton.tsx` — Stop button component
+- `client/src/hooks/useStopAgent.ts` — Stop agent hook
+- `client/src/hooks/useStopAgent.test.ts` — Unit tests
+
+### Files Modified
+- `server/src/services/claudeService.ts` — Added process tracking and stopAgent function
+- `server/src/services/claudeService.test.ts` — Updated tests for process tracking
+- `server/src/api/sessions.ts` — Implemented stop endpoint
+- `client/src/components/conversation/PromptInput.tsx` — Integrated StopButton
+- `client/src/components/conversation/ConversationView.tsx` — Wired up stop functionality and toast
+
+### Verified
+- All 7 implementation tasks complete
+- `pnpm lint` passes with 0 errors
+- `pnpm typecheck` passes with 0 errors
+- `pnpm test` passes with 160 tests (71 client + 89 server)
+- UI verified: Stop button hidden when idle, shows when working
 
 ---
 

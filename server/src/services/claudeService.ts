@@ -7,6 +7,7 @@
 
 import { execa } from 'execa';
 import { logger } from '../lib/logger.js';
+import { trackProcess, untrackProcess, getActiveProcess } from './processManager.js';
 
 // ============================================================
 // Types
@@ -26,7 +27,34 @@ export interface SendPromptResult {
   success: boolean;
   /** Process ID of the spawned claude process */
   pid?: number;
+  /** Whether the process is being tracked for stop functionality */
+  tracked?: boolean;
   /** Error message if spawn failed */
+  error?: string;
+}
+
+export interface StopAgentOptions {
+  /** Session ID to stop */
+  sessionId: string;
+}
+
+/** Signal used to stop the process */
+export type StopSignal = 'SIGINT' | 'SIGTERM' | 'SIGKILL';
+
+export interface StopAgentResult {
+  /** Whether the stop operation completed successfully */
+  success: boolean;
+  /** Whether a process was actually killed (false if no process was running) */
+  processKilled: boolean;
+  /** The session ID that was stopped */
+  sessionId: string;
+  /** The PID of the process that was stopped */
+  pid?: number;
+  /** The signal that successfully stopped the process */
+  signal?: StopSignal;
+  /** Message describing the result */
+  message?: string;
+  /** Error message if stop failed */
   error?: string;
 }
 
@@ -40,6 +68,8 @@ export interface SendPromptResult {
  * Uses `claude -p "prompt" --continue` to send to the most recent session.
  * The process runs detached so it continues independently after we return.
  * Claude writes responses to the JSONL file which our watcher will pick up.
+ *
+ * The process is tracked so it can be stopped via stopAgent().
  *
  * @param options - The prompt options
  * @returns Result indicating success and the process ID
@@ -63,21 +93,52 @@ export async function sendPrompt(options: SendPromptOptions): Promise<SendPrompt
       stdio: 'ignore', // Don't capture output (it goes to JSONL)
     });
 
-    // Get the PID before unreferencing
+    // Get the PID
     const pid = subprocess.pid;
+
+    // Track the process for stop functionality
+    let tracked = false;
+    if (pid !== undefined) {
+      trackProcess(sessionId, pid, projectPath);
+      tracked = true;
+
+      // Set up exit handler to untrack when process exits naturally
+      subprocess.on('exit', (code, signal) => {
+        logger.debug('Claude process exited', {
+          sessionId,
+          pid,
+          exitCode: code,
+          signal,
+        });
+        untrackProcess(sessionId);
+      });
+
+      // Handle process errors (e.g., process couldn't be spawned properly)
+      subprocess.on('error', (err) => {
+        logger.error('Claude process error', {
+          sessionId,
+          pid,
+          error: err.message,
+        });
+        untrackProcess(sessionId);
+      });
+    }
 
     // Don't wait for process to complete - it runs in background
     // unref() allows the parent (our server) to exit independently
+    // Note: We still keep event handlers attached for tracking
     subprocess.unref();
 
     logger.info('Claude process spawned', {
       sessionId,
       pid,
+      tracked,
     });
 
     return {
       success: true,
       pid,
+      tracked,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -117,4 +178,183 @@ export async function isClaudeAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ============================================================
+// Stop Agent
+// ============================================================
+
+/** How long to wait for each signal before escalating (ms) */
+const SIGNAL_TIMEOUT_MS = 2000;
+
+/**
+ * Check if a process is still running
+ *
+ * @param pid - Process ID to check
+ * @returns true if process is running
+ */
+function isProcessRunning(pid: number): boolean {
+  try {
+    // Sending signal 0 checks if process exists without actually sending a signal
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    // ESRCH means process doesn't exist
+    return false;
+  }
+}
+
+/**
+ * Wait for a process to exit or timeout
+ *
+ * @param pid - Process ID to wait for
+ * @param timeoutMs - How long to wait before timing out
+ * @returns true if process exited, false if timeout
+ */
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const startTime = Date.now();
+  const checkInterval = 100; // Check every 100ms
+
+  while (Date.now() - startTime < timeoutMs) {
+    if (!isProcessRunning(pid)) {
+      return true; // Process exited
+    }
+    await new Promise((resolve) => setTimeout(resolve, checkInterval));
+  }
+
+  return false; // Timeout
+}
+
+/**
+ * Send a signal to a process
+ *
+ * @param pid - Process ID to signal
+ * @param signal - Signal to send
+ * @returns true if signal was sent successfully
+ */
+function sendSignal(pid: number, signal: StopSignal): boolean {
+  try {
+    process.kill(pid, signal);
+    return true;
+  } catch {
+    // Process might have already exited
+    return false;
+  }
+}
+
+/**
+ * Stop a running Claude Code agent
+ *
+ * Attempts graceful shutdown with escalating signals:
+ * 1. SIGINT (Ctrl+C equivalent) - allows Claude to clean up
+ * 2. SIGTERM (if SIGINT doesn't work within 2 seconds)
+ * 3. SIGKILL (last resort after another 2 seconds)
+ *
+ * @param options - The stop options
+ * @returns Result indicating success and details
+ */
+export async function stopAgent(options: StopAgentOptions): Promise<StopAgentResult> {
+  const { sessionId } = options;
+
+  logger.info('Attempting to stop Claude agent', { sessionId });
+
+  // Check if there's an active process for this session
+  const processInfo = getActiveProcess(sessionId);
+
+  if (!processInfo) {
+    logger.info('No active process found for session', { sessionId });
+    return {
+      success: true,
+      processKilled: false,
+      sessionId,
+      message: 'No active Claude process for this session',
+    };
+  }
+
+  const { pid } = processInfo;
+
+  // Verify process is actually running
+  if (!isProcessRunning(pid)) {
+    logger.info('Tracked process no longer running, cleaning up', { sessionId, pid });
+    untrackProcess(sessionId);
+    return {
+      success: true,
+      processKilled: false,
+      sessionId,
+      pid,
+      message: 'Process was already stopped',
+    };
+  }
+
+  logger.info('Found active process, sending SIGINT', { sessionId, pid });
+
+  // Try SIGINT first (graceful shutdown)
+  if (sendSignal(pid, 'SIGINT')) {
+    const exited = await waitForProcessExit(pid, SIGNAL_TIMEOUT_MS);
+
+    if (exited) {
+      logger.info('Process stopped with SIGINT', { sessionId, pid });
+      untrackProcess(sessionId);
+      return {
+        success: true,
+        processKilled: true,
+        sessionId,
+        pid,
+        signal: 'SIGINT',
+        message: 'Agent stopped gracefully',
+      };
+    }
+
+    logger.warn('Process did not respond to SIGINT, trying SIGTERM', { sessionId, pid });
+  }
+
+  // Try SIGTERM (more forceful)
+  if (sendSignal(pid, 'SIGTERM')) {
+    const exited = await waitForProcessExit(pid, SIGNAL_TIMEOUT_MS);
+
+    if (exited) {
+      logger.info('Process stopped with SIGTERM', { sessionId, pid });
+      untrackProcess(sessionId);
+      return {
+        success: true,
+        processKilled: true,
+        sessionId,
+        pid,
+        signal: 'SIGTERM',
+        message: 'Agent terminated',
+      };
+    }
+
+    logger.warn('Process did not respond to SIGTERM, trying SIGKILL', { sessionId, pid });
+  }
+
+  // Last resort: SIGKILL (cannot be ignored)
+  if (sendSignal(pid, 'SIGKILL')) {
+    // Give it a moment for SIGKILL to take effect
+    const exited = await waitForProcessExit(pid, 500);
+
+    if (exited) {
+      logger.info('Process stopped with SIGKILL', { sessionId, pid });
+      untrackProcess(sessionId);
+      return {
+        success: true,
+        processKilled: true,
+        sessionId,
+        pid,
+        signal: 'SIGKILL',
+        message: 'Agent forcefully killed',
+      };
+    }
+  }
+
+  // If we get here, something is very wrong
+  logger.error('Failed to stop process after all signals', { sessionId, pid });
+
+  return {
+    success: false,
+    processKilled: false,
+    sessionId,
+    pid,
+    error: 'Failed to stop process after trying SIGINT, SIGTERM, and SIGKILL',
+  };
 }

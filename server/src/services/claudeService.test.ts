@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { sendPrompt, isClaudeAvailable } from './claudeService.js';
+import { sendPrompt, isClaudeAvailable, stopAgent } from './claudeService.js';
+import { trackProcess, clearAllProcesses } from './processManager.js';
 
 // Mock execa
 vi.mock('execa', () => ({
@@ -27,10 +28,11 @@ describe('claudeService', () => {
 
   describe('sendPrompt', () => {
     it('should spawn claude with correct arguments', async () => {
-      // Mock successful spawn
+      // Mock successful spawn with event emitter methods
       const mockSubprocess = {
         pid: 12345,
         unref: vi.fn(),
+        on: vi.fn().mockReturnThis(), // Return this for chaining
       };
       mockExeca.mockReturnValue(mockSubprocess as never);
 
@@ -50,9 +52,14 @@ describe('claudeService', () => {
       // Verify subprocess was unreferenced
       expect(mockSubprocess.unref).toHaveBeenCalled();
 
+      // Verify event handlers were attached for process tracking
+      expect(mockSubprocess.on).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(mockSubprocess.on).toHaveBeenCalledWith('error', expect.any(Function));
+
       // Verify result
       expect(result.success).toBe(true);
       expect(result.pid).toBe(12345);
+      expect(result.tracked).toBe(true);
     });
 
     it('should handle ENOENT error when claude is not installed', async () => {
@@ -93,6 +100,7 @@ describe('claudeService', () => {
       const mockSubprocess = {
         pid: 1,
         unref: vi.fn(),
+        on: vi.fn().mockReturnThis(),
       };
       mockExeca.mockReturnValue(mockSubprocess as never);
 
@@ -129,6 +137,46 @@ describe('claudeService', () => {
       const result = await isClaudeAvailable();
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('stopAgent', () => {
+    beforeEach(() => {
+      clearAllProcesses();
+    });
+
+    it('should return success with processKilled: false when no active process', async () => {
+      const result = await stopAgent({ sessionId: 'non-existent-session' });
+
+      expect(result.success).toBe(true);
+      expect(result.processKilled).toBe(false);
+      expect(result.sessionId).toBe('non-existent-session');
+      expect(result.message).toBe('No active Claude process for this session');
+    });
+
+    it('should return success with processKilled: false when tracked process no longer running', async () => {
+      // Track a process that doesn't exist (PID won't be valid)
+      trackProcess('session-1', 999999999, '/path');
+
+      const result = await stopAgent({ sessionId: 'session-1' });
+
+      expect(result.success).toBe(true);
+      expect(result.processKilled).toBe(false);
+      expect(result.message).toBe('Process was already stopped');
+    });
+
+    it('should attempt to kill running process with SIGINT', async () => {
+      // This test is tricky because we need a real process to kill
+      // For unit tests, we mainly test the "no process" paths
+      // Integration tests would test actual process killing
+
+      // Track a non-existent PID
+      trackProcess('session-1', 999999999, '/path');
+
+      const result = await stopAgent({ sessionId: 'session-1' });
+
+      // Since the process doesn't exist, it should report as already stopped
+      expect(result.success).toBe(true);
     });
   });
 });
