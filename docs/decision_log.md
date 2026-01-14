@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-010 | 2026-01-14 | infra | active | Detached process spawning for Claude CLI |
 | ADR-009 | 2026-01-14 | ui | active | Cursor-style layout for conversation view |
 | ADR-008 | 2026-01-14 | data | active | Extract project paths from JSONL cwd field |
 | ADR-007 | 2026-01-14 | api | active | Standardized API response format |
@@ -32,6 +33,40 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-010: Detached Process Spawning for Claude CLI
+**Date:** 2026-01-14 | **Category:** infra | **Status:** active
+
+#### Trigger
+Implementing the Text Input & Send feature required deciding how to invoke the Claude CLI from our server and handle the long-running process.
+
+#### Decision
+Use **detached process spawning** with `execa` to run Claude CLI commands:
+- Spawn `claude -p "prompt" --continue` with `detached: true` and `stdio: 'ignore'`
+- Call `subprocess.unref()` to allow the parent process to exit independently
+- Don't wait for the Claude process to complete — return immediately to the client
+- Let existing polling mechanism (SWR) pick up new messages from JSONL files
+
+#### Rationale
+- **Non-blocking:** Server responds immediately; Claude runs in background potentially for minutes
+- **Separation of concerns:** Claude writes to JSONL, we read from JSONL (established pattern)
+- **Resilient:** If our server restarts, Claude keeps running
+- **Simple client:** Client just polls for updates, doesn't need to manage a long-lived connection
+- **Native integration:** Uses Claude's own `--continue` flag to append to existing session
+
+Alternatives considered:
+- **Wait for completion:** Would block the API call for minutes, terrible UX
+- **Streaming stdout:** Complex, would need WebSockets, duplicates JSONL data
+- **Job queue:** Overkill for single-user app
+
+#### AI Instructions
+- Always use `detached: true` and `stdio: 'ignore'` when spawning Claude CLI
+- Call `subprocess.unref()` immediately after spawning
+- Return the PID to the client for informational purposes (not used for tracking)
+- Check `isClaudeAvailable()` before spawning to give clear error messages
+- Log spawn success/failure with session context for debugging
+
+---
 
 ### ADR-009: Cursor-Style Layout for Conversation View
 **Date:** 2026-01-14 | **Category:** ui | **Status:** active

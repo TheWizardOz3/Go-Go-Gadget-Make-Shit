@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.6.0 | 2026-01-14 | prerelease | Text Input & Send complete |
 | 0.5.0 | 2026-01-14 | prerelease | Status Indicator complete |
 | 0.4.0 | 2026-01-14 | prerelease | Conversation View UI complete |
 | 0.3.0 | 2026-01-14 | prerelease | JSONL Watcher Service complete |
@@ -32,6 +33,62 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.6.0] - 2026-01-14
+
+### Added
+- **Text Input & Send** — Send prompts to Claude Code from the mobile UI
+  - Auto-expanding textarea (44px min, 150px max height)
+  - Send button with enabled/disabled states and loading spinner
+  - Enter key submits on desktop, Shift+Enter for newlines
+  - localStorage persistence for draft text (survives app backgrounding)
+  - Safe-area-inset handling for iPhone notch/home bar
+  - Mobile-optimized: 16px font (prevents iOS zoom), 44×44px touch targets
+
+- **Claude CLI Integration** — Backend service for spawning Claude processes
+  - `claudeService.ts` with `sendPrompt()` function
+  - Spawns `claude -p "prompt" --continue` as detached background process
+  - Process runs independently, writes to JSONL files (picked up by polling)
+  - Availability check for Claude CLI installation
+
+- **Send Prompt API** — New endpoint for sending prompts
+  - `POST /api/sessions/:id/send` with Zod validation
+  - Returns `{ success: true, pid }` on successful spawn
+  - Proper error handling for missing session, CLI not found, spawn failure
+
+- **Unit Tests** — 36 new tests for the feature
+  - `claudeService.test.ts` (6 tests): Spawn arguments, error handling
+  - `useSendPrompt.test.ts` (10 tests): Loading states, error handling, validation
+  - `PromptInput.test.tsx` (20 tests): Disabled states, send behavior, localStorage
+
+### Dependencies Added
+
+**Client:**
+- `@testing-library/user-event@^14.6.1` — User event simulation for tests
+
+**Server:**
+- `execa@^8.0.1` — Process spawning for Claude CLI
+
+### Files Created
+- `server/src/services/claudeService.ts` — Claude CLI integration service
+- `server/src/services/claudeService.test.ts` — Unit tests
+- `client/src/components/conversation/PromptInput.tsx` — Text input component
+- `client/src/components/conversation/PromptInput.test.tsx` — Unit tests
+- `client/src/hooks/useSendPrompt.ts` — Send prompt hook
+- `client/src/hooks/useSendPrompt.test.ts` — Unit tests
+
+### Files Modified
+- `server/src/api/sessions.ts` — Added POST /:id/send endpoint
+- `client/src/components/conversation/ConversationView.tsx` — Integrated PromptInput
+
+### Verified
+- All 8 implementation tasks complete
+- `pnpm lint` passes with 0 errors
+- `pnpm typecheck` passes with 0 errors
+- `pnpm test` passes with 133 tests (63 client + 70 server)
+- Manual UI testing verified: input renders, button enables, localStorage works
 
 ---
 

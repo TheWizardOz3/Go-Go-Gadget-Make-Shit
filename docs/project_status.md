@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-14 (Status Indicator Complete)
+**Last Updated**: 2026-01-14 (Text Input & Send Complete)
 
 ---
 
@@ -55,11 +55,12 @@
 | JSONL Watcher Service | 2026-01-14 | [Feature doc](Features/jsonl-watcher-service.md) - Parser, scanner, watcher, caching |
 | Conversation View UI | 2026-01-14 | [Feature doc](Features/conversation-view-ui.md) - All 12 tasks complete |
 | Status Indicator | 2026-01-14 | [Feature doc](Features/status-indicator.md) - All 4 tasks complete |
+| Text Input & Send | 2026-01-14 | [Feature doc](Features/text-input-send.md) - 36 new tests, 133 total |
 
 ### In Progress
 | Feature/Task | Started | Feature Doc | Notes |
 |--------------|---------|-------------|-------|
-| — | — | — | — |
+| — | — | — | No feature currently in progress |
 
 ### MVP Build Order (Sequenced)
 
@@ -69,14 +70,14 @@
 | 2 | ~~JSONL Watcher Service~~ | #1 ✅ | MEDIUM | ✅ Complete |
 | 3 | ~~Conversation View UI~~ | #1 ✅, #2 ✅ | MEDIUM | ✅ Complete |
 | 4 | ~~Status Indicator~~ | #2 ✅, #3 ✅ | LOW | ✅ Complete |
-| 5 | **Text Input & Send** | #1 ✅, #3 ✅ | LOW | Primary interaction - send prompts to Claude |
+| 5 | ~~Text Input & Send~~ | #1 ✅, #3 ✅ | LOW | ✅ Complete |
 | 6 | **Stop Button** | #1 ✅ | LOW | Safety - kill runaway agent |
 | 7 | **Project Switcher** | #1 ✅ | MEDIUM | Navigation - switch between codebases |
 | 8 | **Session Picker** | #2 ✅, #7 | MEDIUM | Navigation - resume/start sessions |
-| 9 | **Quick Templates** | #5, #7 | MEDIUM | Convenience - one-tap common prompts |
+| 9 | **Quick Templates** | #5 ✅, #7 | MEDIUM | Convenience - one-tap common prompts |
 | 10 | **Files Changed View** | #1 ✅ + Git service | MEDIUM | Review - list modified files |
 | 11 | **File Diff View** | #10 | HIGH | Review - green/red change highlighting |
-| 12 | **Voice Input** | #5 | MEDIUM | Hands-free - dictate via Groq Whisper |
+| 12 | **Voice Input** | #5 ✅ | MEDIUM | Hands-free - dictate via Groq Whisper |
 | 13 | **iMessage Notifications** | Hooks setup | MEDIUM | Alerts - know when Claude finishes |
 
 **Build Strategy:**
@@ -90,9 +91,9 @@
 ## Upcoming Work
 
 ### Next Up
-1. **Text Input & Send** - Send prompts to Claude from phone (depends on #1 ✅)
-2. **Stop Button** - Kill runaway agent immediately (depends on #1 ✅)
-3. **Project Switcher** - Navigation between codebases (depends on #1 ✅)
+1. **Stop Button** - Kill runaway agent immediately (depends on #1 ✅)
+2. **Project Switcher** - Navigation between codebases (depends on #1 ✅)
+3. **Session Picker** - Resume previous sessions (depends on #2 ✅, #7)
 
 ---
 

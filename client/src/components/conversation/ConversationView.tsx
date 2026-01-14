@@ -8,12 +8,14 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { useConversation } from '@/hooks/useConversation';
+import { useSendPrompt } from '@/hooks/useSendPrompt';
 import { ConversationSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { MessageList } from './MessageList';
 import { EmptyState } from './EmptyState';
 import { JumpToLatest } from './JumpToLatest';
 import { PullToRefresh } from './PullToRefresh';
+import { PromptInput } from './PromptInput';
 
 interface ConversationViewProps {
   /** Session ID to load conversation for */
@@ -41,6 +43,7 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
   const isPulling = useRef(false);
 
   const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId);
+  const { sendPrompt, isSending } = useSendPrompt(sessionId);
 
   /**
    * Scroll to the bottom of the conversation
@@ -167,14 +170,30 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
     }
   }, [pullDistance, isRefreshing, refresh]);
 
+  /**
+   * Handle sending a prompt
+   */
+  const handleSend = useCallback(
+    async (prompt: string) => {
+      const success = await sendPrompt(prompt);
+      if (success) {
+        // Scroll to bottom after a short delay to allow for UI update
+        setTimeout(() => scrollToBottom('smooth'), 100);
+      }
+    },
+    [sendPrompt, scrollToBottom]
+  );
+
   // No session selected
   if (!sessionId) {
     return (
-      <div className={cn('flex-1 flex items-center justify-center', className)}>
-        <EmptyState
-          title="No session selected"
-          message="Select a project and session to view the conversation."
-        />
+      <div className={cn('flex flex-col', className)}>
+        <div className="flex-1 flex items-center justify-center">
+          <EmptyState
+            title="No session selected"
+            message="Select a project and session to view the conversation."
+          />
+        </div>
       </div>
     );
   }
@@ -182,8 +201,11 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
   // Loading state
   if (isLoading) {
     return (
-      <div className={cn('flex-1 overflow-hidden', className)}>
-        <ConversationSkeleton />
+      <div className={cn('flex flex-col', className)}>
+        <div className="flex-1 overflow-hidden">
+          <ConversationSkeleton />
+        </div>
+        <PromptInput onSend={handleSend} isSending={isSending} disabled />
       </div>
     );
   }
@@ -191,74 +213,83 @@ export function ConversationView({ sessionId, className }: ConversationViewProps
   // Error state
   if (error) {
     return (
-      <div className={cn('flex-1 flex items-center justify-center', className)}>
-        <ErrorState
-          title="Failed to load conversation"
-          message={error.message || 'Unable to fetch messages. Please try again.'}
-          onRetry={() => refresh()}
-        />
+      <div className={cn('flex flex-col', className)}>
+        <div className="flex-1 flex items-center justify-center">
+          <ErrorState
+            title="Failed to load conversation"
+            message={error.message || 'Unable to fetch messages. Please try again.'}
+            onRetry={() => refresh()}
+          />
+        </div>
+        <PromptInput onSend={handleSend} isSending={isSending} disabled />
       </div>
     );
   }
 
-  // Empty conversation
+  // Empty conversation - allow sending first message
   if (!messages || messages.length === 0) {
     return (
-      <div className={cn('flex-1 flex items-center justify-center', className)}>
-        <EmptyState
-          title="No messages yet"
-          message="This session doesn't have any messages. Start a conversation with Claude to see it here."
-        />
+      <div className={cn('flex flex-col', className)}>
+        <div className="flex-1 flex items-center justify-center">
+          <EmptyState title="No messages yet" message="Send a message to start the conversation." />
+        </div>
+        <PromptInput onSend={handleSend} isSending={isSending} disabled={status === 'working'} />
       </div>
     );
   }
 
   // Main conversation view
   return (
-    <div className={cn('relative flex-1 overflow-hidden', className)}>
-      {/* Pull-to-refresh indicator */}
-      <PullToRefresh
-        pullDistance={pullDistance}
-        threshold={PULL_THRESHOLD}
-        isRefreshing={isRefreshing || isValidating}
-      />
+    <div className={cn('flex flex-col', className)}>
+      {/* Messages area */}
+      <div className="relative flex-1 overflow-hidden">
+        {/* Pull-to-refresh indicator */}
+        <PullToRefresh
+          pullDistance={pullDistance}
+          threshold={PULL_THRESHOLD}
+          isRefreshing={isRefreshing || isValidating}
+        />
 
-      {/* Scrollable container */}
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        className={cn(
-          'absolute inset-0 overflow-y-auto overflow-x-hidden',
-          'scrollbar-hide',
-          // Add top padding when pulling to make room for indicator
-          pullDistance > 0 && 'transition-transform'
-        )}
-        style={{
-          transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
-        }}
-      >
-        {/* Status indicator at top */}
-        {status && (
-          <div className="sticky top-0 z-10 px-4 py-2 bg-background/80 backdrop-blur-sm border-b border-text-primary/5">
-            <StatusBadge status={status} isRefreshing={isRefreshing || isValidating} />
-          </div>
-        )}
+        {/* Scrollable container */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className={cn(
+            'absolute inset-0 overflow-y-auto overflow-x-hidden',
+            'scrollbar-hide',
+            // Add top padding when pulling to make room for indicator
+            pullDistance > 0 && 'transition-transform'
+          )}
+          style={{
+            transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
+          }}
+        >
+          {/* Status indicator at top */}
+          {status && (
+            <div className="sticky top-0 z-10 px-4 py-2 bg-background/80 backdrop-blur-sm border-b border-text-primary/5">
+              <StatusBadge status={status} isRefreshing={isRefreshing || isValidating} />
+            </div>
+          )}
 
-        {/* Messages */}
-        <MessageList messages={messages} />
+          {/* Messages */}
+          <MessageList messages={messages} />
 
-        {/* Scroll anchor for auto-scroll */}
-        <div ref={messagesEndRef} className="h-px" />
+          {/* Scroll anchor for auto-scroll */}
+          <div ref={messagesEndRef} className="h-px" />
+        </div>
+
+        {/* Jump to latest button (appears when scrolled up) */}
+        <JumpToLatest
+          visible={userScrolledUp && !isRefreshing}
+          onClick={() => scrollToBottom('smooth')}
+        />
       </div>
 
-      {/* Jump to latest button (appears when scrolled up) */}
-      <JumpToLatest
-        visible={userScrolledUp && !isRefreshing}
-        onClick={() => scrollToBottom('smooth')}
-      />
+      {/* Prompt input */}
+      <PromptInput onSend={handleSend} isSending={isSending} disabled={status === 'working'} />
     </div>
   );
 }

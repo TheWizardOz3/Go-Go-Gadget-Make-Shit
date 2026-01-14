@@ -8,6 +8,7 @@ import {
   getSessionStatus,
   getRecentSessions,
 } from '../services/sessionManager.js';
+import { sendPrompt } from '../services/claudeService.js';
 
 const router: RouterType = Router();
 
@@ -213,10 +214,56 @@ router.post('/new', validateRequest({ body: newSessionSchema }), (_req, res) => 
  * POST /api/sessions/:id/send
  * Body: { prompt: string }
  *
- * TODO: Implement Claude CLI integration
+ * Spawns claude CLI with the prompt and returns immediately.
+ * Claude writes to JSONL, which will be picked up by our watcher.
  */
-router.post('/:id/send', validateRequest({ body: sendPromptSchema }), (_req, res) => {
-  res.status(501).json(error(ErrorCodes.NOT_IMPLEMENTED, 'Send prompt not yet implemented'));
+router.post('/:id/send', validateRequest({ body: sendPromptSchema }), async (req, res) => {
+  try {
+    // req.params.id is typed as string | string[] in Express 5 types, but with our
+    // route definition it's always a string. Cast to ensure TypeScript is happy.
+    const id = req.params.id as string;
+    // Body is validated by sendPromptSchema, so prompt is guaranteed to be a string
+    const { prompt } = req.body as z.infer<typeof sendPromptSchema>;
+
+    // Get session to find project path
+    const session = await getSession(id);
+    if (!session) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Session not found'));
+      return;
+    }
+
+    // Send prompt via Claude CLI
+    const result = await sendPrompt({
+      sessionId: id,
+      projectPath: session.projectPath,
+      prompt,
+    });
+
+    if (!result.success) {
+      logger.error('Failed to send prompt', {
+        sessionId: id,
+        error: result.error,
+      });
+      res
+        .status(500)
+        .json(error(ErrorCodes.INTERNAL_ERROR, result.error || 'Failed to send prompt'));
+      return;
+    }
+
+    res.json(
+      success({
+        success: true,
+        sessionId: id,
+        pid: result.pid,
+      })
+    );
+  } catch (err) {
+    logger.error('Failed to send prompt', {
+      sessionId: req.params.id,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to send prompt'));
+  }
 });
 
 /**
