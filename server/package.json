@@ -19,6 +19,7 @@
     "execa": "^9.6.1",
     "express": "^4.21.2",
     "shared": "workspace:*",
+    "simple-git": "^3.27.0",
     "yaml": "^2.7.0",
     "zod": "^3.24.1"
   },

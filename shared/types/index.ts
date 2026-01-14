@@ -179,6 +179,49 @@ export interface FileChange {
 }
 
 // =============================================================================
+// File Diff Types (for diff view feature)
+// =============================================================================
+
+/** Line type in a diff */
+export type DiffLineType = 'context' | 'add' | 'delete';
+
+/** A single line in a diff hunk */
+export interface DiffLine {
+  /** Type of change for this line */
+  type: DiffLineType;
+  /** Line content (without +/- prefix) */
+  content: string;
+  /** Line number in the old file (undefined for added lines) */
+  oldLineNumber?: number;
+  /** Line number in the new file (undefined for deleted lines) */
+  newLineNumber?: number;
+}
+
+/** A hunk (section) of changes in a diff */
+export interface DiffHunk {
+  /** Starting line number in the old file */
+  oldStart: number;
+  /** Number of lines from the old file in this hunk */
+  oldLines: number;
+  /** Starting line number in the new file */
+  newStart: number;
+  /** Number of lines in the new file in this hunk */
+  newLines: number;
+  /** The actual lines in this hunk */
+  lines: DiffLine[];
+}
+
+/** Full diff for a single file */
+export interface FileDiff {
+  /** File path relative to repo root */
+  path: string;
+  /** Change type */
+  status: FileChangeStatus;
+  /** Diff hunks containing the changes */
+  hunks: DiffHunk[];
+}
+
+// =============================================================================
 // Settings Types
 // =============================================================================
 

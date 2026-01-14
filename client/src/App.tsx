@@ -9,13 +9,18 @@ import { cn } from '@/lib/cn';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { useConversation } from '@/hooks/useConversation';
+import { useFilesChanged } from '@/hooks/useFilesChanged';
 import { ConversationView } from '@/components/conversation/ConversationView';
 import { ConversationSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { StatusIndicator, StatusIndicatorSkeleton } from '@/components/ui/StatusIndicator';
 import { ProjectPicker } from '@/components/project';
 import { SessionPicker } from '@/components/session';
+import { FilesChangedView, FilesBadge, FileDiffPlaceholder } from '@/components/files';
 import type { SessionStatus, SessionSummarySerialized } from '@shared/types';
+
+/** Active tab type */
+type ActiveTab = 'conversation' | 'files';
 
 /** localStorage key for persisting selected project */
 const STORAGE_KEY_LAST_PROJECT = 'gogogadgetclaude:lastProject';
@@ -93,6 +98,12 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState<string | null>(() => getStoredProject());
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
+  // Tab navigation state
+  const [activeTab, setActiveTab] = useState<ActiveTab>('conversation');
+
+  // Selected file for diff view (null = show file list)
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+
   // Modal states
   const [isProjectPickerOpen, setIsProjectPickerOpen] = useState(false);
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
@@ -115,6 +126,9 @@ export default function App() {
 
   // Fetch conversation status for selected session
   const { status, isLoading: statusLoading } = useConversation(selectedSession);
+
+  // Fetch files changed for badge count
+  const { count: filesChangedCount } = useFilesChanged(selectedProject);
 
   // Persist selected project to localStorage
   useEffect(() => {
@@ -179,6 +193,11 @@ export default function App() {
   // Reset session when project changes (will be restored from localStorage in above effect)
   useEffect(() => {
     setSelectedSession(null);
+  }, [selectedProject]);
+
+  // Clear selected file when project changes
+  useEffect(() => {
+    setSelectedFilePath(null);
   }, [selectedProject]);
 
   // Loading state (projects)
@@ -257,7 +276,7 @@ export default function App() {
     setSelectedSession(sessionId);
   };
 
-  // Main app with conversation view
+  // Main app with tab navigation
   return (
     <div className={cn('dark', 'min-h-screen', 'flex', 'flex-col', 'bg-background')}>
       <Header
@@ -272,10 +291,33 @@ export default function App() {
         hasProjects={projects.length > 0}
         hasSessions={(sessions?.length ?? 0) > 0}
       />
-      <ConversationView
-        sessionId={selectedSession}
-        encodedPath={selectedProject}
-        className="flex-1"
+
+      {/* Main content area - conditionally render based on active tab */}
+      {activeTab === 'conversation' ? (
+        <ConversationView
+          sessionId={selectedSession}
+          encodedPath={selectedProject}
+          className="flex-1"
+        />
+      ) : selectedFilePath ? (
+        <FileDiffPlaceholder
+          filePath={selectedFilePath}
+          onBack={() => setSelectedFilePath(null)}
+          className="flex-1"
+        />
+      ) : (
+        <FilesChangedView
+          encodedPath={selectedProject}
+          onFilePress={setSelectedFilePath}
+          className="flex-1"
+        />
+      )}
+
+      {/* Bottom Tab Bar */}
+      <TabBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        filesChangedCount={filesChangedCount}
       />
 
       {/* Project Picker Modal */}
@@ -422,5 +464,110 @@ function Header({
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * Chat bubble icon for Conversation tab
+ */
+function ChatBubbleIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Document/Files icon for Files tab
+ */
+function DocumentIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Bottom tab bar for navigation between views
+ */
+interface TabBarProps {
+  activeTab: ActiveTab;
+  onTabChange: (tab: ActiveTab) => void;
+  filesChangedCount: number;
+}
+
+function TabBar({ activeTab, onTabChange, filesChangedCount }: TabBarProps) {
+  return (
+    <nav className="flex-shrink-0 border-t border-text-primary/10 bg-surface safe-bottom">
+      <div className="flex items-center justify-around">
+        {/* Conversation Tab */}
+        <button
+          type="button"
+          onClick={() => onTabChange('conversation')}
+          className={cn(
+            'flex flex-col items-center justify-center gap-1',
+            'flex-1 py-2 min-h-[56px]',
+            'transition-colors duration-150',
+            'focus:outline-none focus-visible:bg-text-primary/5',
+            activeTab === 'conversation' ? 'text-accent' : 'text-text-muted'
+          )}
+          aria-selected={activeTab === 'conversation'}
+          role="tab"
+        >
+          <ChatBubbleIcon />
+          <span className="text-xs font-medium">Chat</span>
+        </button>
+
+        {/* Files Tab */}
+        <button
+          type="button"
+          onClick={() => onTabChange('files')}
+          className={cn(
+            'flex flex-col items-center justify-center gap-1',
+            'flex-1 py-2 min-h-[56px]',
+            'transition-colors duration-150',
+            'focus:outline-none focus-visible:bg-text-primary/5',
+            activeTab === 'files' ? 'text-accent' : 'text-text-muted'
+          )}
+          aria-selected={activeTab === 'files'}
+          role="tab"
+        >
+          <div className="relative">
+            <DocumentIcon />
+            {/* Badge positioned at top-right of icon */}
+            {filesChangedCount > 0 && (
+              <div className="absolute -top-1 -right-2">
+                <FilesBadge count={filesChangedCount} />
+              </div>
+            )}
+          </div>
+          <span className="text-xs font-medium">Files</span>
+        </button>
+      </div>
+    </nav>
   );
 }

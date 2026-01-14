@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-14 (Quick Templates Complete)
+**Last Updated**: 2026-01-14 (Files Changed View Complete)
 
 ---
 
@@ -60,11 +60,12 @@
 | Project Switcher | 2026-01-14 | [Feature doc](Features/project-switcher.md) - 35 new tests, 195 total |
 | Session Picker | 2026-01-14 | [Feature doc](Features/session-picker.md) - 49 new tests, 244 total |
 | Quick Templates | 2026-01-14 | [Feature doc](Features/quick-templates.md) - 51 new tests, 295 total |
+| Files Changed View | 2026-01-14 | [Feature doc](Features/files-changed-view.md) - 65 new tests, 360 total |
 
 ### In Progress
 | Feature | Started | Notes |
 |---------|---------|-------|
-| *None* | - | Next: Files Changed View (requires `/plan-feature`) |
+| — | — | — |
 
 ### MVP Build Order (Sequenced)
 
@@ -79,7 +80,7 @@
 | 7 | ~~Project Switcher~~ | #1 ✅ | MEDIUM | ✅ Complete |
 | 8 | ~~Session Picker~~ | #2 ✅, #7 ✅ | MEDIUM | ✅ Complete |
 | 9 | ~~Quick Templates~~ | #5 ✅, #7 ✅ | MEDIUM | ✅ Complete |
-| 10 | **Files Changed View** | #1 ✅ + Git service | MEDIUM | Review - list modified files |
+| 10 | ~~Files Changed View~~ | #1 ✅ + Git service | MEDIUM | ✅ Complete |
 | 11 | **File Diff View** | #10 | HIGH | Review - green/red change highlighting |
 | 12 | **Voice Input** | #5 ✅ | MEDIUM | Hands-free - dictate via Groq Whisper |
 | 13 | **iMessage Notifications** | Hooks setup | MEDIUM | Alerts - know when Claude finishes |
@@ -95,10 +96,9 @@
 ## Upcoming Work
 
 ### Next Up
-1. **Files Changed View** - List modified files (requires `/plan-feature`)
-2. **File Diff View** - Full file with green/red highlighting (depends on Files Changed)
-3. **Voice Input** - Dictate prompts with Groq Whisper transcription
-4. **iMessage Notifications** - Get notified when Claude finishes
+1. **File Diff View** - Full file with green/red highlighting (Files Changed ✅)
+2. **Voice Input** - Dictate prompts with Groq Whisper transcription
+3. **iMessage Notifications** - Get notified when Claude finishes
 
 ---
 

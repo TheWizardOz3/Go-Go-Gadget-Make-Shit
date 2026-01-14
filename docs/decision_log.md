@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-013 | 2026-01-14 | infra | active | simple-git for Git CLI operations |
 | ADR-012 | 2026-01-14 | ui | active | Pure CSS animations for modal transitions |
 | ADR-011 | 2026-01-14 | infra | active | Signal escalation for stopping Claude processes |
 | ADR-010 | 2026-01-14 | infra | active | Detached process spawning for Claude CLI |
@@ -35,6 +36,45 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-013: simple-git for Git CLI Operations
+**Date:** 2026-01-14 | **Category:** infra | **Status:** active
+
+#### Trigger
+Implementing the Files Changed View feature required interacting with Git to get uncommitted file changes (staged, unstaged, and untracked files).
+
+#### Decision
+Use **simple-git** npm package as a wrapper around Git CLI commands instead of directly spawning git processes with execa.
+
+#### Rationale
+1. **Type Safety:** simple-git provides TypeScript types for all operations and results
+2. **API Simplicity:** High-level methods like `status()`, `diffSummary()`, `checkIsRepo()` abstract away CLI argument complexity
+3. **Error Handling:** Consistent error handling and meaningful error messages
+4. **Maintained:** Actively maintained package with 3.7k+ GitHub stars
+5. **No Shell Parsing:** Avoids manually parsing git command output
+
+#### Alternatives Considered
+1. **Direct execa + git:** More control but requires parsing output, handling edge cases manually
+2. **isomorphic-git:** Pure JS git implementation, but heavier and doesn't need to run in browser
+3. **nodegit:** Native bindings, complex build requirements for a simple use case
+
+#### Implementation
+```typescript
+import { simpleGit, type SimpleGit, type StatusResult } from 'simple-git';
+
+const git = simpleGit({ baseDir: projectPath });
+const status: StatusResult = await git.status();
+const diffSummary = await git.diffSummary(['--cached']); // staged
+```
+
+#### AI Instructions
+- When implementing Git operations, use `simple-git` package
+- Create git instance with `simpleGit({ baseDir: projectPath })`
+- Use `checkIsRepo()` before operations to handle non-git directories gracefully
+- Combine `status()` and `diffSummary()` for complete file change information
+- Handle binary files (no line counts available)
+
+---
 
 ### ADR-012: Pure CSS Animations for Modal Transitions
 **Date:** 2026-01-14 | **Category:** ui | **Status:** active

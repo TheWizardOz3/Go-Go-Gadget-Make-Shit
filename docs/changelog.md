@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.11.0 | 2026-01-14 | prerelease | Files Changed View complete |
 | 0.10.0 | 2026-01-14 | prerelease | Quick Templates complete |
 | 0.9.0 | 2026-01-14 | prerelease | Session Picker complete |
 | 0.8.0 | 2026-01-14 | prerelease | Project Switcher complete |
@@ -37,6 +38,55 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.11.0] - 2026-01-14
+
+### Added
+- **Files Changed View** — List view showing all files modified in the current project
+  - Bottom tab navigation with Chat and Files tabs
+  - Badge on Files tab showing count of changed files (99+ max display)
+  - File list showing filename, directory path, and +/- line counts
+  - Status icons: green + for added, yellow pencil for modified, red - for deleted
+  - Tap file to navigate to diff view placeholder
+  - Back button returns to file list
+  - Empty state when no files changed
+  - Loading skeletons during fetch
+  - 5-second polling interval for file changes
+
+- **Git Service** — Backend service for Git operations
+  - `gitService.ts` using `simple-git` package
+  - `isGitRepo()` — Check if path is a git repository
+  - `getChangedFiles()` — Get staged, unstaged, and untracked files
+  - `getRepoRoot()` — Get repository root directory
+  - Combines staged and unstaged diff stats
+  - Handles binary files gracefully (no line counts)
+
+- **Files API Endpoint** — New endpoint for fetching changed files
+  - `GET /api/projects/:encodedPath/files` — Returns `FileChange[]`
+  - `GET /api/projects/:encodedPath/files/*` — Placeholder for file diff (501 Not Implemented)
+  - Returns empty array for non-git projects
+
+- **useFilesChanged Hook** — SWR-based data fetching for changed files
+  - 5-second polling interval
+  - `count` property for badge display
+  - Revalidates on window focus
+  - Keeps previous data while revalidating
+
+- **File Diff Types** — Shared types for future diff view feature
+  - `DiffLine`, `DiffHunk`, `FileDiff` interfaces in `shared/types/index.ts`
+
+- **FileDiffPlaceholder Component** — Placeholder for upcoming File Diff View feature
+  - Shows file path and "Coming Soon" message
+  - Back button for navigation
+
+### Dependencies
+- Added `simple-git@^3.27.0` to server
+
+### Tests
+- 65 new tests across 5 test files
+- Total test count now: 360
 
 ---
 

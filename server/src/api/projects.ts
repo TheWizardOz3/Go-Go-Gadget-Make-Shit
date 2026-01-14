@@ -3,6 +3,7 @@ import { success, error, ErrorCodes } from '../lib/responses.js';
 import { logger } from '../lib/logger.js';
 import { scanProjects, getProject, getSessionsForProject } from '../services/projectScanner.js';
 import { getTemplates } from '../services/templateService.js';
+import { getChangedFiles } from '../services/gitService.js';
 
 const router: RouterType = Router();
 
@@ -132,10 +133,42 @@ router.get('/:encodedPath/templates', async (req, res) => {
  * Get changed files for a project (git status)
  * GET /api/projects/:encodedPath/files
  *
- * TODO: Implement git diff integration
+ * Returns all uncommitted changes (staged + unstaged + untracked).
+ * Returns empty array if project is not a git repo or has no changes.
  */
-router.get('/:encodedPath/files', (_req, res) => {
-  res.status(501).json(error(ErrorCodes.NOT_IMPLEMENTED, 'File changes not yet implemented'));
+router.get('/:encodedPath/files', async (req, res) => {
+  try {
+    const { encodedPath } = req.params;
+
+    // First check if project exists
+    const project = await getProject(encodedPath);
+    if (!project) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Project not found'));
+      return;
+    }
+
+    // Get changed files from git
+    const result = await getChangedFiles({ projectPath: project.path });
+
+    if (!result.success) {
+      logger.error('Failed to get changed files', {
+        encodedPath,
+        projectPath: project.path,
+        error: result.error,
+      });
+      res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get changed files'));
+      return;
+    }
+
+    // Return file changes (empty array if not a git repo or no changes)
+    res.json(success(result.files));
+  } catch (err) {
+    logger.error('Failed to get changed files', {
+      encodedPath: req.params.encodedPath,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get changed files'));
+  }
 });
 
 /**
