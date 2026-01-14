@@ -14,6 +14,7 @@
   --color-success: #10b981;
   --color-error: #ef4444;
   --color-working: #3b82f6;
+  --color-warning: #f59e0b;
 
   /* Text colors */
   --color-text-primary: #1a1a1a;
@@ -29,6 +30,7 @@
   --color-success: #34d399;
   --color-error: #f87171;
   --color-working: #60a5fa;
+  --color-warning: #fbbf24;
 
   /* Text colors */
   --color-text-primary: #fafafa;
@@ -87,6 +89,28 @@
 }
 
 @layer utilities {
+  /* Status indicator pulse animation */
+  @keyframes status-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-status-pulse {
+    animation: status-pulse 1.5s ease-in-out infinite;
+  }
+
+  /* Respect reduced motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-status-pulse {
+      animation: none;
+    }
+  }
+
   /* Safe area insets for notched devices */
   .safe-top {
     padding-top: env(safe-area-inset-top);

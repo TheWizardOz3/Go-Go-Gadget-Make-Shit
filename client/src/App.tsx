@@ -8,9 +8,12 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/cn';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
+import { useConversation } from '@/hooks/useConversation';
 import { ConversationView } from '@/components/conversation/ConversationView';
 import { ConversationSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { StatusIndicator, StatusIndicatorSkeleton } from '@/components/ui/StatusIndicator';
+import type { SessionStatus } from '@shared/types';
 
 /**
  * Main App component
@@ -40,8 +43,11 @@ export default function App() {
     sessions,
     isLoading: sessionsLoading,
     error: sessionsError,
-    refresh: refreshSessions,
+    refresh: _refreshSessions,
   } = useSessions(selectedProject);
+
+  // Fetch conversation status for selected session
+  const { status, isLoading: statusLoading } = useConversation(selectedSession);
 
   // Auto-select most recent project when projects load
   useEffect(() => {
@@ -142,9 +148,10 @@ export default function App() {
     <div className={cn('dark', 'min-h-screen', 'flex', 'flex-col', 'bg-background')}>
       <Header
         projectName={currentProject?.name || null}
+        status={status}
+        statusLoading={statusLoading}
         sessionLoading={sessionsLoading}
         sessionError={sessionsError}
-        onRetrySession={() => refreshSessions()}
       />
       <ConversationView sessionId={selectedSession} className="flex-1" />
     </div>
@@ -152,23 +159,24 @@ export default function App() {
 }
 
 /**
- * App header with project name
+ * App header with project name and status indicator
  *
  * Project/session picker will be added as separate feature.
  */
 interface HeaderProps {
   projectName: string | null;
+  status?: SessionStatus;
+  statusLoading?: boolean;
   sessionLoading?: boolean;
   sessionError?: Error;
-  onRetrySession?: () => void;
 }
 
-function Header({ projectName, sessionLoading, sessionError }: HeaderProps) {
+function Header({ projectName, status, statusLoading, sessionLoading, sessionError }: HeaderProps) {
   return (
     <header className="flex-shrink-0 px-4 py-3 border-b border-text-primary/10 bg-surface safe-top">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         {/* Project name / title */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <h1 className="text-lg font-semibold text-text-primary truncate">
             {projectName || 'GoGoGadgetClaude'}
           </h1>
@@ -176,6 +184,11 @@ function Header({ projectName, sessionLoading, sessionError }: HeaderProps) {
             <span className="flex-shrink-0 w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
           )}
           {sessionError && <span className="flex-shrink-0 text-error text-xs">Error</span>}
+        </div>
+
+        {/* Status indicator */}
+        <div className="flex-shrink-0">
+          {statusLoading ? <StatusIndicatorSkeleton /> : <StatusIndicator status={status} />}
         </div>
 
         {/* Placeholder for future project/session picker */}

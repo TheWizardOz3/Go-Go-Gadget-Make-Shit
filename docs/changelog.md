@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.5.0 | 2026-01-14 | prerelease | Status Indicator complete |
 | 0.4.0 | 2026-01-14 | prerelease | Conversation View UI complete |
 | 0.3.0 | 2026-01-14 | prerelease | JSONL Watcher Service complete |
 | 0.2.0 | 2026-01-14 | prerelease | API Server Setup complete |
@@ -31,6 +32,47 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.5.0] - 2026-01-14
+
+### Added
+- **Status Indicator** — Visual feedback for Claude Code session state in app header
+  - Pill-shaped badge showing Working (blue), Waiting (amber), or Idle (gray) status
+  - Pulse animation for "Working" state with `prefers-reduced-motion` support
+  - Status dot + label format with proper accessibility (role="status", aria-live="polite")
+  - Loading skeleton while status is being fetched
+  - Defaults to "Idle" when status is undefined or no session selected
+
+- **Warning Color Token** — Added `--color-warning` design token
+  - Light mode: `#F59E0B`
+  - Dark mode: `#FBBF24`
+  - Added to both CSS variables and Tailwind config
+
+- **Unit Tests** — 9 new tests for StatusIndicator component
+  - Tests for all three status states (Working, Waiting, Idle)
+  - Tests for undefined status handling
+  - Tests for accessibility attributes
+  - Tests for custom className support
+  - Tests for skeleton component
+
+### Technical Details
+- **New Files:**
+  - `client/src/components/ui/StatusIndicator.tsx` — Main component + skeleton
+  - `client/src/components/ui/StatusIndicator.test.tsx` — 9 unit tests
+
+- **Modified Files:**
+  - `client/src/App.tsx` — Integrated StatusIndicator into Header
+  - `client/src/index.css` — Added warning color token and pulse animation
+  - `client/tailwind.config.js` — Added warning color to theme
+
+### Verified
+- All 4 implementation tasks complete
+- `pnpm lint` passes with 0 errors
+- `pnpm typecheck` passes with 0 errors
+- `pnpm test` passes with 97 tests (33 client + 64 server)
+- Manual UI testing verified in browser
 
 ---
 

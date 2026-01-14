@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-14 (Conversation View UI Complete)
+**Last Updated**: 2026-01-14 (Status Indicator Complete)
 
 ---
 
@@ -54,6 +54,7 @@
 | API Server Setup | 2026-01-14 | [Feature doc](Features/api-server-setup.md) - Middleware, routes, validation |
 | JSONL Watcher Service | 2026-01-14 | [Feature doc](Features/jsonl-watcher-service.md) - Parser, scanner, watcher, caching |
 | Conversation View UI | 2026-01-14 | [Feature doc](Features/conversation-view-ui.md) - All 12 tasks complete |
+| Status Indicator | 2026-01-14 | [Feature doc](Features/status-indicator.md) - All 4 tasks complete |
 
 ### In Progress
 | Feature/Task | Started | Feature Doc | Notes |
@@ -67,7 +68,7 @@
 | 1 | ~~API Server Setup~~ | Scaffold ✅ | MEDIUM | ✅ Complete |
 | 2 | ~~JSONL Watcher Service~~ | #1 ✅ | MEDIUM | ✅ Complete |
 | 3 | ~~Conversation View UI~~ | #1 ✅, #2 ✅ | MEDIUM | ✅ Complete |
-| 4 | **Status Indicator** | #2 ✅, #3 ✅ | LOW | Working/Waiting/Idle at a glance |
+| 4 | ~~Status Indicator~~ | #2 ✅, #3 ✅ | LOW | ✅ Complete |
 | 5 | **Text Input & Send** | #1 ✅, #3 ✅ | LOW | Primary interaction - send prompts to Claude |
 | 6 | **Stop Button** | #1 ✅ | LOW | Safety - kill runaway agent |
 | 7 | **Project Switcher** | #1 ✅ | MEDIUM | Navigation - switch between codebases |
@@ -89,9 +90,9 @@
 ## Upcoming Work
 
 ### Next Up
-1. **Status Indicator** - Working/Waiting/Idle at a glance (depends on #2 ✅)
-2. **Text Input & Send** - Send prompts to Claude from phone (depends on #1 ✅)
-3. **Stop Button** - Kill runaway agent immediately (depends on #1 ✅)
+1. **Text Input & Send** - Send prompts to Claude from phone (depends on #1 ✅)
+2. **Stop Button** - Kill runaway agent immediately (depends on #1 ✅)
+3. **Project Switcher** - Navigation between codebases (depends on #1 ✅)
 
 ---
 

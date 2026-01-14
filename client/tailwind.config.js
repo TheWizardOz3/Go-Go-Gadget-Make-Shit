@@ -39,6 +39,11 @@ export default {
           dark: '#60A5FA',
           DEFAULT: 'var(--color-working)',
         },
+        warning: {
+          light: '#F59E0B',
+          dark: '#FBBF24',
+          DEFAULT: 'var(--color-warning)',
+        },
         // Text colors
         text: {
           primary: 'var(--color-text-primary)',
