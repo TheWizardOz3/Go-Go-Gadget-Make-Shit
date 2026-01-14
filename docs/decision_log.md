@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-007 | 2026-01-14 | api | active | Standardized API response format |
 | ADR-001 | 2026-01-13 | arch | active | Local-first architecture via Tailscale |
 | ADR-002 | 2026-01-13 | data | active | File-based storage (no database) |
 | ADR-003 | 2026-01-13 | infra | active | Polling over WebSockets for conversation updates |
@@ -29,6 +30,36 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-007: Standardized API Response Format
+**Date:** 2026-01-14 | **Category:** api | **Status:** active
+
+#### Trigger
+Implementing the API server setup feature required a consistent approach to formatting both success and error responses across all endpoints.
+
+#### Decision
+Standardize all API responses with this format:
+- **Success:** `{ data: T, meta: { timestamp } }`
+- **Error:** `{ error: { code: string, message: string, details?: Record<string, string> } }`
+
+Use custom error classes (`AppError`, `ValidationError`, `NotFoundError`, etc.) that integrate with a centralized error handler to produce consistent error responses.
+
+#### Rationale
+- **Predictable client parsing:** All responses follow the same structure, simplifying the client API wrapper
+- **Typed error codes:** Using constants (`VALIDATION_ERROR`, `NOT_FOUND`, etc.) enables switch-based error handling on the client
+- **Field-level details:** Zod validation errors include per-field messages in `details` object
+- **Operational vs unexpected:** Custom error classes distinguish expected errors (return proper status) from bugs (return 500)
+- **Timestamp in meta:** Useful for debugging and cache invalidation
+
+#### AI Instructions
+- Always use `success()` and `error()` utilities from `server/src/lib/responses.ts`
+- Throw custom error classes from `server/src/lib/errors.ts` — they'll be caught by `errorHandler`
+- Never return raw objects — wrap in `success()` or `error()`
+- Use `ValidationError` for Zod failures (validateRequest middleware does this automatically)
+- Use `NotFoundError` for missing resources
+- Only log unexpected errors (non-operational) as `logger.error`; operational errors use `logger.warn`
+
+---
 
 ### ADR-006: ESLint 9 Flat Config
 **Date:** 2026-01-13 | **Category:** infra | **Status:** active

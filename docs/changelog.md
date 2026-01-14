@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.2.0 | 2026-01-14 | prerelease | API Server Setup complete |
 | 0.1.0 | 2026-01-13 | prerelease | Project scaffolding complete |
 | 0.0.2 | 2026-01-13 | prerelease | Technical architecture documentation |
 | 0.0.1 | 2026-01-13 | prerelease | Initial product specification |
@@ -27,8 +28,58 @@
 
 ## [Unreleased]
 
+*Nothing unreleased*
+
+---
+
+## [0.2.0] - 2026-01-14
+
 ### Added
-- Nothing yet
+- **API Server Setup** — Complete Express API infrastructure for MVP features
+  - Express middleware stack: JSON parsing (10MB limit), CORS, request logging
+  - API router structure with placeholder routes for all endpoint groups
+  - Static file serving for production (serves built React app from `/`)
+  - SPA catch-all route for client-side routing support
+  - Standardized response utilities (`success()`, `error()`) with TypeScript types
+  - Zod validation middleware with field-level error details
+  - Custom error classes (`AppError`, `ValidationError`, `NotFoundError`, etc.)
+  - Enhanced error handler supporting all error types
+  - API 404 handler returning proper JSON errors for unmatched routes
+  - Client-side API fetch wrapper with auto base URL detection
+  - Server-side logging utility with levels (error, warn, info, debug)
+
+- **Environment Configuration** — Complete development environment setup
+  - `.env.example` with all documented environment variables
+  - `README.md` with comprehensive setup instructions
+  - `scripts/setup-hooks.sh` for Claude Code hook configuration
+  - Tailscale setup guide for phone access
+  - Groq API key instructions for voice transcription
+
+### Changed
+- **Client App** — Now fetches and displays server status (Server: Healthy, Claude: Idle)
+- **Client tsconfig** — Added Vite client types for `import.meta.env` support
+
+### Technical Details
+- **New Server Files:**
+  - `server/src/api/index.ts` — Main API router
+  - `server/src/api/projects.ts` — Projects endpoints (placeholders)
+  - `server/src/api/sessions.ts` — Sessions endpoints with validation
+  - `server/src/api/transcribe.ts` — Transcription endpoint (placeholder)
+  - `server/src/api/settings.ts` — Settings endpoints (placeholders)
+  - `server/src/lib/responses.ts` — Response utilities and types
+  - `server/src/lib/errors.ts` — Custom error classes
+  - `server/src/lib/logger.ts` — Logging utility
+  - `server/src/middleware/requestLogger.ts` — Request logging middleware
+  - `server/src/middleware/validateRequest.ts` — Zod validation middleware
+
+- **New Client Files:**
+  - `client/src/lib/api.ts` — Typed API fetch wrapper
+
+### Verified
+- All 6 acceptance criteria passing
+- 11 manual tests passing (health check, CORS, validation, error handling, etc.)
+- UI displays live server status fetched via API client
+- `pnpm lint` and `pnpm typecheck` pass with 0 errors
 
 ---
 

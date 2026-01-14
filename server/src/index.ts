@@ -1,25 +1,79 @@
 import 'dotenv/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
-import statusRouter from './api/status.js';
-import { errorHandler } from './middleware/errorHandler.js';
+import apiRouter from './api/index.js';
+import { errorHandler, apiNotFoundHandler } from './middleware/errorHandler.js';
+import { requestLogger } from './middleware/requestLogger.js';
 import { config } from './lib/config.js';
+import { logger } from './lib/logger.js';
+
+// ES Module dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Path to built React app (relative to server/src/)
+const CLIENT_DIST_PATH = path.join(__dirname, '../../client/dist');
 
 const app = express();
 const PORT = config.port;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// ============================================================
+// Middleware Stack (order matters!)
+// ============================================================
 
+// 1. CORS - Allow cross-origin requests (Tailscale is the security boundary)
+app.use(
+  cors({
+    origin: true, // Reflect request origin (allows all origins)
+    credentials: true,
+  })
+);
+
+// 2. JSON Body Parser - Parse JSON request bodies with size limit
+app.use(
+  express.json({
+    limit: '10mb', // Accommodate voice recordings and large prompts
+  })
+);
+
+// 3. Request Logger - Log all incoming requests
+app.use(requestLogger);
+
+// ============================================================
 // API Routes
-app.use('/api/status', statusRouter);
+// ============================================================
+app.use('/api', apiRouter);
 
-// Error handling (must be last)
+// API 404 handler - must be after API routes but before static serving
+// Returns JSON error for unmatched /api/* requests
+app.use('/api', apiNotFoundHandler);
+
+// ============================================================
+// Static File Serving (Production)
+// ============================================================
+// Serve built React app from client/dist
+app.use(express.static(CLIENT_DIST_PATH));
+
+// SPA catch-all: serve index.html for any non-API routes
+// This enables client-side routing (React Router)
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(CLIENT_DIST_PATH, 'index.html'));
+});
+
+// ============================================================
+// Error Handling (must be last)
+// ============================================================
 app.use(errorHandler);
 
-// Start server
+// ============================================================
+// Start Server
+// ============================================================
 app.listen(PORT, () => {
-  console.log(`🚀 GoGoGadgetClaude server running on http://localhost:${PORT}`);
-  console.log(`   Health check: http://localhost:${PORT}/api/status`);
+  logger.info('GoGoGadgetClaude server started', {
+    port: PORT,
+    url: `http://localhost:${PORT}`,
+    healthCheck: `http://localhost:${PORT}/api/status`,
+  });
 });
