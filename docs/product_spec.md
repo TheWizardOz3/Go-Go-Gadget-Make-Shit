@@ -111,11 +111,15 @@ Inspired by Linear's precision and polish, Olauncher's radical minimalism, and C
 | File Diff View | P0 | MVP | High | Git diff + syntax highlighting |
 | Session Picker | P0 | MVP | Medium | JSONL session management |
 | iMessage Notifications | P0 | MVP | Medium | macOS Shortcuts/AppleScript |
+| File Tree View | P1 | V0.75 | Medium | File system scanning |
+| Model Switching | P1 | V0.75 | Medium | Claude CLI integration |
+| Voice Waveform | P1 | V0.75 | Low | Audio visualization |
 | Slack Notifications | P1 | V1 | Medium | Slack Webhook API |
 | Telegram Notifications | P1 | V1 | Medium | Telegram Bot API |
-| Email Notifications | P1 | V1 | Medium | SMTP or email service |
-| Enhanced Diff View | P2 | V1 | Medium | UI improvements |
-| Voice Waveform | P2 | V1 | Low | Audio visualization |
+| Serverless Execution | P1 | V1 | High | Cloud compute |
+| Cursor Support | P2 | V2 | High | Cursor CLI (if available) |
+| Email Notifications | P2 | V2 | Medium | SMTP or email service |
+| Enhanced Diff View | P2 | V2 | Medium | UI improvements |
 | Work Account Support | P2 | V2 | High | Okta integration |
 | Super App Integration | P2 | V2 | Medium | API design |
 
@@ -611,61 +615,87 @@ Open App → See Problem in Conversation → Tap Stop → Confirm Stopped → Re
 
 ---
 
-### 5.2 V1 (Version 1.0)
+### 5.2 V0.75 (Navigation & Model Control)
 
-**Functionality Summary:** Enhanced notification options and improved UX for power users.
+**Functionality Summary:** Enhanced project navigation, model switching, and improved voice input UX.
 
 **User Goals:**
-- Get notifications via my preferred channel (Slack, Telegram, email)
-- Better voice input experience with visual feedback
-- Enhanced diff viewing
+- Browse project file tree from my phone
+- Switch Claude models without laptop access
+- See visual feedback when recording voice prompts
 
 **Features Added/Evolved:**
 | Feature | Change from MVP | Rationale |
 |---------|-----------------|-----------|
+| File Tree View | NEW - Browse project files | Navigate codebase on mobile |
+| Model Switching | NEW - Change Claude model | Use different models for different tasks |
+| Voice Waveform | NEW - Visual feedback during recording | Know recording is working |
+
+**Technical Scope:**
+- File system tree API endpoint
+- Claude CLI model switching (`claude config model`)
+- Audio visualization (Web Audio API)
+
+---
+
+### 5.3 V1 (Version 1.0)
+
+**Functionality Summary:** Multiple notification channels and serverless execution.
+
+**User Goals:**
+- Get notifications via my preferred channel (Slack, Telegram)
+- Run agents without keeping laptop awake
+
+**Features Added/Evolved:**
+| Feature | Change from MVP | Rationale |
+|---------|-----------------|-----------|
+| Notification Channel Abstraction | NEW - Pluggable notification system | Easy to add new channels |
 | Slack Notifications | NEW - Webhook integration | Many developers live in Slack |
 | Telegram Notifications | NEW - Bot API integration | Popular for personal notifications |
-| Email Notifications | NEW - SMTP integration | Universal fallback option |
-| Voice Waveform | NEW - Visual feedback during recording | Know recording is working |
-| Edit Transcription | ENHANCED - Better editing UX | Fix transcription errors easier |
-| Enhanced Diff View | ENHANCED - Expand/collapse, better navigation | Large diffs more manageable |
+| Serverless Execution | NEW - Cloud compute for agents | True async operation |
 
 **Technical Scope:**
 - Notification channel abstraction layer
 - Slack webhook integration
 - Telegram bot setup
-- SMTP client (nodemailer)
-- Audio visualization (Web Audio API)
-- Improved diff UI components
+- Cloud compute integration (AWS Lambda, Modal, or similar)
 
 ---
 
-### 5.3 V2 (Version 2.0)
+### 5.4 V2 (Version 2.0)
 
-**Functionality Summary:** Enterprise-ready with work account support and super app integration.
+**Functionality Summary:** Enterprise-ready with work account support, Cursor integration, and enhanced UX.
 
 **User Goals:**
 - Use this for work projects with proper security
-- Integrate into my personal productivity super app
+- Monitor Cursor sessions (when supported)
+- Enhanced diff viewing for large changes
+- Get email notifications as fallback
 
 **Features Added/Evolved:**
 | Feature | Change from MVP | Rationale |
 |---------|-----------------|-----------|
 | Work Account Support | NEW - Okta SSO integration | Enterprise security requirements |
 | GitHub Org Repos | NEW - Org repo support with auth | Access work codebases |
+| Cursor Support | NEW - Observe/control Cursor | If Cursor adds CLI agent mode |
 | Super App Integration | NEW - Embeddable API/component | Part of larger productivity suite |
 | Account Segregation | NEW - Fully separate work/personal | Security and compliance |
+| Email Notifications | NEW - SMTP integration | Universal fallback option |
+| Enhanced Diff View | ENHANCED - Expand/collapse, better navigation | Large diffs more manageable |
 
 **Technical Scope:**
 - Okta OIDC integration
 - GitHub OAuth with org permissions
+- Cursor observation/control layer (pending Cursor CLI)
 - Separate deployment for work instance
 - API design for embedding
 - Data isolation architecture
+- SMTP client (nodemailer)
+- Improved diff UI components
 
 ---
 
-### 5.4 Not In Scope (Explicit Exclusions)
+### 5.5 Not In Scope (Explicit Exclusions)
 
 **Rationale:** Keeping MVP focused on core value proposition; deferring complexity and enterprise features.
 
@@ -673,17 +703,15 @@ Open App → See Problem in Conversation → Tap Stop → Confirm Stopped → Re
 |------|---------------------|---------------------------|
 | Multi-session monitoring | Complexity, user said not needed | V2+ if demand arises |
 | Real-time streaming | Polling is "good enough", streaming is complex | V1 if latency is painful |
-| Cursor support | GUI app, hard to observe/control programmatically | V2+ if Cursor adds CLI |
-| Command history/favorites | Nice-to-have, not core | V1 |
-| Git operations (commit, push, branch) | Better done on laptop, risky on mobile | V2 |
+| Command history/favorites | Nice-to-have, not core | V2+ |
+| Git operations (commit, push, branch) | Better done on laptop, risky on mobile | V2+ |
 | Undo/revert from phone | Risky, git CLI on laptop is safer | Never (by design) |
-| Serverless/async execution | Requires cloud compute, adds cost/complexity | V2+ as optional mode |
 | Custom themes | System preference is sufficient | Never |
-| iPad/tablet optimization | Mobile is primary; tablet works but not optimized | V1 |
+| iPad/tablet optimization | Mobile is primary; tablet works but not optimized | V2+ |
 
 **Boundaries:**
-- We will NOT support Cursor (GUI app) in MVP—Claude Code CLI only
-- We will NOT run agents in the cloud—laptop must be awake
+- We will NOT support Cursor (GUI app) in MVP—Claude Code CLI only (V2 target)
+- We will NOT run agents in the cloud in MVP—laptop must be awake (V1 adds serverless)
 - We will NOT provide authentication on the web UI—Tailscale is the security boundary
 - We will NOT auto-send voice prompts—user must explicitly tap send
 - We will NOT allow destructive git operations from the phone
@@ -996,4 +1024,4 @@ npm run start  # Runs server on :3000
 
 ---
 
-*Last Updated: 2026-01-13*
+*Last Updated: 2026-01-15*

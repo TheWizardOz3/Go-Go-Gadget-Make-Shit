@@ -143,6 +143,41 @@ export const api = {
   delete<T>(path: string): Promise<T> {
     return request<T>('DELETE', path);
   },
+
+  /**
+   * Upload file via multipart/form-data
+   * @example
+   * const formData = new FormData();
+   * formData.append('audio', audioBlob);
+   * const result = await api.upload<TranscriptionResult>('/transcribe', formData);
+   */
+  async upload<T>(path: string, formData: FormData): Promise<T> {
+    const url = `${BASE_URL}/api${path}`;
+
+    // Don't set Content-Type header - browser will set it with boundary
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    // Parse JSON response
+    const json = await response.json();
+
+    // Handle error responses
+    if (!response.ok) {
+      const errorResponse = json as ApiErrorResponse;
+      throw new ApiError(
+        errorResponse.error?.message || 'Upload failed',
+        errorResponse.error?.code || 'UPLOAD_ERROR',
+        response.status,
+        errorResponse.error?.details
+      );
+    }
+
+    // Return the data from success response
+    const successResponse = json as ApiSuccessResponse<T>;
+    return successResponse.data;
+  },
 };
 
 // ============================================================

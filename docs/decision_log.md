@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-015 | 2026-01-15 | api | active | Groq Whisper API with Web Speech fallback for voice input |
 | ADR-014 | 2026-01-15 | data | active | Unified diff parsing for File Diff View |
 | ADR-013 | 2026-01-14 | infra | active | simple-git for Git CLI operations |
 | ADR-012 | 2026-01-14 | ui | active | Pure CSS animations for modal transitions |
@@ -37,6 +38,54 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-015: Groq Whisper API with Web Speech Fallback for Voice Input
+**Date:** 2026-01-15 | **Category:** api | **Status:** active
+
+#### Trigger
+Implementing voice input required choosing a transcription service that works well on mobile Safari while being accessible without complex authentication.
+
+#### Decision
+Use **Groq Whisper API** as primary transcription with **Web Speech API** as parallel fallback:
+
+1. **Groq Whisper (primary)**: Server-side transcription via `POST /api/transcribe`
+   - High accuracy with `whisper-large-v3` model
+   - Works in all browsers (audio sent to server)
+   - Requires `GROQ_API_KEY` environment variable
+
+2. **Web Speech API (fallback)**: Client-side browser-native transcription
+   - Runs in parallel during recording (captures interim results)
+   - Used only if Groq fails (network error, rate limit, etc.)
+   - Works on Safari iOS without additional setup
+
+3. **Audio capture**: MediaRecorder API with optimal Whisper settings
+   - MIME type priority: `audio/webm` > `audio/mp4` > `audio/ogg`
+   - Sample rate: 16kHz (optimal for Whisper)
+   - Echo cancellation and noise suppression enabled
+
+#### Alternatives Considered
+
+| Option | Pros | Cons |
+|--------|------|------|
+| OpenAI Whisper directly | Same model quality | Requires separate API key, higher cost |
+| Web Speech API only | No server needed, free | iOS Safari has quirks, lower accuracy |
+| AssemblyAI | Good accuracy | Additional subscription, more complex setup |
+| Deepgram | Real-time streaming | Overkill for this use case |
+
+#### Consequences
+- **Positive**: High accuracy transcription with graceful degradation
+- **Positive**: No-config fallback works immediately (Web Speech)
+- **Positive**: Groq's free tier generous for personal use
+- **Negative**: Requires Groq API key for best experience
+- **Negative**: Web Speech fallback quality varies by device
+
+#### AI Instructions
+- Always send audio to server first (Groq) before falling back to Web Speech
+- Web Speech recognition should run in parallel to have fallback ready
+- Use memory storage for multer (no disk writes for audio files)
+- Set 30-second timeout for Groq API to handle slow connections
+
+---
 
 ### ADR-014: Unified Diff Parsing for File Diff View
 **Date:** 2026-01-15 | **Category:** data | **Status:** active

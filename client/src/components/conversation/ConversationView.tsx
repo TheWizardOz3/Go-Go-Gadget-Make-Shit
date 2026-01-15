@@ -55,8 +55,8 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
   const { stopAgent, isStopping } = useStopAgent(sessionId);
   const { templates, isLoading: templatesLoading } = useTemplates(encodedPath);
 
-  // Toast state for showing "Agent stopped" message
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Toast state for showing messages (info or error)
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'error' } | null>(null);
 
   /**
    * Handle template selection - sets input value
@@ -72,6 +72,13 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
   const handleInputValueChange = useCallback(() => {
     // Clear external value so user can edit freely
     setExternalInputValue(undefined);
+  }, []);
+
+  /**
+   * Handle voice input errors - display as error toast
+   */
+  const handleVoiceError = useCallback((error: Error) => {
+    setToast({ message: error.message, type: 'error' });
   }, []);
 
   /**
@@ -219,7 +226,7 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
   const handleStop = useCallback(async () => {
     const success = await stopAgent();
     if (success) {
-      setToastMessage('Agent stopped');
+      setToast({ message: 'Agent stopped', type: 'info' });
     }
   }, [stopAgent]);
 
@@ -227,13 +234,13 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
    * Auto-dismiss toast after 3 seconds
    */
   useEffect(() => {
-    if (toastMessage) {
+    if (toast) {
       const timer = setTimeout(() => {
-        setToastMessage(null);
+        setToast(null);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [toastMessage]);
+  }, [toast]);
 
   // No session selected
   if (!sessionId) {
@@ -263,6 +270,7 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
           status={status}
           onStop={handleStop}
           isStopping={isStopping}
+          onVoiceError={handleVoiceError}
         />
       </div>
     );
@@ -286,6 +294,7 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
           status={status}
           onStop={handleStop}
           isStopping={isStopping}
+          onVoiceError={handleVoiceError}
         />
       </div>
     );
@@ -317,6 +326,7 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
           isStopping={isStopping}
           externalValue={externalInputValue}
           onValueChange={handleInputValueChange}
+          onVoiceError={handleVoiceError}
         />
       </div>
     );
@@ -393,12 +403,40 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
         isStopping={isStopping}
         externalValue={externalInputValue}
         onValueChange={handleInputValueChange}
+        onVoiceError={handleVoiceError}
       />
 
       {/* Toast notification */}
-      {toastMessage && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 bg-surface border border-text-primary/10 rounded-lg shadow-lg text-sm text-text-primary animate-in fade-in slide-in-from-bottom-2 duration-200">
-          {toastMessage}
+      {toast && (
+        <div
+          className={cn(
+            'absolute bottom-20 left-1/2 -translate-x-1/2',
+            'flex items-center gap-2',
+            'px-4 py-2 rounded-lg shadow-lg',
+            'text-sm animate-in fade-in slide-in-from-bottom-2 duration-200',
+            // Error styling
+            toast.type === 'error' && 'bg-error/10 border border-error/30 text-error',
+            // Info styling
+            toast.type === 'info' && 'bg-surface border border-text-primary/10 text-text-primary'
+          )}
+        >
+          {toast.type === 'error' && (
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+              />
+            </svg>
+          )}
+          {toast.message}
         </div>
       )}
     </div>

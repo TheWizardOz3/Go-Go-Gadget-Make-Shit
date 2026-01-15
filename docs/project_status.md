@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-15 (File Diff View Complete)
+**Last Updated**: 2026-01-15 (Voice Input Feature Complete - 12/13 MVP features done)
 
 ---
 
@@ -26,13 +26,14 @@
 #### Explicitly Out of Scope
 | Item | Reason for Exclusion | Planned Milestone |
 |------|---------------------|-------------------|
-| Slack/Telegram/Email notifications | Additional complexity, iMessage sufficient for personal use | V1 |
+| Slack/Telegram notifications | Additional complexity, iMessage sufficient for personal use | V1 |
 | Multi-session monitoring | User indicated single session is sufficient | V2+ |
-| Cursor support | GUI app, hard to observe/control programmatically | V2+ |
+| Cursor support | GUI app, hard to observe/control programmatically | V2 |
 | Real-time streaming | Polling every 2-3s is sufficient | V1 if needed |
 | Work account / Okta | Enterprise feature, requires separate deployment | V2 |
 | Git operations (commit, push) | Better done on laptop, risky on mobile | V2 |
-| Serverless execution | Requires cloud compute, adds cost/complexity | V2+ |
+| File tree viewing | Project navigation enhancement | V0.75 |
+| Model switching | Switch Claude models from mobile | V0.75 |
 
 #### Boundaries
 - We will NOT support Cursor (GUI app) in this milestone—Claude Code CLI only
@@ -62,6 +63,7 @@
 | Quick Templates | 2026-01-14 | [Feature doc](Features/quick-templates.md) - 51 new tests, 295 total |
 | Files Changed View | 2026-01-14 | [Feature doc](Features/files-changed-view.md) - 65 new tests, 360 total |
 | File Diff View | 2026-01-15 | [Feature doc](Features/file-diff-view.md) - 54 new tests, 414 total |
+| Voice Input | 2026-01-15 | [Feature doc](Features/voice-input.md) - 46 new tests, 460 total |
 
 ### MVP Build Order (Sequenced)
 
@@ -78,8 +80,8 @@
 | 9 | ~~Quick Templates~~ | #5 ✅, #7 ✅ | MEDIUM | ✅ Complete |
 | 10 | ~~Files Changed View~~ | #1 ✅ + Git service | MEDIUM | ✅ Complete |
 | 11 | ~~File Diff View~~ | #10 ✅ | HIGH | ✅ Complete |
-| 12 | **Voice Input** | #5 ✅ | MEDIUM | Hands-free - dictate via Groq Whisper |
-| 13 | **iMessage Notifications** | Hooks setup | MEDIUM | Alerts - know when Claude finishes |
+| 12 | ~~Voice Input~~ | #5 ✅ | MEDIUM | ✅ Complete |
+| 13 | **iMessage Notifications** 🚧 | Hooks setup | MEDIUM | Alerts - know when Claude finishes |
 
 **Build Strategy:**
 - **Core Loop (#1-6):** View conversation → send prompts → control agent
@@ -91,55 +93,76 @@
 
 ## Upcoming Work
 
+### In Progress
+1. **iMessage Notifications** 🚧 - Feature doc needed (plan next)
+
 ### Next Up
-1. **Voice Input** - Dictate prompts with Groq Whisper transcription
-2. **iMessage Notifications** - Get notified when Claude finishes
+None - iMessage Notifications is the last MVP feature!
 
 ---
 
 ## Future Milestones
 
-### V1: Enhanced Notifications & UX Polish
-**Functionality Summary**: Multiple notification channels and improved user experience
+### V0.75: Navigation & Model Control
+**Functionality Summary**: Enhanced project navigation and model switching capabilities
 
 **Key Features:**
+- File tree viewing for project navigation
+- Model switching (change Claude models from mobile)
+- Voice input waveform visualization
+
+**Technical Scope:**
+- File system tree API endpoint
+- Claude CLI model switching integration
+- Audio visualization with Web Audio API
+
+---
+
+### V1: Notifications & Serverless
+**Functionality Summary**: Multiple notification channels and serverless execution
+
+**Key Features:**
+- Notification channel abstraction layer
 - Slack webhook notifications
 - Telegram bot notifications
-- Email notifications (SMTP)
-- Voice input waveform visualization
-- Enhanced diff view (expand/collapse, better navigation)
+- Serverless/async execution (run agents without laptop awake)
 
 **Technical Scope:**
 - Notification channel abstraction layer
-- Audio visualization with Web Audio API
-- Improved diff UI components
+- Slack webhook integration
+- Telegram bot setup
+- Cloud compute integration for serverless mode
 
 ---
 
 ### V2: Enterprise & Integration
-**Functionality Summary**: Work account support and super app integration
+**Functionality Summary**: Work account support, Cursor integration, and enhanced UX
 
 **Key Features:**
 - Okta SSO integration for work accounts
 - GitHub org repo support
+- Cursor support (if Cursor adds CLI agent mode)
 - Super app embeddable API
 - Full account segregation (work/personal)
+- Email notifications (SMTP)
+- Enhanced diff view (expand/collapse, better navigation)
 
 **Technical Scope:**
 - Okta OIDC integration
 - GitHub OAuth with org permissions
+- Cursor observation/control layer
 - API design for embedding
 - Separate deployment architecture
+- SMTP client (nodemailer)
+- Improved diff UI components
 
 ---
 
 ### Long-Term / Future Considerations
 | Feature/Capability | Rationale | Tentative Timeline |
 |--------------------|-----------|-------------------|
-| Cursor support | Many developers use Cursor, would expand audience | V3+ (if Cursor adds CLI agent) |
-| Serverless execution | True async operation without laptop | V3+ |
-| Command history & favorites | Power user convenience | V2 |
-| iPad optimization | Better tablet experience | V1.5 |
+| Command history & favorites | Power user convenience | V2+ |
+| iPad optimization | Better tablet experience | V2+ |
 
 ---
 

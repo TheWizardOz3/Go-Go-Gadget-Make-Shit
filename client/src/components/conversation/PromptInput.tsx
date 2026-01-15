@@ -1,7 +1,7 @@
 /**
  * PromptInput - Text input for sending prompts to Claude
  *
- * Mobile-optimized input with auto-expanding textarea and send button.
+ * Mobile-optimized input with auto-expanding textarea, voice input, and send button.
  * Positioned at the bottom of the conversation view.
  * Shows stop button when Claude is working.
  */
@@ -9,6 +9,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { StopButton } from './StopButton';
+import { VoiceButton } from './VoiceButton';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 import type { SessionStatus } from '@shared/types';
 
 interface PromptInputProps {
@@ -28,6 +30,8 @@ interface PromptInputProps {
   externalValue?: string;
   /** Callback when value changes - useful for parent state sync */
   onValueChange?: (value: string) => void;
+  /** Callback when voice input encounters an error */
+  onVoiceError?: (error: Error) => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -64,6 +68,7 @@ export function PromptInput({
   isStopping = false,
   externalValue,
   onValueChange,
+  onVoiceError,
   className,
 }: PromptInputProps) {
   // Initialize from localStorage to persist draft across app backgrounds
@@ -75,6 +80,35 @@ export function PromptInput({
     }
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * Handle transcription result from voice input
+   * Appends to existing text or replaces if empty
+   */
+  const handleTranscription = useCallback(
+    (text: string) => {
+      const newValue = value.trim() ? `${value} ${text}` : text;
+      setValue(newValue);
+      onValueChange?.(newValue);
+
+      // Persist to localStorage
+      try {
+        localStorage.setItem(STORAGE_KEY, newValue);
+      } catch {
+        // Ignore localStorage errors
+      }
+    },
+    [value, onValueChange]
+  );
+
+  // Voice input hook
+  const { isRecording, isProcessing, startRecording, stopRecording } = useVoiceInput({
+    onTranscription: handleTranscription,
+    onError: onVoiceError,
+  });
+
+  // Disable voice input when Claude is working or when sending
+  const isVoiceDisabled = disabled || isSending || status === 'working';
 
   // Sync external value when it changes (e.g., from template selection)
   useEffect(() => {
@@ -95,7 +129,7 @@ export function PromptInput({
 
   // Trim value to check if it's empty (whitespace-only counts as empty)
   const hasContent = value.trim().length > 0;
-  const isDisabled = disabled || isSending;
+  const isDisabled = disabled || isSending || isRecording || isProcessing;
   const canSend = hasContent && !isDisabled;
 
   /**
@@ -229,6 +263,15 @@ export function PromptInput({
           }}
         />
       </div>
+
+      {/* Voice input button */}
+      <VoiceButton
+        isRecording={isRecording}
+        isProcessing={isProcessing}
+        disabled={isVoiceDisabled}
+        onStart={startRecording}
+        onStop={stopRecording}
+      />
 
       {/* Action button: Stop when working, Send otherwise */}
       {status === 'working' && onStop ? (

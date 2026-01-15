@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.13.0 | 2026-01-15 | prerelease | Voice Input complete |
 | 0.12.0 | 2026-01-15 | prerelease | File Diff View complete |
 | 0.11.0 | 2026-01-14 | prerelease | Files Changed View complete |
 | 0.10.0 | 2026-01-14 | prerelease | Quick Templates complete |
@@ -39,6 +40,71 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.13.0] - 2026-01-15
+
+### Added
+- **Voice Input** — Dictate prompts with Groq Whisper transcription for hands-free interaction
+  - Tap-to-record button (tap to start, tap to stop—not hold-to-record)
+  - Visual feedback: microphone icon (idle), stop icon with red pulse (recording), spinner (processing)
+  - Transcription via Groq Whisper API (primary) with Web Speech API fallback
+  - Transcribed text appears in input field for review/editing before send
+  - Recording duration tracking with 2-minute max auto-stop
+  - Haptic feedback on button tap (mobile devices)
+
+- **VoiceButton Component** — `client/src/components/conversation/VoiceButton.tsx`
+  - Three visual states: idle (microphone), recording (stop + pulse), processing (spinner)
+  - Disabled state handling during send/processing
+  - Accessible aria-labels that update based on state
+  - 44×44px touch target for mobile usability
+
+- **useVoiceInput Hook** — `client/src/hooks/useVoiceInput.ts`
+  - MediaRecorder API for audio capture with optimal settings for Whisper
+  - Web Speech API parallel recording as fallback transcription source
+  - Automatic cleanup of media streams and recognition on unmount
+  - State machine: idle → recording → processing → idle (or error)
+  - Min recording duration check (0.5s) to avoid accidental taps
+
+- **Transcription Service** — `server/src/services/transcriptionService.ts`
+  - Groq Whisper API integration (`whisper-large-v3` model)
+  - 30-second request timeout with proper abort handling
+  - Error handling for 401 (invalid key), 429 (rate limit), 413 (file too large)
+  - Audio size validation (25MB max per Whisper limit)
+  - MIME type to file extension mapping for proper file naming
+
+- **Transcription API Endpoint** — `POST /api/transcribe`
+  - Accepts multipart/form-data with audio file
+  - Multer middleware for memory storage (no disk writes)
+  - 25MB file size limit enforced
+  - Returns `{ text, empty }` on success
+  - Proper error codes: VALIDATION_ERROR, SERVICE_UNAVAILABLE, RATE_LIMITED, etc.
+
+- **API Client Upload Method** — `api.upload()` for FormData requests
+  - Handles multipart/form-data without manually setting Content-Type
+  - Proper error handling with ApiError class
+
+- **Error Toast Enhancement** — Toast now supports error styling
+  - Red background with error icon for voice input failures
+  - Auto-dismiss after 3 seconds
+  - Error messages: permission denied, no microphone, transcription failed
+
+### Changed
+- **PromptInput** — Integrated VoiceButton between textarea and send button
+  - Voice input disabled when Claude is working or during send
+  - Textarea disabled during recording/processing
+  - Transcription appends to existing text or replaces if empty
+
+### Dependencies
+- Added `multer` (^2.0.2) for multipart form data parsing
+- Added `@types/multer` (^2.0.0) for TypeScript support
+
+### Tests
+- 46 new tests for Voice Input feature (460 total)
+  - `transcriptionService.test.ts`: 13 tests
+  - `useVoiceInput.test.ts`: 15 tests  
+  - `VoiceButton.test.tsx`: 18 tests
 
 ---
 
