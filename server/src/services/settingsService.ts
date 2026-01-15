@@ -34,6 +34,8 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   /** Phone number for iMessage notifications */
   notificationPhoneNumber?: string;
+  /** Server hostname for notification links (e.g., "dereks-macbook-pro" or "my-mac.tailnet.ts.net") */
+  serverHostname?: string;
   /** User's custom templates */
   defaultTemplates: Template[];
   /** Theme preference */
@@ -65,6 +67,7 @@ const TemplateSchema = z.object({
 const AppSettingsSchema = z.object({
   notificationsEnabled: z.boolean(),
   notificationPhoneNumber: z.string().optional(),
+  serverHostname: z.string().optional(),
   defaultTemplates: z.array(TemplateSchema),
   theme: z.enum(['light', 'dark', 'system']),
 });
@@ -137,6 +140,7 @@ function mergeWithDefaults(settings: Partial<AppSettings>): AppSettings {
   return {
     notificationsEnabled: settings.notificationsEnabled ?? DEFAULT_SETTINGS.notificationsEnabled,
     notificationPhoneNumber: settings.notificationPhoneNumber,
+    serverHostname: settings.serverHostname,
     defaultTemplates: settings.defaultTemplates ?? DEFAULT_SETTINGS.defaultTemplates,
     theme: settings.theme ?? DEFAULT_SETTINGS.theme,
   };

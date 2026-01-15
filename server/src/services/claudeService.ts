@@ -3,11 +3,14 @@
  *
  * Service for interacting with Claude Code CLI.
  * Handles spawning claude processes to send prompts.
+ * Sends notifications when Claude completes tasks.
  */
 
+import path from 'node:path';
 import { execa } from 'execa';
 import { logger } from '../lib/logger.js';
 import { trackProcess, untrackProcess, getActiveProcess } from './processManager.js';
+import { sendTaskCompleteNotification } from './notificationService.js';
 
 // ============================================================
 // Types
@@ -127,6 +130,16 @@ export async function sendPrompt(options: SendPromptOptions): Promise<SendPrompt
           signal,
         });
         untrackProcess(sessionId);
+
+        // Send notification when Claude completes successfully
+        if (code === 0) {
+          const projectName = path.basename(projectPath);
+          sendTaskCompleteNotification(projectName).catch((err) => {
+            logger.error('Failed to send completion notification', {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
       });
 
       // Handle process errors (e.g., process couldn't be spawned properly)
@@ -245,13 +258,23 @@ export async function startNewSession(
     const pid = subprocess.pid;
 
     if (pid !== undefined) {
-      // Set up handlers for logging
+      // Set up handlers for logging and notifications
       subprocess.on('exit', (code, signal) => {
         logger.debug('New session Claude process exited', {
           pid,
           exitCode: code,
           signal,
         });
+
+        // Send notification when Claude completes successfully
+        if (code === 0) {
+          const projectName = path.basename(projectPath);
+          sendTaskCompleteNotification(projectName).catch((err) => {
+            logger.error('Failed to send completion notification', {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
       });
 
       subprocess.on('error', (err) => {

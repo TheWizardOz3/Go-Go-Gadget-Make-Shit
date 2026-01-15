@@ -242,6 +242,8 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   /** Phone number for iMessage notifications */
   notificationPhoneNumber?: string;
+  /** Server hostname for notification links (e.g., "dereks-macbook-pro" or "my-mac.tailnet.ts.net") */
+  serverHostname?: string;
   /** User's custom templates */
   defaultTemplates: Template[];
   /** Theme preference */

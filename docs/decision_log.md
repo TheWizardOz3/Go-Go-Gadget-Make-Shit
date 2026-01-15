@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-018 | 2026-01-15 | infra | active | Server-side notifications for programmatic sessions |
 | ADR-017 | 2026-01-15 | infra | active | In-memory rate limiting for notifications |
 | ADR-016 | 2026-01-15 | ui | active | Dynamic viewport height (dvh) for mobile Safari |
 | ADR-015 | 2026-01-15 | api | active | Groq Whisper API with Web Speech fallback for voice input |
@@ -40,6 +41,45 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-018: Server-Side Notifications for Programmatic Sessions
+**Date:** 2026-01-15 | **Category:** infra | **Status:** active
+
+#### Trigger
+Notifications via Claude Code's `Stop` hook only work for interactive CLI sessions, not for sessions started programmatically via `claude -p "message"` (which is how GoGoGadgetClaude sends prompts).
+
+#### Decision
+**Send notifications from the server when Claude process exits** instead of relying on Claude Code hooks:
+
+```typescript
+subprocess.on('exit', (code, signal) => {
+  untrackProcess(sessionId);
+  
+  // Send notification when Claude completes successfully
+  if (code === 0) {
+    const projectName = path.basename(projectPath);
+    sendTaskCompleteNotification(projectName).catch(/* log error */);
+  }
+});
+```
+
+#### Rationale
+1. **Reliability** — Claude Code hooks don't fire for programmatic sessions
+2. **Simplicity** — We already track process lifecycle for the stop button
+3. **Consistency** — Works the same whether started via CLI or mobile UI
+4. **No external dependencies** — Doesn't require Claude Code hook configuration
+
+#### Alternatives Considered
+1. **Poll session status** — Complex, adds latency, unreliable detection of "done"
+2. **Claude Code hooks only** — Doesn't work for programmatic sessions
+3. **File watcher on JSONL** — Complex to detect "task complete" vs "still working"
+
+#### AI Instructions
+- Notifications for GoGoGadgetClaude-initiated sessions come from `claudeService.ts` process exit handler
+- Claude Code hook notifications (for interactive sessions) still work via `/api/hooks/task-complete`
+- Both paths respect the same rate limiting in `notificationService.ts`
+
+---
 
 ### ADR-017: In-Memory Rate Limiting for Notifications
 **Date:** 2026-01-15 | **Category:** infra | **Status:** active

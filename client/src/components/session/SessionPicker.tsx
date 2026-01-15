@@ -8,7 +8,6 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { cn } from '@/lib/cn';
-import { api } from '@/lib/api';
 import { SessionListItem } from './SessionListItem';
 import type { SessionSummarySerialized } from '@shared/types';
 
@@ -188,8 +187,7 @@ export function SessionPicker({
   const modalRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCreatingSession, setIsCreatingSession] = useState(false);
-  const [newSessionError, setNewSessionError] = useState<string | null>(null);
+  // Note: Session creation state removed - new sessions are created directly from ConversationView
 
   // Determine if search should be shown
   const showSearch = sessions.length > SEARCH_THRESHOLD;
@@ -285,29 +283,12 @@ export function SessionPicker({
   };
 
   // Handle new session creation
-  const handleNewSession = async () => {
-    if (!projectPath || isCreatingSession) return;
-
-    setIsCreatingSession(true);
-    setNewSessionError(null);
-
-    try {
-      await api.post('/sessions/new', { projectPath });
-      // Close modal and trigger refresh
-      onNewSession?.();
-      onClose();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start new session';
-      setNewSessionError(errorMessage);
-    } finally {
-      setIsCreatingSession(false);
-    }
+  const handleNewSession = () => {
+    // Simply trigger the callback - the parent will clear the session selection
+    // and show the "new conversation" state where the user can type their first message
+    onNewSession?.();
+    onClose();
   };
-
-  // Reset error when modal closes
-  if (!isOpen && newSessionError) {
-    setNewSessionError(null);
-  }
 
   if (!isOpen) return null;
 
@@ -379,32 +360,18 @@ export function SessionPicker({
             <button
               type="button"
               onClick={handleNewSession}
-              disabled={isCreatingSession}
               className={cn(
                 'w-full flex items-center justify-center gap-2',
                 'px-4 py-3 rounded-lg',
                 'bg-accent text-white font-medium',
                 'hover:bg-accent/90 active:bg-accent/80',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
                 'transition-colors duration-150',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface'
               )}
             >
-              {isCreatingSession ? (
-                <>
-                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Starting...</span>
-                </>
-              ) : (
-                <>
-                  <PlusIcon />
-                  <span>New Session</span>
-                </>
-              )}
+              <PlusIcon />
+              <span>New Session</span>
             </button>
-            {newSessionError && (
-              <p className="mt-2 text-sm text-error text-center">{newSessionError}</p>
-            )}
           </div>
         )}
 

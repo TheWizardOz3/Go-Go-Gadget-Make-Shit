@@ -43,18 +43,33 @@ function isRateLimited(): boolean {
 
 /**
  * Build the app URL for the notification message
+ * @param serverHostname - Optional hostname/URL from settings
  */
-function getAppUrl(): string {
-  const hostname = config.tailscaleHostname;
+function getAppUrl(serverHostname?: string): string {
+  const hostnameOrUrl = serverHostname || config.tailscaleHostname;
   const port = config.port;
-  return `http://${hostname}:${port}`;
+
+  // If the hostname already includes a protocol, use it as-is (just append port if needed)
+  if (hostnameOrUrl.startsWith('http://') || hostnameOrUrl.startsWith('https://')) {
+    // Check if port is already included
+    if (hostnameOrUrl.includes(':' + port) || hostnameOrUrl.match(/:\d+$/)) {
+      return hostnameOrUrl;
+    }
+    return `${hostnameOrUrl}:${port}`;
+  }
+
+  // No protocol - use https if HTTPS is enabled, otherwise http
+  const protocol = config.httpsEnabled ? 'https' : 'http';
+  return `${protocol}://${hostnameOrUrl}:${port}`;
 }
 
 /**
  * Build the notification message
+ * @param projectName - Name of the project
+ * @param serverHostname - Optional hostname from settings
  */
-function buildMessage(projectName: string): string {
-  const url = getAppUrl();
+function buildMessage(projectName: string, serverHostname?: string): string {
+  const url = getAppUrl(serverHostname);
   return `🤖 GoGoGadgetClaude: Task complete in ${projectName}.\n${url}`;
 }
 
@@ -130,7 +145,7 @@ export async function sendTaskCompleteNotification(projectName: string): Promise
     }
 
     // Build and send the notification
-    const message = buildMessage(projectName);
+    const message = buildMessage(projectName, settings.serverHostname);
     const script = buildAppleScript(settings.notificationPhoneNumber, message);
 
     logger.info('Sending task completion notification', {
@@ -161,11 +176,15 @@ export async function sendTaskCompleteNotification(projectName: string): Promise
  * Bypasses rate limiting to allow testing the notification setup.
  *
  * @param phoneNumber - Phone number to send test to
+ * @param serverHostname - Optional hostname for the app URL
  * @returns true if test notification was sent successfully
  */
-export async function sendTestNotification(phoneNumber: string): Promise<boolean> {
+export async function sendTestNotification(
+  phoneNumber: string,
+  serverHostname?: string
+): Promise<boolean> {
   try {
-    const message = `🤖 GoGoGadgetClaude: Test notification!\nYour notifications are set up correctly.\n${getAppUrl()}`;
+    const message = `🤖 GoGoGadgetClaude: Test notification!\nYour notifications are set up correctly.\n${getAppUrl(serverHostname)}`;
     const script = buildAppleScript(phoneNumber, message);
 
     logger.info('Sending test notification', {

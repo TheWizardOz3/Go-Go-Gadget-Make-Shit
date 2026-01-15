@@ -36,6 +36,7 @@ const taskCompleteSchema = z.object({
  */
 const testNotificationSchema = z.object({
   phoneNumber: z.string().min(1, 'Phone number is required'),
+  serverHostname: z.string().optional(),
 });
 
 // ============================================================
@@ -89,14 +90,15 @@ router.post(
   '/notifications/test',
   validateRequest({ body: testNotificationSchema }),
   async (req, res) => {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, serverHostname } = req.body;
 
     logger.info('Test notification requested', {
       phoneNumber: phoneNumber.slice(0, 4) + '****',
+      serverHostname: serverHostname || 'default',
     });
 
     try {
-      const sent = await sendTestNotification(phoneNumber);
+      const sent = await sendTestNotification(phoneNumber, serverHostname);
 
       if (sent) {
         res.json(success({ sent: true, message: 'Test notification sent' }));

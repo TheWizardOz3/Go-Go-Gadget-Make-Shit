@@ -26,10 +26,12 @@ interface PromptInputProps {
   onStop?: () => void;
   /** Whether the stop operation is in progress */
   isStopping?: boolean;
-  /** External value for controlled mode (e.g., from template selection) */
-  externalValue?: string;
+  /** Text to insert at cursor position (e.g., from template selection) */
+  insertText?: string;
   /** Callback when value changes - useful for parent state sync */
   onValueChange?: (value: string) => void;
+  /** Callback after text has been inserted (to clear insertText) */
+  onInsertComplete?: () => void;
   /** Callback when voice input encounters an error */
   onVoiceError?: (error: Error) => void;
   /** Additional CSS classes */
@@ -66,8 +68,9 @@ export function PromptInput({
   status,
   onStop,
   isStopping = false,
-  externalValue,
+  insertText,
   onValueChange,
+  onInsertComplete,
   onVoiceError,
   className,
 }: PromptInputProps) {
@@ -82,12 +85,40 @@ export function PromptInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   /**
-   * Handle transcription result from voice input
-   * Appends to existing text or replaces if empty
+   * Insert text at cursor position (or append if no selection)
+   * Used by both voice transcription and template insertion
    */
-  const handleTranscription = useCallback(
+  const insertAtCursor = useCallback(
     (text: string) => {
-      const newValue = value.trim() ? `${value} ${text}` : text;
+      const textarea = textareaRef.current;
+      if (!textarea) {
+        // Fallback: append to end
+        const newValue = value.trim() ? `${value} ${text}` : text;
+        setValue(newValue);
+        onValueChange?.(newValue);
+        try {
+          localStorage.setItem(STORAGE_KEY, newValue);
+        } catch {
+          // Ignore localStorage errors
+        }
+        return;
+      }
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      // Insert text at cursor position, replacing any selection
+      const before = value.substring(0, start);
+      const after = value.substring(end);
+
+      // Add space before if needed (not at start, no space before cursor)
+      const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+      // Add space after if needed (not at end, no space after cursor)
+      const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
+
+      const insertedText = (needsSpaceBefore ? ' ' : '') + text + (needsSpaceAfter ? ' ' : '');
+      const newValue = before + insertedText + after;
+
       setValue(newValue);
       onValueChange?.(newValue);
 
@@ -97,8 +128,26 @@ export function PromptInput({
       } catch {
         // Ignore localStorage errors
       }
+
+      // Move cursor to end of inserted text
+      const newCursorPos = start + insertedText.length;
+      requestAnimationFrame(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      });
     },
     [value, onValueChange]
+  );
+
+  /**
+   * Handle transcription result from voice input
+   * Inserts at cursor position
+   */
+  const handleTranscription = useCallback(
+    (text: string) => {
+      insertAtCursor(text);
+    },
+    [insertAtCursor]
   );
 
   // Voice input hook
@@ -110,22 +159,14 @@ export function PromptInput({
   // Disable voice input when Claude is working or when sending
   const isVoiceDisabled = disabled || isSending || status === 'working';
 
-  // Sync external value when it changes (e.g., from template selection)
+  // Handle insertText prop - insert at cursor when it changes
   useEffect(() => {
-    if (externalValue !== undefined && externalValue !== value) {
-      setValue(externalValue);
-      // Persist to localStorage
-      try {
-        if (externalValue) {
-          localStorage.setItem(STORAGE_KEY, externalValue);
-        } else {
-          localStorage.removeItem(STORAGE_KEY);
-        }
-      } catch {
-        // Ignore localStorage errors
-      }
+    if (insertText !== undefined && insertText.length > 0) {
+      insertAtCursor(insertText);
+      // Notify parent that insertion is complete
+      onInsertComplete?.();
     }
-  }, [externalValue]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [insertText]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Trim value to check if it's empty (whitespace-only counts as empty)
   const hasContent = value.trim().length > 0;
@@ -218,6 +259,24 @@ export function PromptInput({
     adjustHeight();
   }, [value, adjustHeight]);
 
+  /**
+   * Clear all text from the input
+   */
+  const handleClear = useCallback(() => {
+    setValue('');
+    onValueChange?.('');
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore localStorage errors
+    }
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = `${MIN_HEIGHT}px`;
+      textareaRef.current.focus();
+    }
+  }, [onValueChange]);
+
   return (
     <div
       className={cn(
@@ -245,6 +304,8 @@ export function PromptInput({
             // Base styling
             'w-full resize-none',
             'px-4 py-3',
+            // Add right padding for clear button
+            hasContent && 'pr-10',
             'bg-background rounded-xl',
             'border border-text-primary/10',
             // Typography (16px prevents iOS zoom)
@@ -262,6 +323,34 @@ export function PromptInput({
             maxHeight: `${MAX_HEIGHT}px`,
           }}
         />
+
+        {/* Clear button - appears when there's content */}
+        {hasContent && !isDisabled && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className={cn(
+              'absolute right-2 top-1/2 -translate-y-1/2',
+              'p-1.5 rounded-full',
+              'text-text-muted hover:text-text-primary',
+              'hover:bg-text-primary/10 active:bg-text-primary/20',
+              'transition-colors duration-150',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            )}
+            aria-label="Clear input"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Voice input button */}

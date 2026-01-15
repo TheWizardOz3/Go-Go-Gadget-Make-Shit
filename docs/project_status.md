@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-15 (🎉 MVP COMPLETE - v0.14.0)
+**Last Updated**: 2026-01-15 (🎉 MVP COMPLETE - v0.14.1)
 
 ---
 

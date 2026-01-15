@@ -7,6 +7,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
+import { api } from '@/lib/api';
 import { useConversation } from '@/hooks/useConversation';
 import { useSendPrompt } from '@/hooks/useSendPrompt';
 import { useStopAgent } from '@/hooks/useStopAgent';
@@ -25,6 +26,10 @@ interface ConversationViewProps {
   sessionId: string | null;
   /** Encoded project path for loading templates */
   encodedPath: string | null;
+  /** Project path (decoded) for creating new sessions */
+  projectPath?: string;
+  /** Callback when a new session is started with the user's first message */
+  onNewSessionStarted?: () => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -35,7 +40,13 @@ const SCROLL_THRESHOLD = 150;
 /** Threshold in pixels for triggering pull-to-refresh */
 const PULL_THRESHOLD = 80;
 
-export function ConversationView({ sessionId, encodedPath, className }: ConversationViewProps) {
+export function ConversationView({
+  sessionId,
+  encodedPath,
+  projectPath,
+  onNewSessionStarted,
+  className,
+}: ConversationViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
@@ -47,8 +58,8 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
   const touchStartY = useRef(0);
   const isPulling = useRef(false);
 
-  // External value for PromptInput (from template selection)
-  const [externalInputValue, setExternalInputValue] = useState<string | undefined>(undefined);
+  // Text to insert into PromptInput (from template selection)
+  const [textToInsert, setTextToInsert] = useState<string | undefined>(undefined);
 
   const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId);
   const { sendPrompt, isSending } = useSendPrompt(sessionId);
@@ -58,20 +69,53 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
   // Toast state for showing messages (info or error)
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'error' } | null>(null);
 
+  // State for creating new session
+  const [isStartingNewSession, setIsStartingNewSession] = useState(false);
+
   /**
-   * Handle template selection - sets input value
+   * Handle starting a new session with the user's first message
+   */
+  const handleStartNewSession = useCallback(
+    async (prompt: string) => {
+      if (!projectPath || isStartingNewSession) return false;
+
+      const trimmedPrompt = prompt.trim();
+      if (!trimmedPrompt) return false;
+
+      setIsStartingNewSession(true);
+
+      try {
+        await api.post('/sessions/new', {
+          projectPath,
+          prompt: trimmedPrompt,
+        });
+
+        // Notify parent to refresh sessions and select the new one
+        onNewSessionStarted?.();
+        return true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to start session';
+        setToast({ message, type: 'error' });
+        return false;
+      } finally {
+        setIsStartingNewSession(false);
+      }
+    },
+    [projectPath, isStartingNewSession, onNewSessionStarted]
+  );
+
+  /**
+   * Handle template selection - insert text at cursor position
    */
   const handleTemplateSelect = useCallback((prompt: string) => {
-    setExternalInputValue(prompt);
+    setTextToInsert(prompt);
   }, []);
 
   /**
-   * Clear external value after it's been applied
-   * This allows the PromptInput to manage its own state after template insertion
+   * Clear insert text after it's been applied
    */
-  const handleInputValueChange = useCallback(() => {
-    // Clear external value so user can edit freely
-    setExternalInputValue(undefined);
+  const handleInsertComplete = useCallback(() => {
+    setTextToInsert(undefined);
   }, []);
 
   /**
@@ -242,22 +286,86 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
     }
   }, [toast]);
 
-  // No session selected
+  // No session selected - show "new conversation" UI if project is selected
   if (!sessionId) {
+    // If no project is selected, show basic empty state
+    if (!projectPath) {
+      return (
+        <div className={cn('flex flex-col', className)}>
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState
+              title="No session selected"
+              message="Select a project and session to view the conversation."
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Project is selected - show new conversation UI
     return (
       <div className={cn('flex flex-col', className)}>
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
-            title="No session selected"
-            message="Select a project and session to view the conversation."
-          />
+        {/* Empty conversation area with prompt to start */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
+          <div className="mb-6 text-center">
+            <div className="mb-3 flex h-16 w-16 mx-auto items-center justify-center rounded-full bg-accent/10">
+              <svg
+                className="h-8 w-8 text-accent"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-text-primary mb-1">New Conversation</h3>
+            <p className="text-sm text-text-secondary max-w-xs">
+              Type a message below to start a new session with Claude.
+            </p>
+          </div>
         </div>
+
+        {/* Template chips */}
+        {templatesLoading ? (
+          <TemplateChipsSkeleton />
+        ) : templates && templates.length > 0 ? (
+          <TemplateChips templates={templates} onSelect={handleTemplateSelect} />
+        ) : null}
+
+        {/* Toast notification */}
+        {toast && (
+          <div
+            className={cn(
+              'fixed bottom-20 left-1/2 -translate-x-1/2 z-50',
+              'px-4 py-2 rounded-lg shadow-lg',
+              'text-sm font-medium',
+              'animate-fade-in',
+              toast.type === 'error'
+                ? 'bg-error/90 text-white'
+                : 'bg-surface-elevated text-text-primary border border-text-primary/10'
+            )}
+          >
+            {toast.message}
+          </div>
+        )}
+
+        {/* Prompt input for new session */}
+        <PromptInput
+          onSend={handleStartNewSession}
+          isSending={isStartingNewSession}
+          disabled={false}
+          status="idle"
+          insertText={textToInsert}
+          onInsertComplete={handleInsertComplete}
+          onVoiceError={handleVoiceError}
+        />
       </div>
     );
   }
 
-  // Loading state
-  if (isLoading) {
+  // Loading state - only show if no messages yet (prevents flickering during revalidation)
+  if (isLoading && !messages) {
     return (
       <div className={cn('flex flex-col', className)}>
         <div className="flex-1 overflow-hidden">
@@ -276,8 +384,8 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
     );
   }
 
-  // Error state
-  if (error) {
+  // Error state - only show if no messages yet (keeps showing messages during transient errors)
+  if (error && !messages) {
     return (
       <div className={cn('flex flex-col', className)}>
         <div className="flex-1 flex items-center justify-center">
@@ -324,8 +432,8 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
           status={status}
           onStop={handleStop}
           isStopping={isStopping}
-          externalValue={externalInputValue}
-          onValueChange={handleInputValueChange}
+          insertText={textToInsert}
+          onInsertComplete={handleInsertComplete}
           onVoiceError={handleVoiceError}
         />
       </div>
@@ -401,8 +509,8 @@ export function ConversationView({ sessionId, encodedPath, className }: Conversa
         status={status}
         onStop={handleStop}
         isStopping={isStopping}
-        externalValue={externalInputValue}
-        onValueChange={handleInputValueChange}
+        insertText={textToInsert}
+        onInsertComplete={handleInsertComplete}
         onVoiceError={handleVoiceError}
       />
 

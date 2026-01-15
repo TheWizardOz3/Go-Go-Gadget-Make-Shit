@@ -44,9 +44,11 @@ temp/
 .eslintcache
 .prettiercache
 
-# Debug files
+# SSL certificates and keys (never commit)
+certs/
 *.pem
 *.key
+*.crt
 
 # Claude Code local data (never commit user data)
 # Note: We read from ~/.claude/ but never commit it

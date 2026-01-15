@@ -73,6 +73,21 @@ function MessageHeader({ type, timestamp }: { type: 'user' | 'assistant'; timest
 }
 
 /**
+ * Clean content by removing XML-like tags (e.g., <ide_opened_file>)
+ * These are system-generated and not interesting to display
+ */
+function cleanXmlTags(text: string): string {
+  return (
+    text
+      // Remove XML-like tags and their content (e.g., <ide_opened_file>...</ide_opened_file>)
+      .replace(/<ide_opened_file[^>]*>[\s\S]*?<\/ide_opened_file>/g, '')
+      // Clean up extra whitespace
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+/**
  * MessageTurn component - displays a single message turn
  *
  * @example
@@ -82,10 +97,13 @@ function MessageHeader({ type, timestamp }: { type: 'user' | 'assistant'; timest
  */
 export function MessageTurn({ message, className }: MessageTurnProps) {
   const isUser = message.type === 'user';
+
+  // Clean user message content to remove ide_opened_file tags
+  const displayContent =
+    typeof message.content === 'string' && isUser ? cleanXmlTags(message.content) : message.content;
+
   const hasContent =
-    typeof message.content === 'string'
-      ? message.content.trim().length > 0
-      : Boolean(message.content);
+    typeof displayContent === 'string' ? displayContent.trim().length > 0 : Boolean(displayContent);
 
   return (
     <div
@@ -107,7 +125,7 @@ export function MessageTurn({ message, className }: MessageTurnProps) {
         {hasContent && (
           <div className="text-sm text-text-primary break-words leading-relaxed">
             <Markdown components={markdownComponents}>
-              {typeof message.content === 'string' ? message.content : String(message.content)}
+              {typeof displayContent === 'string' ? displayContent : String(displayContent)}
             </Markdown>
           </div>
         )}

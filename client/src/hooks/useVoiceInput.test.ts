@@ -359,7 +359,7 @@ describe('useVoiceInput', () => {
       });
 
       expect(result.current.state).toBe('error');
-      expect(result.current.error?.message).toContain('not supported');
+      expect(result.current.error?.message).toContain('HTTPS');
 
       // Restore
       (global as unknown as { MediaRecorder: unknown }).MediaRecorder = original;

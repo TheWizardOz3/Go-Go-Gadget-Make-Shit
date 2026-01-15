@@ -22,6 +22,7 @@ const router: RouterType = Router();
 const updateSettingsSchema = z.object({
   notificationsEnabled: z.boolean().optional(),
   notificationPhoneNumber: z.string().optional(),
+  serverHostname: z.string().optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
   // defaultTemplates intentionally omitted - managed separately
 });

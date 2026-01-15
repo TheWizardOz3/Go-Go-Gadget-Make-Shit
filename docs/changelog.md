@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.14.1 | 2026-01-15 | patch | UX polish: HTTPS, notifications, new session flow |
 | 0.14.0 | 2026-01-15 | **MVP** | iMessage Notifications complete - MVP DONE! |
 | 0.13.1 | 2026-01-15 | patch | UI Polish & Mobile Improvements |
 | 0.13.0 | 2026-01-15 | prerelease | Voice Input complete |
@@ -42,6 +43,57 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.14.1] - 2026-01-15
+
+### Added
+- **Server-Side Notifications** — Notifications now sent when Claude finishes responding to prompts sent via GoGoGadgetClaude (previously only worked for interactive CLI sessions via Claude Code hooks)
+- **Server Hostname Setting** — Configurable Tailscale hostname in Settings for correct notification URLs
+- **HTTPS Support** — Server can now run with SSL certificates for iOS Safari voice input
+  - Tailscale HTTPS certificates (via `tailscale cert`) auto-detected
+  - mkcert fallback for local development
+  - `scripts/setup-https.sh` to automate certificate generation
+- **Clear Button** — New clear-all button in message input field
+- **Cursor-Position Insertion** — Templates and voice transcription now insert at cursor position instead of replacing entire input
+
+### Changed
+- **Session Names** — Shortened to 35 chars with relative timestamps (e.g., "Fix login bug · 2m ago")
+- **Session Preview Filter** — Now filters out `<ide_opened_file>` tags from session previews
+- **Message Filter** — Conversation view hides messages containing only `<ide_opened_file>` tags
+- **New Session Flow** — "New Session" button now shows blank conversation; user types first message to create session
+- **Port Configuration** — HTTPS runs on port 3456 (primary), HTTP on 3457 (secondary)
+- **Voice Input Error Messages** — Now correctly indicates HTTPS requirement on iOS Safari
+- **Notification URLs** — Properly use configured Tailscale hostname with correct protocol
+
+### Fixed
+- **iOS Voice Input** — Added secure context check; provides clear error when HTTPS required
+- **Page Flickering** — Loading states only show when no existing data (prevents UI flash during revalidation)
+- **Mobile Viewport** — Added `viewport-fit=cover` and matching `theme-color` to prevent white gaps in Safari
+- **New Session Auto-Selection** — Improved polling with cache bypass to reliably select newly created sessions
+
+### Technical Details
+- **Files Modified:**
+  - `server/src/services/claudeService.ts` — Added notification on process exit
+  - `server/src/services/notificationService.ts` — Dynamic protocol detection
+  - `server/src/services/settingsService.ts` — Added serverHostname setting
+  - `server/src/lib/config.ts` — Added HTTPS config, swapped port defaults
+  - `server/src/index.ts` — HTTPS server support, cache control headers
+  - `server/src/api/hooks.ts` — Pass serverHostname to test notifications
+  - `client/src/App.tsx` — New session mode, improved session display
+  - `client/src/components/conversation/PromptInput.tsx` — Clear button, cursor insertion
+  - `client/src/components/conversation/ConversationView.tsx` — New session UI
+  - `client/src/components/conversation/MessageList.tsx` — Filter ide_opened_file messages
+  - `client/src/components/conversation/MessageTurn.tsx` — Clean ide_opened_file tags
+  - `client/src/components/session/SessionPicker.tsx` — Simplified new session flow
+  - `client/src/components/settings/SettingsModal.tsx` — Server hostname input
+  - `client/src/hooks/useVoiceInput.ts` — HTTPS secure context check
+  - `client/index.html` — viewport-fit, theme-color meta tags
+  - `server/src/lib/jsonlParser.ts` — Filter ide_opened_file from previews
+
+- **Files Created:**
+  - `scripts/setup-https.sh` — HTTPS certificate setup script
 
 ---
 

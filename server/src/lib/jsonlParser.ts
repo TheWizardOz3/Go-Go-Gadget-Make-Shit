@@ -338,18 +338,37 @@ export function extractProjectPath(entries: RawJsonlEntry[]): string | null {
 }
 
 /**
+ * Clean preview text by removing XML-like tags (e.g., <ide_opened_file>)
+ * and other non-human-readable content
+ */
+function cleanPreviewText(text: string): string {
+  return (
+    text
+      // Remove XML-like tags and their content (e.g., <ide_opened_file>...</ide_opened_file>)
+      .replace(/<[^>]+>[\s\S]*?<\/[^>]+>/g, '')
+      // Remove self-closing tags (e.g., <tag />)
+      .replace(/<[^>]+\/>/g, '')
+      // Remove standalone opening/closing tags
+      .replace(/<\/?[^>]+>/g, '')
+      // Clean up extra whitespace
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+/**
  * Extract the first user message as a preview string
  *
  * Used for session list display. Returns the first user message
  * content truncated to maxLength characters.
  *
  * @param entries - Parsed JSONL entries
- * @param maxLength - Maximum length of preview (default: 100)
+ * @param maxLength - Maximum length of preview (default: 60)
  * @returns Preview string or null if no user messages found
  */
 export function getFirstUserMessagePreview(
   entries: RawJsonlEntry[],
-  maxLength: number = 100
+  maxLength: number = 60
 ): string | null {
   // Sort by timestamp to ensure we get the actual first message
   const sortedEntries = [...entries].sort(
@@ -366,11 +385,11 @@ export function getFirstUserMessagePreview(
       const userEntry = entry as UserJsonlEntry;
       const content = extractTextFromContent(userEntry.message.content);
 
-      // Clean up whitespace and truncate
-      const cleaned = content.replace(/\s+/g, ' ').trim();
+      // Clean up whitespace, remove XML tags, and truncate
+      const cleaned = cleanPreviewText(content);
 
       if (cleaned.length === 0) {
-        continue; // Skip empty messages
+        continue; // Skip empty messages (or messages with only tags)
       }
 
       if (cleaned.length <= maxLength) {

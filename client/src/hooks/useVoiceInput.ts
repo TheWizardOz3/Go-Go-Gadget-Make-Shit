@@ -137,6 +137,18 @@ function getSupportedMimeType(): string {
 }
 
 /**
+ * Check if we're in a secure context (HTTPS or localhost)
+ * MediaRecorder requires secure context on iOS Safari
+ */
+function isSecureContext(): boolean {
+  return (
+    window.isSecureContext ||
+    window.location.protocol === 'https:' ||
+    window.location.hostname === 'localhost'
+  );
+}
+
+/**
  * Check if MediaRecorder API is available
  */
 function isMediaRecorderSupported(): boolean {
@@ -369,13 +381,14 @@ export function useVoiceInput({
   );
 
   /**
-   * Start recording audio from the microphone
+   * Start recording using Web Speech API only (fallback mode)
+   * Used when MediaRecorder is not available (e.g., iOS Safari over HTTP)
    */
-  const startRecording = useCallback(async () => {
-    // Check if MediaRecorder is supported
-    if (!isMediaRecorderSupported()) {
+  const startWebSpeechOnly = useCallback(() => {
+    const SpeechRecognitionConstructor = getSpeechRecognition();
+    if (!SpeechRecognitionConstructor) {
       const unsupportedError = new Error(
-        'Voice input is not supported in this browser. Please use a modern browser.'
+        'Voice input requires HTTPS on iOS Safari. Try accessing via https:// or use Chrome.'
       );
       setError(unsupportedError);
       setState('error');
@@ -383,8 +396,115 @@ export function useVoiceInput({
       return;
     }
 
+    try {
+      const recognition = new SpeechRecognitionConstructor();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      webSpeechResultRef.current = '';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result && result[0]) {
+            transcript += result[0].transcript + ' ';
+          }
+        }
+        webSpeechResultRef.current = transcript.trim();
+      };
+
+      recognition.onerror = (event: Event) => {
+        cleanupRecording();
+        const errorEvent = event as Event & { error?: string };
+        let errorMessage = 'Voice recognition failed. Please try again.';
+
+        if (errorEvent.error === 'not-allowed') {
+          errorMessage = 'Microphone access denied. Please enable microphone permission.';
+        } else if (errorEvent.error === 'no-speech') {
+          errorMessage = "Couldn't hear anything. Please try again.";
+        }
+
+        const recognitionError = new Error(errorMessage);
+        setError(recognitionError);
+        setState('error');
+        onError?.(recognitionError);
+        setTimeout(() => setState('idle'), 100);
+      };
+
+      recognition.onend = () => {
+        // Only process if we were recording (not if stopped due to error)
+        if (state === 'recording' && webSpeechResultRef.current) {
+          onTranscription(webSpeechResultRef.current);
+          setState('idle');
+          setError(null);
+        } else if (state === 'recording' && !webSpeechResultRef.current) {
+          const emptyError = new Error("Couldn't understand audio. Please try again.");
+          setError(emptyError);
+          setState('error');
+          onError?.(emptyError);
+          setTimeout(() => setState('idle'), 100);
+        }
+        cleanupRecording();
+      };
+
+      recognition.start();
+      speechRecognitionRef.current = recognition;
+
+      // Start duration counter
+      recordingStartTimeRef.current = Date.now();
+      setDuration(0);
+      durationIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
+        setDuration(elapsed);
+      }, 1000);
+
+      // Set up max duration timeout
+      maxDurationTimeoutRef.current = setTimeout(() => {
+        if (speechRecognitionRef.current) {
+          speechRecognitionRef.current.stop();
+        }
+      }, MAX_RECORDING_DURATION_MS);
+
+      setState('recording');
+      setError(null);
+    } catch {
+      cleanupRecording();
+      const startError = new Error('Failed to start voice recognition. Please try again.');
+      setError(startError);
+      setState('error');
+      onError?.(startError);
+    }
+  }, [state, onTranscription, onError, cleanupRecording]);
+
+  /**
+   * Start recording audio from the microphone
+   */
+  const startRecording = useCallback(async () => {
     // Don't start if already recording or processing
     if (state === 'recording' || state === 'processing') {
+      return;
+    }
+
+    // Check if MediaRecorder is supported AND we're in a secure context
+    // iOS Safari requires HTTPS for MediaRecorder
+    const canUseMediaRecorder = isMediaRecorderSupported() && isSecureContext();
+
+    if (!canUseMediaRecorder) {
+      // Fall back to Web Speech API only mode
+      if (isWebSpeechSupported()) {
+        startWebSpeechOnly();
+        return;
+      }
+
+      // Neither is available
+      const unsupportedError = new Error(
+        'Voice input requires HTTPS on this device. Access via https:// to enable voice.'
+      );
+      setError(unsupportedError);
+      setState('error');
+      onError?.(unsupportedError);
       return;
     }
 
@@ -493,7 +613,7 @@ export function useVoiceInput({
       setState('error');
       onError?.(startError);
     }
-  }, [state, onError, cleanupRecording, processAudio, startWebSpeechFallback]);
+  }, [state, onError, cleanupRecording, processAudio, startWebSpeechFallback, startWebSpeechOnly]);
 
   /**
    * Stop recording and begin transcription

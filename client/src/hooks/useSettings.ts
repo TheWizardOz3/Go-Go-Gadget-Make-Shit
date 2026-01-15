@@ -127,11 +127,16 @@ export function useSettings(): UseSettingsReturn {
  * Separate function (not part of the hook) for sending test notifications.
  *
  * @param phoneNumber - Phone number to send test notification to
+ * @param serverHostname - Optional server hostname for notification links
  * @returns Promise that resolves when notification is sent
  * @throws Error if notification fails
  */
 export async function sendTestNotification(
-  phoneNumber: string
+  phoneNumber: string,
+  serverHostname?: string
 ): Promise<{ sent: boolean; message: string }> {
-  return api.post<{ sent: boolean; message: string }>('/notifications/test', { phoneNumber });
+  return api.post<{ sent: boolean; message: string }>('/notifications/test', {
+    phoneNumber,
+    serverHostname,
+  });
 }

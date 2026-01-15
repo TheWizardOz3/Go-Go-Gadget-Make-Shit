@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/cn';
+import { api } from '@/lib/api';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { useConversation } from '@/hooks/useConversation';
@@ -100,6 +101,9 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState<string | null>(() => getStoredProject());
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
+  // "New session" mode - prevents auto-select from re-selecting a session
+  const [isNewSessionMode, setIsNewSessionMode] = useState(false);
+
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<ActiveTab>('conversation');
 
@@ -160,8 +164,13 @@ export default function App() {
   }, [projects, selectedProject]);
 
   // When sessions load, try to restore from localStorage or auto-select most recent
+  // Skip auto-selection when in "new session" mode (user explicitly wants blank conversation)
   useEffect(() => {
     if (!sessions || sessions.length === 0) return;
+
+    // Don't auto-select when user clicked "New Session"
+    if (isNewSessionMode) return;
+
     if (selectedSession) {
       // Validate that selected session still exists
       const stillExists = sessions.some((s) => s.id === selectedSession);
@@ -186,7 +195,7 @@ export default function App() {
       return bTime - aTime;
     });
     setSelectedSession(sorted[0].id);
-  }, [sessions, selectedSession, selectedProject]);
+  }, [sessions, selectedSession, selectedProject, isNewSessionMode]);
 
   // Persist selected session to localStorage when it changes
   useEffect(() => {
@@ -276,6 +285,7 @@ export default function App() {
 
   // Handle session selection from picker
   const handleSelectSession = (sessionId: string) => {
+    setIsNewSessionMode(false); // Exit new session mode when manually selecting
     setSelectedSession(sessionId);
   };
 
@@ -302,6 +312,50 @@ export default function App() {
           <ConversationView
             sessionId={selectedSession}
             encodedPath={selectedProject}
+            projectPath={currentProject?.path}
+            onNewSessionStarted={async () => {
+              // Poll for new session with direct API calls (bypasses SWR cache)
+              // Claude takes a few seconds to write the JSONL
+              for (let attempt = 0; attempt < 8; attempt++) {
+                await new Promise((r) => setTimeout(r, 1500));
+
+                try {
+                  // Direct API call to bypass SWR cache
+                  const freshSessions = await api.get<SessionSummarySerialized[]>(
+                    `/projects/${selectedProject}/sessions`
+                  );
+
+                  if (freshSessions && freshSessions.length > 0) {
+                    // Sort by lastActivityAt descending
+                    const sorted = [...freshSessions].sort((a, b) => {
+                      const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+                      const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+                      return bTime - aTime;
+                    });
+
+                    // If the newest session was created within last 60 seconds, select it
+                    const newest = sorted[0];
+                    if (newest?.lastActivityAt) {
+                      const newestTime = new Date(newest.lastActivityAt).getTime();
+                      if (Date.now() - newestTime < 60000) {
+                        // Exit "new session" mode and select the new session
+                        setIsNewSessionMode(false);
+                        setSelectedSession(newest.id);
+                        setStoredSession(selectedProject, newest.id);
+                        // Also refresh SWR cache
+                        _refreshSessions();
+                        return;
+                      }
+                    }
+                  }
+                } catch {
+                  // Ignore errors, keep polling
+                }
+              }
+              // Even if we didn't find a new session, exit new session mode
+              setIsNewSessionMode(false);
+              _refreshSessions();
+            }}
             className="h-full"
           />
         ) : selectedFilePath && selectedProject ? (
@@ -344,10 +398,11 @@ export default function App() {
         onSelectSession={handleSelectSession}
         projectPath={currentProject?.path}
         onNewSession={() => {
-          // Refresh sessions to discover the new one
-          _refreshSessions();
-          // Clear selected session so auto-select picks up the new one
+          // Enter "new session" mode - prevents auto-select from re-selecting
+          setIsNewSessionMode(true);
+          // Clear the session selection - this shows the "new conversation" state
           setSelectedSession(null);
+          setStoredSession(selectedProject, null);
         }}
       />
 
@@ -415,6 +470,35 @@ interface HeaderProps {
   hasSessions?: boolean;
 }
 
+/**
+ * Truncate text to a maximum length, adding ellipsis if needed
+ */
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 1).trim() + '…';
+}
+
+/**
+ * Format a date as a short relative or absolute time for header display
+ */
+function formatShortTime(dateString: string | null): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  // Show short date for older sessions
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 function Header({
   projectName,
   currentSession,
@@ -431,8 +515,12 @@ function Header({
   const isProjectClickable = hasProjects && onProjectClick;
   const isSessionClickable = hasSessions && onSessionClick;
 
-  // Generate session display text
-  const sessionDisplayText = currentSession?.preview || 'Select session';
+  // Generate session display text - shorter for header, with time context
+  const sessionPreview = currentSession?.preview
+    ? truncateText(currentSession.preview, 35)
+    : 'Select session';
+  const sessionTime = formatShortTime(currentSession?.lastActivityAt || null);
+  const sessionDisplayText = sessionTime ? `${sessionPreview} · ${sessionTime}` : sessionPreview;
 
   return (
     <header className="flex-shrink-0 px-4 py-2 border-b border-text-primary/10 bg-surface safe-top">

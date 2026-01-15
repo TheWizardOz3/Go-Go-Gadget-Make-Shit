@@ -116,18 +116,22 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
 
   const { settings, isLoading, updateSettings, isUpdating } = useSettings();
 
-  // Local state for phone input (to allow editing before save)
+  // Local state for inputs (to allow editing before save)
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [serverHostname, setServerHostname] = useState('');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Sync phone number from settings when modal opens or settings change
+  // Sync values from settings when modal opens or settings change
   useEffect(() => {
     if (settings?.notificationPhoneNumber) {
       setPhoneNumber(settings.notificationPhoneNumber);
     }
-  }, [settings?.notificationPhoneNumber]);
+    if (settings?.serverHostname) {
+      setServerHostname(settings.serverHostname);
+    }
+  }, [settings?.notificationPhoneNumber, settings?.serverHostname]);
 
   // Clear test result after 5 seconds
   useEffect(() => {
@@ -222,6 +226,21 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
     }
   };
 
+  // Handle hostname change
+  const handleHostnameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setServerHostname(e.target.value);
+  };
+
+  // Handle hostname blur (save)
+  const handleHostnameBlur = async () => {
+    const trimmed = serverHostname.trim();
+    try {
+      await updateSettings({ serverHostname: trimmed || undefined });
+    } catch {
+      // Silent fail - hostname is optional
+    }
+  };
+
   // Handle test notification
   const handleTestNotification = async () => {
     if (!isValidPhoneNumber(phoneNumber)) {
@@ -233,12 +252,19 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
     setTestResult(null);
 
     try {
-      // Save phone number first if not already saved
+      // Save phone number and hostname first if changed
+      const updates: Record<string, string | undefined> = {};
       if (phoneNumber !== settings?.notificationPhoneNumber) {
-        await updateSettings({ notificationPhoneNumber: phoneNumber });
+        updates.notificationPhoneNumber = phoneNumber;
+      }
+      if (serverHostname !== settings?.serverHostname) {
+        updates.serverHostname = serverHostname.trim() || undefined;
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateSettings(updates);
       }
 
-      const result = await sendTestNotification(phoneNumber);
+      const result = await sendTestNotification(phoneNumber, serverHostname.trim() || undefined);
       setTestResult({ success: result.sent, message: result.message });
     } catch (err) {
       setTestResult({
@@ -376,6 +402,36 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                     )}
                     <p className="text-xs text-text-muted">
                       The phone number to receive iMessage notifications
+                    </p>
+                  </div>
+
+                  {/* Server hostname input */}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="server-hostname"
+                      className="block text-sm font-medium text-text-primary"
+                    >
+                      Server Hostname
+                    </label>
+                    <input
+                      id="server-hostname"
+                      type="text"
+                      value={serverHostname}
+                      onChange={handleHostnameChange}
+                      onBlur={handleHostnameBlur}
+                      placeholder="dereks-macbook-pro"
+                      className={cn(
+                        'w-full px-3 py-2.5',
+                        'bg-text-primary/5 rounded-lg',
+                        'text-text-primary placeholder:text-text-muted',
+                        'border border-transparent',
+                        'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
+                        'transition-colors duration-150'
+                      )}
+                    />
+                    <p className="text-xs text-text-muted">
+                      Your Tailscale hostname for notification links (run `tailscale status` to find
+                      it)
                     </p>
                   </div>
 

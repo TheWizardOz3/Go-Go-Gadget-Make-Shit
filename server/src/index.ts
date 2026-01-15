@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import fs from 'node:fs';
+import https from 'node:https';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -56,11 +58,30 @@ app.use('/api', apiNotFoundHandler);
 // Static File Serving (Production)
 // ============================================================
 // Serve built React app from client/dist
-app.use(express.static(CLIENT_DIST_PATH));
+// Assets with hashes can be cached long-term, HTML should not be cached
+app.use(
+  express.static(CLIENT_DIST_PATH, {
+    // Cache hashed assets (JS, CSS) for 1 year
+    // HTML files should not be cached (handled by catch-all below)
+    setHeaders: (res, filePath) => {
+      if (filePath.includes('/assets/')) {
+        // Hashed assets - cache for 1 year
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        // Other static files - short cache
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+      }
+    },
+  })
+);
 
 // SPA catch-all: serve index.html for any non-API routes
 // This enables client-side routing (React Router)
+// No cache for HTML to ensure users get the latest version
 app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(CLIENT_DIST_PATH, 'index.html'));
 });
 
@@ -72,19 +93,79 @@ app.use(errorHandler);
 // ============================================================
 // Start Server
 // ============================================================
-app.listen(PORT, () => {
-  logger.info('GoGoGadgetClaude server started', {
-    port: PORT,
-    url: `http://localhost:${PORT}`,
-    healthCheck: `http://localhost:${PORT}/api/status`,
-  });
 
-  // Start file watcher for JSONL session files
+/**
+ * Start the file watcher and session cache invalidation
+ */
+function initializeWatcher() {
   startWatching();
-
-  // Invalidate cache when session files change
   onSessionChange((sessionId, eventType) => {
     logger.debug('Session file changed, invalidating cache', { sessionId, eventType });
     invalidateSessionCache(sessionId);
   });
-});
+}
+
+// When HTTPS is enabled:
+//   - HTTPS runs on main port (3456) - for iOS voice input
+//   - HTTP runs on secondary port (3457) - for local dev without certs
+// When HTTPS is not enabled:
+//   - HTTP runs on main port (3456)
+
+if (config.httpsEnabled) {
+  // HTTPS mode: HTTPS on main port, HTTP on secondary
+  try {
+    const httpsOptions = {
+      key: fs.readFileSync(config.sslKeyPath),
+      cert: fs.readFileSync(config.sslCertPath),
+    };
+
+    // Start HTTPS on main port (3456)
+    https.createServer(httpsOptions, app).listen(PORT, () => {
+      logger.info('GoGoGadgetClaude HTTPS server started (primary)', {
+        port: PORT,
+        url: `https://localhost:${PORT}`,
+        healthCheck: `https://localhost:${PORT}/api/status`,
+        voiceInput: '✅ Voice input enabled (secure context)',
+      });
+
+      initializeWatcher();
+    });
+
+    // Start HTTP on secondary port (3457) for convenience
+    app.listen(config.httpPort, () => {
+      logger.info('GoGoGadgetClaude HTTP server started (secondary)', {
+        port: config.httpPort,
+        url: `http://localhost:${config.httpPort}`,
+        note: 'Voice input requires HTTPS - use main port for iOS',
+      });
+    });
+  } catch (err) {
+    logger.error('Failed to start HTTPS server - check SSL certificate paths', {
+      sslCertPath: config.sslCertPath,
+      sslKeyPath: config.sslKeyPath,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    logger.info('Falling back to HTTP-only mode...');
+
+    // Fall back to HTTP on main port
+    app.listen(PORT, () => {
+      logger.info('GoGoGadgetClaude HTTP server started (fallback)', {
+        port: PORT,
+        url: `http://localhost:${PORT}`,
+        warning: '⚠️ Voice input will not work on iOS - fix SSL cert paths',
+      });
+      initializeWatcher();
+    });
+  }
+} else {
+  // HTTP-only mode
+  app.listen(PORT, () => {
+    logger.info('GoGoGadgetClaude HTTP server started', {
+      port: PORT,
+      url: `http://localhost:${PORT}`,
+      healthCheck: `http://localhost:${PORT}/api/status`,
+      note: '⚠️ Voice input requires HTTPS - run scripts/setup-https.sh',
+    });
+    initializeWatcher();
+  });
+}
