@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.14.0 | 2026-01-15 | **MVP** | iMessage Notifications complete - MVP DONE! |
 | 0.13.1 | 2026-01-15 | patch | UI Polish & Mobile Improvements |
 | 0.13.0 | 2026-01-15 | prerelease | Voice Input complete |
 | 0.12.0 | 2026-01-15 | prerelease | File Diff View complete |
@@ -41,6 +42,87 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.14.0] - 2026-01-15 🎉 MVP COMPLETE
+
+### Added
+- **iMessage Notifications** — Receive notifications on your phone when Claude Code completes a task
+  - Settings modal accessible via gear icon in header
+  - Toggle to enable/disable notifications (default: off)
+  - Phone number input with client-side validation
+  - "Send Test Notification" button to verify setup
+  - Notifications sent via macOS AppleScript/osascript to Messages.app
+  - Rate limiting: max 1 notification per 60 seconds to prevent spam
+  - Message format: "🤖 GoGoGadgetClaude: Task complete in [ProjectName]. [link]"
+  - App link uses Tailscale hostname from environment config
+
+- **Settings Service** — `server/src/services/settingsService.ts`
+  - File-based settings storage at `~/.gogogadgetclaude/settings.json`
+  - Zod validation for settings schema
+  - Auto-creates settings directory and defaults if missing
+  - Partial update support (merge with existing settings)
+
+- **Notification Service** — `server/src/services/notificationService.ts`
+  - `sendTaskCompleteNotification(projectName)` for task completion alerts
+  - `sendTestNotification(phoneNumber)` for testing without rate limit
+  - In-memory rate limiter with 60-second cooldown
+  - Uses `execa` to run `osascript` for AppleScript execution
+  - Graceful error handling (logs failures, doesn't crash)
+
+- **Settings API Endpoints**
+  - `GET /api/settings` — Retrieve current app settings
+  - `PUT /api/settings` — Update settings (partial merge)
+  
+- **Hooks API Endpoint**
+  - `POST /api/hooks/task-complete` — Endpoint for Claude Code Stop hook
+  - `POST /api/notifications/test` — Send test notification
+
+- **useSettings Hook** — `client/src/hooks/useSettings.ts`
+  - SWR-based settings fetching (revalidates on focus)
+  - Optimistic updates with rollback on error
+  - `updateSettings(partial)` mutation function
+  - `sendTestNotification(phoneNumber)` for test button
+
+- **Settings UI** — `client/src/components/settings/SettingsModal.tsx`
+  - Full-screen modal matching ProjectPicker pattern
+  - Notifications section with toggle, phone input, test button
+  - Phone number validation (basic format check)
+  - Visual feedback for loading, updating, and test states
+  - Keyboard accessible (Escape to close)
+
+- **Settings Button** — Gear icon in header (right side, before status)
+  - Opens SettingsModal on tap
+  - Uses Heroicons cog icon
+
+### Technical Details
+- **Files Created:**
+  - `server/src/services/settingsService.ts` — Settings management
+  - `server/src/services/settingsService.test.ts` — 10 unit tests
+  - `server/src/services/notificationService.ts` — iMessage sending
+  - `server/src/services/notificationService.test.ts` — 13 unit tests
+  - `server/src/api/hooks.ts` — Hooks and test notification endpoints
+  - `client/src/hooks/useSettings.ts` — Settings hook
+  - `client/src/hooks/useSettings.test.ts` — 10 unit tests
+  - `client/src/components/settings/SettingsModal.tsx` — Settings UI
+  - `client/src/components/settings/index.ts` — Barrel export
+
+- **Files Modified:**
+  - `server/src/api/index.ts` — Added hooks router
+  - `server/src/api/settings.ts` — Implemented GET/PUT endpoints
+  - `server/src/lib/config.ts` — Added `tailscaleHostname` config
+  - `client/src/App.tsx` — Added settings button and modal
+
+### Tests
+- 33 new tests for iMessage Notifications feature
+- **Total test count: 493 tests** (320 client + 173 server)
+- All tests passing, lint clean, typecheck clean
+
+### Notes
+- Notifications require Messages.app to be set up on Mac
+- Phone number is stored locally only (never sent to cloud)
+- Rate limiting resets when server restarts (acceptable for MVP)
 
 ---
 

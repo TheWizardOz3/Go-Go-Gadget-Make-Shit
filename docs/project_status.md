@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-15 (UI Polish complete - 12/13 MVP features done + v0.13.1 patch)
+**Last Updated**: 2026-01-15 (🎉 MVP COMPLETE - v0.14.0)
 
 ---
 
@@ -64,40 +64,31 @@
 | Files Changed View | 2026-01-14 | [Feature doc](Features/files-changed-view.md) - 65 new tests, 360 total |
 | File Diff View | 2026-01-15 | [Feature doc](Features/file-diff-view.md) - 54 new tests, 414 total |
 | Voice Input | 2026-01-15 | [Feature doc](Features/voice-input.md) - 46 new tests, 460 total |
+| iMessage Notifications | 2026-01-15 | [Feature doc](Features/imessage-notifications.md) - 33 new tests, 493 total |
 
-### MVP Build Order (Sequenced)
+### MVP Summary
 
-| # | Feature | Dependencies | Complexity | Notes |
-|---|---------|--------------|------------|-------|
-| 1 | ~~API Server Setup~~ | Scaffold ✅ | MEDIUM | ✅ Complete |
-| 2 | ~~JSONL Watcher Service~~ | #1 ✅ | MEDIUM | ✅ Complete |
-| 3 | ~~Conversation View UI~~ | #1 ✅, #2 ✅ | MEDIUM | ✅ Complete |
-| 4 | ~~Status Indicator~~ | #2 ✅, #3 ✅ | LOW | ✅ Complete |
-| 5 | ~~Text Input & Send~~ | #1 ✅, #3 ✅ | LOW | ✅ Complete |
-| 6 | ~~Stop Button~~ | #1 ✅ | LOW | ✅ Complete |
-| 7 | ~~Project Switcher~~ | #1 ✅ | MEDIUM | ✅ Complete |
-| 8 | ~~Session Picker~~ | #2 ✅, #7 ✅ | MEDIUM | ✅ Complete |
-| 9 | ~~Quick Templates~~ | #5 ✅, #7 ✅ | MEDIUM | ✅ Complete |
-| 10 | ~~Files Changed View~~ | #1 ✅ + Git service | MEDIUM | ✅ Complete |
-| 11 | ~~File Diff View~~ | #10 ✅ | HIGH | ✅ Complete |
-| 12 | ~~Voice Input~~ | #5 ✅ | MEDIUM | ✅ Complete |
-| 13 | **iMessage Notifications** 🚧 | Hooks setup | MEDIUM | Alerts - know when Claude finishes |
+**All 13 MVP features complete!** Total: 493 tests (320 client + 173 server)
 
-**Build Strategy:**
-- **Core Loop (#1-6):** View conversation → send prompts → control agent
-- **Navigation (#7-9):** Multi-project/session support + templates
-- **Code Review (#10-11):** See what Claude changed
-- **Polish (#12-13):** Voice input and notifications (can ship MVP without)
+| Category | Features |
+|----------|----------|
+| Core Loop | API Server, JSONL Watcher, Conversation View, Status Indicator, Text Input, Stop Button |
+| Navigation | Project Switcher, Session Picker, Quick Templates |
+| Code Review | Files Changed View, File Diff View |
+| Polish | Voice Input, iMessage Notifications |
 
 ---
 
 ## Upcoming Work
 
-### In Progress
-1. **iMessage Notifications** 🚧 - Feature doc needed (plan next)
+### MVP Complete! 🎉
 
-### Next Up
-None - iMessage Notifications is the last MVP feature!
+All MVP features have been implemented. Next milestone is **V0.75: Navigation & Model Control**.
+
+### Next Up (V0.75)
+- File tree viewing for project navigation
+- Model switching (change Claude models from mobile)
+- Voice input waveform visualization
 
 ---
 

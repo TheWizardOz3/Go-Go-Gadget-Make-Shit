@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-017 | 2026-01-15 | infra | active | In-memory rate limiting for notifications |
 | ADR-016 | 2026-01-15 | ui | active | Dynamic viewport height (dvh) for mobile Safari |
 | ADR-015 | 2026-01-15 | api | active | Groq Whisper API with Web Speech fallback for voice input |
 | ADR-014 | 2026-01-15 | data | active | Unified diff parsing for File Diff View |
@@ -39,6 +40,47 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-017: In-Memory Rate Limiting for Notifications
+**Date:** 2026-01-15 | **Category:** infra | **Status:** active
+
+#### Trigger
+Implementing iMessage Notifications required a rate limiting mechanism to prevent spam when Claude completes multiple tasks rapidly.
+
+#### Decision
+Use **in-memory rate limiting** with a simple timestamp check:
+- Store `lastNotificationTime` as a module-level variable
+- Check if 60 seconds have passed before sending
+- Reset automatically when server restarts
+
+```typescript
+let lastNotificationTime: number | null = null;
+const RATE_LIMIT_MS = 60_000; // 60 seconds
+
+function isRateLimited(): boolean {
+  if (!lastNotificationTime) return false;
+  return Date.now() - lastNotificationTime < RATE_LIMIT_MS;
+}
+```
+
+#### Rationale
+1. **Simplicity:** No external dependencies (Redis, etc.) for a single-user app
+2. **Sufficient:** 60 seconds prevents spam while allowing reasonable notification frequency
+3. **Acceptable tradeoff:** Rate limit resetting on server restart is fine for MVP
+4. **Easy to extend:** Can add Redis/persistent storage in V1 if multi-user support is added
+
+#### Alternatives Considered
+- **Redis:** Overkill for single-user, adds infrastructure complexity
+- **File-based:** Unnecessary I/O for a simple counter
+- **No rate limiting:** Would spam user during rapid task completions
+
+#### AI Instructions
+- Rate limiting is in `notificationService.ts`, not middleware
+- Test notifications bypass rate limiting (they're user-initiated)
+- If rate limited, return `false` from `sendTaskCompleteNotification()` but don't throw
+- Log rate-limited attempts at debug level for troubleshooting
+
+---
 
 ### ADR-016: Dynamic Viewport Height (dvh) for Mobile Safari
 **Date:** 2026-01-15 | **Category:** ui | **Status:** active

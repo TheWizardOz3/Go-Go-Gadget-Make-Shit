@@ -10,4 +10,9 @@ export const config = {
   // Groq API for voice transcription (Whisper)
   // Get your key at: https://console.groq.com/keys
   groqApiKey: process.env.GROQ_API_KEY || '',
+
+  // Tailscale hostname for notification links
+  // e.g., "your-macbook.tailnet-name.ts.net"
+  // Falls back to localhost if not set
+  tailscaleHostname: process.env.TAILSCALE_HOSTNAME || 'localhost',
 } as const;
