@@ -16,7 +16,8 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { StatusIndicator, StatusIndicatorSkeleton } from '@/components/ui/StatusIndicator';
 import { ProjectPicker } from '@/components/project';
 import { SessionPicker } from '@/components/session';
-import { FilesChangedView, FilesBadge, FileDiffPlaceholder } from '@/components/files';
+import { FilesChangedView, FilesBadge } from '@/components/files';
+import { DiffViewer } from '@/components/files/diff';
 import type { SessionStatus, SessionSummarySerialized } from '@shared/types';
 
 /** Active tab type */
@@ -299,11 +300,11 @@ export default function App() {
           encodedPath={selectedProject}
           className="flex-1"
         />
-      ) : selectedFilePath ? (
-        <FileDiffPlaceholder
+      ) : selectedFilePath && selectedProject ? (
+        <DiffViewer
+          encodedPath={selectedProject}
           filePath={selectedFilePath}
           onBack={() => setSelectedFilePath(null)}
-          className="flex-1"
         />
       ) : (
         <FilesChangedView

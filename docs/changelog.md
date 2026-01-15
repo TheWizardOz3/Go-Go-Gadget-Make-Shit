@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.12.0 | 2026-01-15 | prerelease | File Diff View complete |
 | 0.11.0 | 2026-01-14 | prerelease | Files Changed View complete |
 | 0.10.0 | 2026-01-14 | prerelease | Quick Templates complete |
 | 0.9.0 | 2026-01-14 | prerelease | Session Picker complete |
@@ -38,6 +39,88 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.12.0] - 2026-01-15
+
+### Added
+- **File Diff View** — Full file content display with green/red change highlighting for mobile code review
+  - Tap a file in Files Changed View to see its full diff
+  - Green background for added lines, red background with subtle styling for deleted lines
+  - Line numbers displayed for all lines
+  - Horizontal scrolling for long lines
+  - Binary file detection with friendly message ("Cannot display diff for binary files")
+  - Large file warning (5000+ lines) with "Load anyway" button to prevent mobile performance issues
+  - Loading skeleton with shimmer animation matching diff structure
+  - Error states with retry functionality
+  - Empty state for files with no changes
+  - "Jump to next change" floating action button (UI ready, scroll logic TODO)
+  - Sticky header with file path (tap to expand/collapse long paths)
+  - Back navigation to Files Changed View
+
+- **Git Diff Service** — Extended `gitService.ts` for detailed file diffs
+  - `getFileDiff()` function with options object `{ projectPath, filePath, context }`
+  - Unified diff parsing into structured `FileDiff` → `DiffHunk[]` → `DiffLine[]`
+  - Binary file detection via `git diff --numstat` (shows `-\t-\t` for binary)
+  - Language detection from file extension (40+ extensions mapped to Shiki languages)
+  - Large file flagging (`isTooBig: true` for 10,000+ line diffs)
+  - Path traversal prevention (rejects `../` and absolute paths)
+  - Handles new files, deleted files, and modified files
+
+- **File Diff API Endpoint**
+  - `GET /api/projects/:encodedPath/files/*filepath` — Returns `FileDiff` structure
+  - Query param: `?context=N` for context lines (default: full file)
+  - Security: Path validation prevents directory traversal attacks
+  - Proper error responses for not-found, not-git-repo, invalid-path
+
+- **useFileDiff Hook** — SWR-based data fetching for file diffs
+  - No automatic revalidation (diffs are static until refreshed)
+  - Keep previous data while revalidating
+  - Manual refresh via `mutate()` function
+  - Error retry with 1s interval, max 2 retries
+
+- **Diff UI Components**
+  - `DiffViewer` — Main container orchestrating all states (loading, error, binary, success)
+  - `DiffHeader` — Sticky header with back button, file path, optional menu
+  - `DiffContent` — Renders hunks with large file warning/confirmation
+  - `DiffLine` — Single line with background color based on type
+  - `DiffLineNumber` — Line number with +/- indicators
+  - `DiffLoadingSkeleton` — Animated skeleton matching diff structure
+  - `DiffEmptyState` — Error, not-found, and no-changes states
+  - `BinaryFileView` — Friendly message for binary files
+  - `JumpToChangeButton` — Floating button showing remaining changes
+
+- **Mobile UX Enhancements**
+  - Pinch-to-zoom enabled via viewport meta tag (`user-scalable=yes, maximum-scale=5.0`)
+  - Touch-friendly 44×44px minimum touch targets
+  - Monospace font for code readability
+
+### Technical Details
+- **Files Created (Frontend):**
+  - `client/src/hooks/useFileDiff.ts` — SWR hook for fetching diffs
+  - `client/src/hooks/useFileDiff.test.ts` — 14 unit tests
+  - `client/src/lib/languageDetector.ts` — File extension to language mapping
+  - `client/src/lib/languageDetector.test.ts` — 34 unit tests
+  - `client/src/components/files/diff/` — 9 new components with barrel export
+
+- **Files Modified (Backend):**
+  - `server/src/services/gitService.ts` — Added `getFileDiff()`, diff parsing utilities
+  - `server/src/services/gitService.test.ts` — Extended with 6 new tests for `getFileDiff`
+  - `server/src/api/projects.ts` — Implemented `/files/*filepath` endpoint
+
+- **Shared Types Extended:**
+  - `FileDiff` — Added `isBinary`, `isTooBig`, `language`, `oldPath` fields
+
+### Tests
+- 54 new tests across client and server
+- Total test count: **414 tests** (277 client + 137 server)
+- All tests passing, lint clean, typecheck clean
+
+### Notes
+- Syntax highlighting with Shiki not yet integrated (lines render without highlighting)
+- "Jump to next change" button has UI but scroll-to-change logic is TODO
+- Virtualization with `react-window` not yet implemented (considered for V1 if needed)
 
 ---
 

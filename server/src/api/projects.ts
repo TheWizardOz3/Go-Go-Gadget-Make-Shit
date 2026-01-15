@@ -3,7 +3,7 @@ import { success, error, ErrorCodes } from '../lib/responses.js';
 import { logger } from '../lib/logger.js';
 import { scanProjects, getProject, getSessionsForProject } from '../services/projectScanner.js';
 import { getTemplates } from '../services/templateService.js';
-import { getChangedFiles } from '../services/gitService.js';
+import { getChangedFiles, getFileDiff } from '../services/gitService.js';
 
 const router: RouterType = Router();
 
@@ -173,12 +173,87 @@ router.get('/:encodedPath/files', async (req, res) => {
 
 /**
  * Get file diff for a specific file
- * GET /api/projects/:encodedPath/files/:filePath
+ * GET /api/projects/:encodedPath/files/*filepath
  *
- * TODO: Implement file diff view
+ * Query parameters:
+ * - context: Number of context lines (default: 999999 for full file)
+ *
+ * Returns structured diff with hunks showing line-by-line changes.
+ * Handles binary files, new files, deleted files, and renames.
  */
-router.get('/:encodedPath/files/*', (_req, res) => {
-  res.status(501).json(error(ErrorCodes.NOT_IMPLEMENTED, 'File diff not yet implemented'));
+router.get('/:encodedPath/files/*', async (req, res) => {
+  try {
+    const { encodedPath } = req.params;
+
+    // Extract file path from the wildcard (everything after /files/)
+    // Express wildcard routes put the match in params[0]
+    const filePath = (req.params as unknown as { '0': string })['0'] || '';
+
+    if (!filePath) {
+      res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'File path is required'));
+      return;
+    }
+
+    // Validate file path to prevent path traversal attacks
+    // Don't allow paths that go up directories or are absolute
+    if (filePath.includes('..') || filePath.startsWith('/')) {
+      res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid file path'));
+      return;
+    }
+
+    // Parse context query parameter (default to 999999 for full file)
+    const contextParam = req.query.context as string | undefined;
+    const context = contextParam ? parseInt(contextParam, 10) : 999999;
+
+    // Validate context is a valid number
+    if (isNaN(context) || context < 0) {
+      res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid context parameter'));
+      return;
+    }
+
+    // First check if project exists
+    const project = await getProject(encodedPath);
+    if (!project) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Project not found'));
+      return;
+    }
+
+    // Get the file diff
+    const fileDiff = await getFileDiff({
+      projectPath: project.path,
+      filePath,
+      context,
+    });
+
+    res.json(success(fileDiff));
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
+    logger.error('Failed to get file diff', {
+      encodedPath: req.params.encodedPath,
+      filePath: (req.params as unknown as { '0': string })['0'],
+      error: errorMessage,
+    });
+
+    // Handle specific error cases
+    if (errorMessage.includes('Not a git repository')) {
+      res.status(400).json(error(ErrorCodes.BAD_REQUEST, 'Project is not a git repository'));
+      return;
+    }
+
+    if (errorMessage.includes('File not found') || errorMessage.includes('has no changes')) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'File not found or has no changes'));
+      return;
+    }
+
+    if (errorMessage.includes('Invalid file path')) {
+      res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid file path'));
+      return;
+    }
+
+    // Generic error
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get file diff'));
+  }
 });
 
 export default router;

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isGitRepo, getChangedFiles, getRepoRoot } from './gitService.js';
+import { isGitRepo, getChangedFiles, getRepoRoot, getFileDiff } from './gitService.js';
 
 // Mock simple-git
 vi.mock('simple-git', () => ({
@@ -22,6 +22,8 @@ describe('gitService', () => {
     status: ReturnType<typeof vi.fn>;
     diffSummary: ReturnType<typeof vi.fn>;
     revparse: ReturnType<typeof vi.fn>;
+    diff: ReturnType<typeof vi.fn>;
+    raw: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -33,6 +35,8 @@ describe('gitService', () => {
       status: vi.fn(),
       diffSummary: vi.fn(),
       revparse: vi.fn(),
+      diff: vi.fn(),
+      raw: vi.fn(),
     };
 
     mockSimpleGit.mockReturnValue(mockGitInstance as never);
@@ -371,6 +375,92 @@ describe('gitService', () => {
       expect(result.files).toEqual([]);
       expect(result.isGitRepo).toBe(false);
       expect(result.error).toContain('Failed to get changed files');
+    });
+  });
+
+  describe('getFileDiff', () => {
+    // These tests focus on error handling and security
+    // Full integration tests with real git repos should be done separately
+
+    it('should throw error for non-git directory', async () => {
+      mockGitInstance.checkIsRepo.mockResolvedValue(false);
+
+      await expect(
+        getFileDiff({ projectPath: '/not/a/repo', filePath: 'src/file.ts' })
+      ).rejects.toThrow('Not a git repository');
+    });
+
+    it('should throw error when file has no changes', async () => {
+      mockGitInstance.checkIsRepo.mockResolvedValue(true);
+      // File not in any change lists
+      mockGitInstance.status.mockResolvedValue({
+        staged: [],
+        modified: [],
+        not_added: [],
+        deleted: [],
+        created: [],
+        files: [],
+      });
+
+      await expect(
+        getFileDiff({ projectPath: '/project', filePath: 'unchanged.ts' })
+      ).rejects.toThrow('File not found or has no changes');
+    });
+
+    it('should throw error for path traversal attempts', async () => {
+      mockGitInstance.checkIsRepo.mockResolvedValue(true);
+
+      await expect(
+        getFileDiff({ projectPath: '/project', filePath: '../../../etc/passwd' })
+      ).rejects.toThrow('Invalid file path');
+    });
+
+    it('should throw error for absolute paths', async () => {
+      mockGitInstance.checkIsRepo.mockResolvedValue(true);
+
+      await expect(
+        getFileDiff({ projectPath: '/project', filePath: '/etc/passwd' })
+      ).rejects.toThrow('Invalid file path');
+    });
+
+    it('should detect binary files via numstat', async () => {
+      mockGitInstance.checkIsRepo.mockResolvedValue(true);
+      mockGitInstance.status.mockResolvedValue({
+        staged: [],
+        modified: ['image.png'],
+        not_added: [],
+        deleted: [],
+        created: [],
+        files: [{ path: 'image.png', index: ' ', working_dir: 'M' }],
+      });
+      // Binary files show as "-\t-\tfilename" in numstat
+      mockGitInstance.raw.mockResolvedValueOnce('-\t-\timage.png');
+
+      const result = await getFileDiff({ projectPath: '/project', filePath: 'image.png' });
+
+      expect(result).toBeDefined();
+      expect(result.path).toBe('image.png');
+      expect(result.isBinary).toBe(true);
+      expect(result.hunks).toEqual([]);
+    });
+
+    it('should detect language from file extension', async () => {
+      mockGitInstance.checkIsRepo.mockResolvedValue(true);
+      mockGitInstance.status.mockResolvedValue({
+        staged: [],
+        modified: ['script.py'],
+        not_added: [],
+        deleted: [],
+        created: [],
+        files: [{ path: 'script.py', index: ' ', working_dir: 'M' }],
+      });
+      mockGitInstance.raw
+        .mockResolvedValueOnce('1\t0\tscript.py') // numstat - not binary
+        .mockResolvedValueOnce(''); // empty diff (will result in 0 hunks but that's ok for this test)
+
+      const result = await getFileDiff({ projectPath: '/project', filePath: 'script.py' });
+
+      expect(result.language).toBe('python');
     });
   });
 });

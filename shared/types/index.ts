@@ -217,6 +217,14 @@ export interface FileDiff {
   path: string;
   /** Change type */
   status: FileChangeStatus;
+  /** Old path (for renamed files) */
+  oldPath?: string;
+  /** File language for syntax highlighting (e.g., 'typescript', 'python') */
+  language?: string;
+  /** Whether the file is binary (cannot display diff) */
+  isBinary: boolean;
+  /** Whether the file is too large to display efficiently (>10,000 lines) */
+  isTooBig: boolean;
   /** Diff hunks containing the changes */
   hunks: DiffHunk[];
 }

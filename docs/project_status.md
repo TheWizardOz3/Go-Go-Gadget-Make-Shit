@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-14 (Files Changed View Complete)
+**Last Updated**: 2026-01-15 (File Diff View Complete)
 
 ---
 
@@ -61,11 +61,7 @@
 | Session Picker | 2026-01-14 | [Feature doc](Features/session-picker.md) - 49 new tests, 244 total |
 | Quick Templates | 2026-01-14 | [Feature doc](Features/quick-templates.md) - 51 new tests, 295 total |
 | Files Changed View | 2026-01-14 | [Feature doc](Features/files-changed-view.md) - 65 new tests, 360 total |
-
-### In Progress
-| Feature | Started | Notes |
-|---------|---------|-------|
-| — | — | — |
+| File Diff View | 2026-01-15 | [Feature doc](Features/file-diff-view.md) - 54 new tests, 414 total |
 
 ### MVP Build Order (Sequenced)
 
@@ -81,7 +77,7 @@
 | 8 | ~~Session Picker~~ | #2 ✅, #7 ✅ | MEDIUM | ✅ Complete |
 | 9 | ~~Quick Templates~~ | #5 ✅, #7 ✅ | MEDIUM | ✅ Complete |
 | 10 | ~~Files Changed View~~ | #1 ✅ + Git service | MEDIUM | ✅ Complete |
-| 11 | **File Diff View** | #10 | HIGH | Review - green/red change highlighting |
+| 11 | ~~File Diff View~~ | #10 ✅ | HIGH | ✅ Complete |
 | 12 | **Voice Input** | #5 ✅ | MEDIUM | Hands-free - dictate via Groq Whisper |
 | 13 | **iMessage Notifications** | Hooks setup | MEDIUM | Alerts - know when Claude finishes |
 
@@ -96,9 +92,8 @@
 ## Upcoming Work
 
 ### Next Up
-1. **File Diff View** - Full file with green/red highlighting (Files Changed ✅)
-2. **Voice Input** - Dictate prompts with Groq Whisper transcription
-3. **iMessage Notifications** - Get notified when Claude finishes
+1. **Voice Input** - Dictate prompts with Groq Whisper transcription
+2. **iMessage Notifications** - Get notified when Claude finishes
 
 ---
 

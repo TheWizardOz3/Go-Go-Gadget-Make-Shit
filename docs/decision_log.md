@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-014 | 2026-01-15 | data | active | Unified diff parsing for File Diff View |
 | ADR-013 | 2026-01-14 | infra | active | simple-git for Git CLI operations |
 | ADR-012 | 2026-01-14 | ui | active | Pure CSS animations for modal transitions |
 | ADR-011 | 2026-01-14 | infra | active | Signal escalation for stopping Claude processes |
@@ -36,6 +37,44 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-014: Unified Diff Parsing for File Diff View
+**Date:** 2026-01-15 | **Category:** data | **Status:** active
+
+#### Trigger
+Implementing the File Diff View feature required parsing Git diff output into structured data for rendering with line-by-line highlighting.
+
+#### Decision
+Parse unified diff format server-side into structured `FileDiff` → `DiffHunk[]` → `DiffLine[]` objects, with:
+1. Use `git.raw()` with `--unified=999999` for full file context
+2. Detect binary files via `git diff --numstat` (shows `-\t-\t` for binary)
+3. Flag files > 10,000 lines as `isTooBig` for client-side warning
+4. Validate file paths to prevent directory traversal attacks
+
+#### Rationale
+1. **Full Context:** Using `--unified=999999` ensures the entire file is included, not just change hunks. This matches the product requirement for "full file with highlights."
+2. **Binary Detection:** The `--numstat` output reliably indicates binary files with `-\t-\t` pattern, whereas parsing diff headers can miss edge cases.
+3. **Server-Side Parsing:** Parsing on the server keeps the client simple and allows consistent data structure regardless of git version quirks.
+4. **Security:** Path validation is critical since the endpoint accepts user-controlled file paths.
+
+#### Alternatives Considered
+- **libgit2/nodegit:** Would give more control but adds native dependencies and complexity
+- **Client-side parsing:** Would require shipping raw diff text, larger payloads, and duplicate logic
+- **Diff library (jsdiff):** Designed for string comparison, not Git output parsing
+
+#### Impact
+- Server parses diffs into clean JSON structure
+- Client receives ready-to-render data
+- Large files get user confirmation before rendering
+- Binary files show friendly message
+
+#### AI Instructions
+- When extending `getFileDiff()`, maintain the options object pattern `{ projectPath, filePath, context }`
+- Always validate file paths before passing to git commands
+- Use `git.raw()` for git operations that need specific flags not supported by simple-git methods
+- Keep diff parsing logic in `parseDiffHunks()` - don't add parsing logic elsewhere
+
+---
 
 ### ADR-013: simple-git for Git CLI Operations
 **Date:** 2026-01-14 | **Category:** infra | **Status:** active
