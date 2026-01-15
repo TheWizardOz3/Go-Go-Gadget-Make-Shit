@@ -13,6 +13,7 @@
 
 | ID | Date | Category | Status | Summary |
 |----|------|----------|--------|---------|
+| ADR-016 | 2026-01-15 | ui | active | Dynamic viewport height (dvh) for mobile Safari |
 | ADR-015 | 2026-01-15 | api | active | Groq Whisper API with Web Speech fallback for voice input |
 | ADR-014 | 2026-01-15 | data | active | Unified diff parsing for File Diff View |
 | ADR-013 | 2026-01-14 | infra | active | simple-git for Git CLI operations |
@@ -38,6 +39,35 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-016: Dynamic Viewport Height (dvh) for Mobile Safari
+**Date:** 2026-01-15 | **Category:** ui | **Status:** active
+
+#### Trigger
+UI elements (especially the bottom tab bar) were getting cut off on mobile Safari because `100vh` doesn't account for the dynamic address bar and home indicator.
+
+#### Decision
+Use **`h-dvh`** (dynamic viewport height) instead of **`h-screen`** (`100vh`) for all full-height containers:
+
+```css
+.h-dvh {
+  height: 100vh;  /* Fallback for older browsers */
+  height: 100dvh; /* Modern browsers - adjusts for Safari's dynamic chrome */
+}
+```
+
+#### Rationale
+1. **`100vh` on iOS Safari** = includes area behind the address bar, causing content to be hidden
+2. **`100dvh`** = adjusts dynamically when Safari's chrome shows/hides
+3. **CSS fallback** = older browsers fall back to `100vh` gracefully
+
+#### AI Instructions
+When creating full-height layouts for mobile-first apps:
+- Use `h-dvh` class instead of `h-screen`
+- Include CSS fallback: `height: 100vh; height: 100dvh;`
+- Test on real iPhone Safari, not just Chrome DevTools
+
+---
 
 ### ADR-015: Groq Whisper API with Web Speech Fallback for Voice Input
 **Date:** 2026-01-15 | **Category:** api | **Status:** active

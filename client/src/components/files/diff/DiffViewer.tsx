@@ -45,7 +45,7 @@ export function DiffViewer({ encodedPath, filePath, onBack }: DiffViewerProps) {
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-dvh flex-col">
         <DiffHeader filePath={filePath} onBack={onBack} />
         <DiffLoadingSkeleton lines={15} />
       </div>
@@ -55,7 +55,7 @@ export function DiffViewer({ encodedPath, filePath, onBack }: DiffViewerProps) {
   // Error state
   if (error) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-dvh flex-col">
         <DiffHeader filePath={filePath} onBack={onBack} />
         <DiffEmptyState variant="error" message={error.message} onRetry={refresh} onBack={onBack} />
       </div>
@@ -65,7 +65,7 @@ export function DiffViewer({ encodedPath, filePath, onBack }: DiffViewerProps) {
   // No diff data (shouldn't normally happen, but handle gracefully)
   if (!diff) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-dvh flex-col">
         <DiffHeader filePath={filePath} onBack={onBack} />
         <DiffEmptyState variant="not-found" onBack={onBack} />
       </div>
@@ -75,7 +75,7 @@ export function DiffViewer({ encodedPath, filePath, onBack }: DiffViewerProps) {
   // Binary file
   if (diff.isBinary) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-dvh flex-col">
         <DiffHeader filePath={filePath} onBack={onBack} />
         <BinaryFileView filePath={filePath} onBack={onBack} />
       </div>
@@ -85,7 +85,7 @@ export function DiffViewer({ encodedPath, filePath, onBack }: DiffViewerProps) {
   // No changes (edge case)
   if (diff.hunks.length === 0) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-dvh flex-col">
         <DiffHeader filePath={filePath} onBack={onBack} />
         <DiffEmptyState variant="no-changes" onBack={onBack} />
       </div>
@@ -112,7 +112,7 @@ export function DiffViewer({ encodedPath, filePath, onBack }: DiffViewerProps) {
 
   // Success state - show the diff
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       {/* Sticky header */}
       <DiffHeader filePath={filePath} onBack={onBack} />
 

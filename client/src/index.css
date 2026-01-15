@@ -7,35 +7,57 @@
  * Colors from product_spec.md visual design system
  */
 :root {
-  /* Light mode (default) */
-  --color-background: #fafafa;
+  /* Light mode - warm Claude palette */
+  --color-background: #faf8f5;
   --color-surface: #ffffff;
-  --color-accent: #6366f1;
-  --color-success: #10b981;
-  --color-error: #ef4444;
-  --color-working: #3b82f6;
-  --color-warning: #f59e0b;
+  --color-surface-elevated: #f5f3f0;
+  --color-accent: #c97a62;
+  --color-accent-hover: #b86d56;
+  --color-success: #7aa356;
+  --color-error: #d76a4f;
+  --color-working: #c97a62;
+  --color-warning: #e0b97f;
 
   /* Text colors */
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #4a4a4a;
-  --color-text-muted: #9a9a9a;
+  --color-text-primary: #1a1816;
+  --color-text-secondary: #4a4844;
+  --color-text-muted: #8a857d;
+
+  /* Conversation-specific colors */
+  --color-user-bg: rgba(201, 122, 98, 0.08);
+  --color-user-border: rgba(201, 122, 98, 0.3);
+  --color-claude-bg: transparent;
+  --color-tool-bg: rgba(122, 163, 86, 0.08);
+  --color-tool-border: rgba(122, 163, 86, 0.3);
+  --color-thinking-bg: rgba(224, 185, 127, 0.1);
+  --color-thinking-border: rgba(224, 185, 127, 0.3);
 }
 
 .dark {
-  /* Dark mode */
-  --color-background: #0a0a0a;
-  --color-surface: #141414;
-  --color-accent: #818cf8;
-  --color-success: #34d399;
-  --color-error: #f87171;
-  --color-working: #60a5fa;
-  --color-warning: #fbbf24;
+  /* Dark mode - Claude-inspired warm palette */
+  --color-background: #1a1816;
+  --color-surface: #242220;
+  --color-surface-elevated: #2e2c29;
+  --color-accent: #d4826a;
+  --color-accent-hover: #e0927a;
+  --color-success: #8cb369;
+  --color-error: #e07a5f;
+  --color-working: #d4826a;
+  --color-warning: #f2cc8f;
 
-  /* Text colors */
-  --color-text-primary: #fafafa;
-  --color-text-secondary: #b0b0b0;
-  --color-text-muted: #6a6a6a;
+  /* Text colors - warm cream tones */
+  --color-text-primary: #f5f0e8;
+  --color-text-secondary: #c4bfb6;
+  --color-text-muted: #8a857d;
+
+  /* Conversation-specific colors */
+  --color-user-bg: rgba(212, 130, 106, 0.08);
+  --color-user-border: rgba(212, 130, 106, 0.3);
+  --color-claude-bg: transparent;
+  --color-tool-bg: rgba(140, 179, 105, 0.1);
+  --color-tool-border: rgba(140, 179, 105, 0.3);
+  --color-thinking-bg: rgba(242, 204, 143, 0.08);
+  --color-thinking-border: rgba(242, 204, 143, 0.3);
 }
 
 @layer base {
@@ -44,6 +66,12 @@
     -webkit-text-size-adjust: 100%;
     /* Smooth scrolling */
     scroll-behavior: smooth;
+  }
+
+  /* Fallback for h-dvh on older browsers */
+  .h-dvh {
+    height: 100vh; /* Fallback */
+    height: 100dvh; /* Modern browsers */
   }
 
   body {

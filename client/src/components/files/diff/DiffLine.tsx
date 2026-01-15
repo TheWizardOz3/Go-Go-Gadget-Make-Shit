@@ -77,7 +77,7 @@ export function DiffLine({ line, className }: DiffLineProps) {
       <div
         className={cn(
           // Flex-grow to fill remaining space
-          'flex-1 overflow-x-auto px-3 py-0',
+          'flex-1 min-w-0 px-3 py-0',
           // Monospace font for code
           'font-mono',
           // Text color
@@ -86,8 +86,8 @@ export function DiffLine({ line, className }: DiffLineProps) {
           type === 'delete' && 'line-through opacity-75'
         )}
       >
-        {/* Pre-formatted content preserves whitespace */}
-        <pre className="inline">
+        {/* Pre-formatted content with wrapping for mobile */}
+        <pre className="whitespace-pre-wrap break-words">
           <code>{content || ' '}</code>
         </pre>
       </div>

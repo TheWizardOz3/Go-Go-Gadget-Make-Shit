@@ -5,43 +5,45 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Background colors
+        // Background colors - Claude warm palette
         background: {
-          light: '#FAFAFA',
-          dark: '#0A0A0A',
+          light: '#FAF8F5',
+          dark: '#1a1816',
           DEFAULT: 'var(--color-background)',
         },
         // Surface/card colors
         surface: {
           light: '#FFFFFF',
-          dark: '#141414',
+          dark: '#242220',
+          elevated: 'var(--color-surface-elevated)',
           DEFAULT: 'var(--color-surface)',
         },
-        // Accent/primary colors
+        // Accent/primary colors - warm terracotta
         accent: {
-          light: '#6366F1',
-          dark: '#818CF8',
+          light: '#c97a62',
+          dark: '#d4826a',
+          hover: 'var(--color-accent-hover)',
           DEFAULT: 'var(--color-accent)',
         },
-        // Status colors
+        // Status colors - warm variants
         success: {
-          light: '#10B981',
-          dark: '#34D399',
+          light: '#7aa356',
+          dark: '#8cb369',
           DEFAULT: 'var(--color-success)',
         },
         error: {
-          light: '#EF4444',
-          dark: '#F87171',
+          light: '#d76a4f',
+          dark: '#e07a5f',
           DEFAULT: 'var(--color-error)',
         },
         working: {
-          light: '#3B82F6',
-          dark: '#60A5FA',
+          light: '#c97a62',
+          dark: '#d4826a',
           DEFAULT: 'var(--color-working)',
         },
         warning: {
-          light: '#F59E0B',
-          dark: '#FBBF24',
+          light: '#e0b97f',
+          dark: '#f2cc8f',
           DEFAULT: 'var(--color-warning)',
         },
         // Text colors
@@ -49,6 +51,22 @@ export default {
           primary: 'var(--color-text-primary)',
           secondary: 'var(--color-text-secondary)',
           muted: 'var(--color-text-muted)',
+        },
+        // Conversation-specific colors
+        user: {
+          bg: 'var(--color-user-bg)',
+          border: 'var(--color-user-border)',
+        },
+        claude: {
+          bg: 'var(--color-claude-bg)',
+        },
+        tool: {
+          bg: 'var(--color-tool-bg)',
+          border: 'var(--color-tool-border)',
+        },
+        thinking: {
+          bg: 'var(--color-thinking-bg)',
+          border: 'var(--color-thinking-border)',
         },
       },
       fontFamily: {

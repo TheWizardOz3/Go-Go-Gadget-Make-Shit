@@ -194,13 +194,18 @@ export function SessionPicker({
   // Determine if search should be shown
   const showSearch = sessions.length > SEARCH_THRESHOLD;
 
-  // Filter sessions based on search query (searches preview text)
+  // Filter sessions based on search query and exclude empty sessions
   const filteredSessions = useMemo(() => {
+    // First, filter out empty sessions (no messages or no preview)
+    const nonEmptySessions = sessions.filter(
+      (session) => session.messageCount > 0 || session.preview
+    );
+
     if (!searchQuery.trim()) {
-      return sessions;
+      return nonEmptySessions;
     }
     const query = searchQuery.toLowerCase().trim();
-    return sessions.filter((session) => session.preview?.toLowerCase().includes(query));
+    return nonEmptySessions.filter((session) => session.preview?.toLowerCase().includes(query));
   }, [sessions, searchQuery]);
 
   // Handle escape key to close modal

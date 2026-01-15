@@ -204,7 +204,7 @@ export default function App() {
   // Loading state (projects)
   if (projectsLoading) {
     return (
-      <div className={cn('dark', 'min-h-screen', 'flex', 'flex-col', 'bg-background')}>
+      <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
         <Header projectName={null} />
         <div className="flex-1 overflow-hidden">
           <ConversationSkeleton />
@@ -216,7 +216,7 @@ export default function App() {
   // Error state (projects)
   if (projectsError) {
     return (
-      <div className={cn('dark', 'min-h-screen', 'flex', 'flex-col', 'bg-background')}>
+      <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
         <Header projectName={null} />
         <div className="flex-1 flex items-center justify-center">
           <ErrorState
@@ -232,7 +232,7 @@ export default function App() {
   // No projects found
   if (!projects || projects.length === 0) {
     return (
-      <div className={cn('dark', 'min-h-screen', 'flex', 'flex-col', 'bg-background')}>
+      <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
         <Header projectName={null} />
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="text-center">
@@ -279,7 +279,7 @@ export default function App() {
 
   // Main app with tab navigation
   return (
-    <div className={cn('dark', 'min-h-screen', 'flex', 'flex-col', 'bg-background')}>
+    <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
       <Header
         projectName={currentProject?.name || null}
         currentSession={currentSession}
@@ -294,27 +294,29 @@ export default function App() {
       />
 
       {/* Main content area - conditionally render based on active tab */}
-      {activeTab === 'conversation' ? (
-        <ConversationView
-          sessionId={selectedSession}
-          encodedPath={selectedProject}
-          className="flex-1"
-        />
-      ) : selectedFilePath && selectedProject ? (
-        <DiffViewer
-          encodedPath={selectedProject}
-          filePath={selectedFilePath}
-          onBack={() => setSelectedFilePath(null)}
-        />
-      ) : (
-        <FilesChangedView
-          encodedPath={selectedProject}
-          onFilePress={setSelectedFilePath}
-          className="flex-1"
-        />
-      )}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'conversation' ? (
+          <ConversationView
+            sessionId={selectedSession}
+            encodedPath={selectedProject}
+            className="h-full"
+          />
+        ) : selectedFilePath && selectedProject ? (
+          <DiffViewer
+            encodedPath={selectedProject}
+            filePath={selectedFilePath}
+            onBack={() => setSelectedFilePath(null)}
+          />
+        ) : (
+          <FilesChangedView
+            encodedPath={selectedProject}
+            onFilePress={setSelectedFilePath}
+            className="h-full"
+          />
+        )}
+      </div>
 
-      {/* Bottom Tab Bar */}
+      {/* Bottom Tab Bar - fixed at bottom */}
       <TabBar
         activeTab={activeTab}
         onTabChange={setActiveTab}

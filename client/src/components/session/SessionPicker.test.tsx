@@ -9,6 +9,7 @@ import { SessionPicker } from './SessionPicker';
 import type { SessionSummarySerialized } from '@shared/types';
 
 // Mock session data
+// Note: Sessions with empty/null previews are now filtered out by SessionPicker
 const mockSessions: SessionSummarySerialized[] = [
   {
     id: 'session-alpha',
@@ -29,10 +30,10 @@ const mockSessions: SessionSummarySerialized[] = [
   {
     id: 'session-gamma',
     filePath: '/Users/test/.claude/projects/-test/session-gamma.jsonl',
-    startedAt: null,
-    lastActivityAt: null,
-    messageCount: 0,
-    preview: null,
+    startedAt: new Date(Date.now() - 7200000).toISOString(),
+    lastActivityAt: new Date(Date.now() - 7200000).toISOString(),
+    messageCount: 1,
+    preview: 'Third session with content',
   },
 ];
 
@@ -126,7 +127,7 @@ describe('SessionPicker', () => {
 
       expect(screen.getByText('Hello Claude, help me with React')).toBeInTheDocument();
       expect(screen.getByText('Write a Python script')).toBeInTheDocument();
-      expect(screen.getByText('Empty session')).toBeInTheDocument();
+      expect(screen.getByText('Third session with content')).toBeInTheDocument();
     });
 
     it('marks selected session with aria-selected', () => {

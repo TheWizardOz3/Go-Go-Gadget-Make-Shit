@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.13.1 | 2026-01-15 | patch | UI Polish & Mobile Improvements |
 | 0.13.0 | 2026-01-15 | prerelease | Voice Input complete |
 | 0.12.0 | 2026-01-15 | prerelease | File Diff View complete |
 | 0.11.0 | 2026-01-14 | prerelease | Files Changed View complete |
@@ -40,6 +41,35 @@
 ## [Unreleased]
 
 *Nothing unreleased*
+
+---
+
+## [0.13.1] - 2026-01-15
+
+### Changed
+- **Dark Mode Theme** — Updated to Claude's warm terracotta/clay branding
+  - Background: `#1a1816` (warm dark brown)
+  - Surface: `#242220` (medium warm brown)
+  - Accent: `#d4826a` (terracotta)
+  - Text: `#f5f0e8` (warm cream)
+
+- **Conversation View UI** — Multiple improvements for Cursor-like experience
+  - Replaced emoji icons with professional SVG icons in tool cards
+  - Increased message density with reduced padding
+  - Enhanced visual distinction between user and Claude messages
+  - Filtered empty user messages from display
+  - Added `whitespace-pre-wrap` to diff viewer for mobile text wrapping
+
+- **Session Picker** — Now filters out sessions with empty/null previews
+
+- **Mobile Responsiveness** — Fixed viewport issues
+  - Changed `h-screen` to `h-dvh` (dynamic viewport height) for Safari compatibility
+  - Added CSS fallback for older browsers
+  - Diff viewer content now wraps properly on mobile instead of horizontal scrolling
+
+### Fixed
+- Bottom tab bar no longer gets pushed off-screen when viewing many files
+- Diff viewer content cutoff on mobile viewports
 
 ---
 
