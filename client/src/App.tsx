@@ -7,7 +7,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
-import { getCachedProjects, getLastSyncRelative, getCachedFilesChanged } from '@/lib/localCache';
+import {
+  getCachedProjects,
+  getLastSyncRelative,
+  getCachedFileTree,
+  type CachedFileTreeEntry,
+} from '@/lib/localCache';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { useConversation } from '@/hooks/useConversation';
@@ -107,6 +112,108 @@ function setStoredSession(encodedPath: string | null, sessionId: string | null):
 }
 
 /**
+ * Recursive tree view for cached file tree
+ */
+function CachedTreeView({
+  entries,
+  expandedFolders,
+  onToggleFolder,
+  depth = 0,
+}: {
+  entries: CachedFileTreeEntry[];
+  expandedFolders: Set<string>;
+  onToggleFolder: (path: string) => void;
+  depth?: number;
+}) {
+  // Sort: folders first, then files, alphabetically
+  const sorted = [...entries].sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className={depth > 0 ? 'ml-4 border-l border-border/30 pl-2' : ''}>
+      {sorted.map((entry) => {
+        const isExpanded = expandedFolders.has(entry.path);
+        const isFolder = entry.type === 'directory';
+
+        return (
+          <div key={entry.path}>
+            <button
+              onClick={() => isFolder && onToggleFolder(entry.path)}
+              className={cn(
+                'w-full flex items-center gap-2 py-1.5 px-2 rounded text-left text-sm',
+                'hover:bg-text-primary/5 transition-colors',
+                isFolder ? 'cursor-pointer' : 'cursor-default'
+              )}
+            >
+              {isFolder ? (
+                <>
+                  <svg
+                    className={cn(
+                      'w-4 h-4 text-text-muted transition-transform',
+                      isExpanded && 'rotate-90'
+                    )}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                  <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                  </svg>
+                </>
+              ) : (
+                <>
+                  <span className="w-4" />
+                  <svg
+                    className="w-4 h-4 text-text-muted"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </>
+              )}
+              <span
+                className={cn(
+                  'truncate',
+                  isFolder
+                    ? 'text-text-primary font-medium'
+                    : 'text-text-secondary font-mono text-xs'
+                )}
+              >
+                {entry.name}
+              </span>
+            </button>
+            {isFolder && isExpanded && entry.children && (
+              <CachedTreeView
+                entries={entry.children}
+                expandedFolders={expandedFolders}
+                onToggleFolder={onToggleFolder}
+                depth={depth + 1}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * Loading screen shown while determining API endpoint
  */
 function InitializationLoader() {
@@ -150,10 +257,25 @@ function CloudEmptyState({
 
   const isCloudMode = mode === 'cloud';
 
-  // Get cached files for selected project
-  const cachedFiles = selectedCachedProject
-    ? getCachedFilesChanged(selectedCachedProject.encodedPath)
+  // Get cached file tree for selected project
+  const cachedTree = selectedCachedProject
+    ? getCachedFileTree(selectedCachedProject.encodedPath)
     : null;
+
+  // Track expanded folders in the tree
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+
+  const toggleFolder = (path: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  };
 
   // Send prompt to cloud for selected project
   const handleSendCloudPrompt = async () => {
@@ -443,9 +565,9 @@ function CloudEmptyState({
                 )}
               >
                 Files
-                {cachedFiles && cachedFiles.length > 0 && (
-                  <span className="px-1.5 py-0.5 text-xs bg-text-primary/10 rounded-full">
-                    {cachedFiles.length}
+                {cachedTree && (
+                  <span className="px-1.5 py-0.5 text-xs bg-emerald-500/20 text-emerald-400 rounded-full">
+                    ✓
                   </span>
                 )}
               </button>
@@ -525,37 +647,32 @@ function CloudEmptyState({
                   </div>
                 )
               ) : /* Files Tab */
-              cachedFiles && cachedFiles.length > 0 ? (
-                <div className="space-y-1">
-                  {cachedFiles.map((file) => (
-                    <div
-                      key={file.path}
-                      className="flex items-center gap-3 py-2 px-3 rounded-lg bg-background/50"
-                    >
-                      <span
-                        className={cn(
-                          'w-2 h-2 rounded-full shrink-0',
-                          file.status === 'added' && 'bg-emerald-500',
-                          file.status === 'modified' && 'bg-amber-500',
-                          file.status === 'deleted' && 'bg-red-500'
-                        )}
-                      />
-                      <span className="text-sm text-text-primary truncate flex-1 font-mono">
-                        {file.path}
-                      </span>
-                      {(file.additions || file.deletions) && (
-                        <span className="text-xs text-text-muted shrink-0">
-                          {file.additions ? (
-                            <span className="text-emerald-400">+{file.additions}</span>
-                          ) : null}
-                          {file.additions && file.deletions ? ' ' : ''}
-                          {file.deletions ? (
-                            <span className="text-red-400">-{file.deletions}</span>
-                          ) : null}
-                        </span>
-                      )}
+              cachedTree && cachedTree.entries.length > 0 ? (
+                <div className="space-y-0.5">
+                  {cachedTree.branch && (
+                    <div className="text-xs text-text-muted mb-3 flex items-center gap-2">
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 10V3L4 14h7v7l9-11h-7z"
+                        />
+                      </svg>
+                      Branch:{' '}
+                      <span className="text-text-secondary font-mono">{cachedTree.branch}</span>
                     </div>
-                  ))}
+                  )}
+                  <CachedTreeView
+                    entries={cachedTree.entries}
+                    expandedFolders={expandedFolders}
+                    onToggleFolder={toggleFolder}
+                  />
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -569,11 +686,13 @@ function CloudEmptyState({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
                     />
                   </svg>
-                  <p className="text-sm text-text-muted">No cached files</p>
-                  <p className="text-xs text-text-muted/70 mt-1">View files on laptop to cache</p>
+                  <p className="text-sm text-text-muted">No cached file tree</p>
+                  <p className="text-xs text-text-muted/70 mt-1">
+                    Browse files on laptop to cache the tree
+                  </p>
                 </div>
               )}
             </div>

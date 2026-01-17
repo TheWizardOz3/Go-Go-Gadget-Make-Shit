@@ -15,6 +15,7 @@ import type { ProjectSerialized, SessionSummarySerialized } from '@shared/types'
 const CACHE_KEY_PROJECTS = 'ggg_cache_projects';
 const CACHE_KEY_SESSIONS_PREFIX = 'ggg_cache_sessions_';
 const CACHE_KEY_FILES_PREFIX = 'ggg_cache_files_';
+const CACHE_KEY_TREE_PREFIX = 'ggg_cache_tree_';
 const CACHE_KEY_LAST_SYNC = 'ggg_cache_last_sync';
 
 // ============================================================
@@ -27,6 +28,23 @@ export interface CachedFileChange {
   status: 'added' | 'modified' | 'deleted';
   additions?: number;
   deletions?: number;
+}
+
+/** Cached file tree entry */
+export interface CachedFileTreeEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  extension: string | null;
+  children?: CachedFileTreeEntry[];
+}
+
+/** Cached file tree response */
+export interface CachedFileTree {
+  path: string;
+  githubUrl: string | null;
+  branch: string;
+  entries: CachedFileTreeEntry[];
 }
 
 // ============================================================
@@ -113,6 +131,40 @@ export function getCachedSessions(encodedPath: string): SessionSummarySerialized
     if (!stored) return null;
 
     const cached: CachedData<SessionSummarySerialized[]> = JSON.parse(stored);
+    return cached.data;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================
+// File Tree Cache
+// ============================================================
+
+/**
+ * Cache the file tree for a specific project
+ */
+export function cacheFileTree(encodedPath: string, tree: CachedFileTree): void {
+  try {
+    const cached: CachedData<CachedFileTree> = {
+      data: tree,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(CACHE_KEY_TREE_PREFIX + encodedPath, JSON.stringify(cached));
+  } catch (e) {
+    console.warn('Failed to cache file tree:', e);
+  }
+}
+
+/**
+ * Get cached file tree for offline viewing
+ */
+export function getCachedFileTree(encodedPath: string): CachedFileTree | null {
+  try {
+    const stored = localStorage.getItem(CACHE_KEY_TREE_PREFIX + encodedPath);
+    if (!stored) return null;
+
+    const cached: CachedData<CachedFileTree> = JSON.parse(stored);
     return cached.data;
   } catch {
     return null;

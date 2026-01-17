@@ -3,10 +3,13 @@
  *
  * Uses SWR for caching. Does not auto-refresh since committed files
  * don't change frequently during a session.
+ * Caches tree to localStorage for offline viewing.
  */
 
+import { useEffect } from 'react';
 import useSWR from 'swr';
 import { api } from '@/lib/api';
+import { cacheFileTree } from '@/lib/localCache';
 import type { FileTreeResponse } from '@shared/types';
 
 /**
@@ -66,6 +69,18 @@ export function useFileTree(encodedPath: string | null, subPath?: string): UseFi
       errorRetryCount: 2,
     }
   );
+
+  // Cache file tree to localStorage for offline access (only for root path)
+  useEffect(() => {
+    if (data && encodedPath && !subPath) {
+      cacheFileTree(encodedPath, {
+        path: data.path,
+        githubUrl: data.githubUrl,
+        branch: data.branch,
+        entries: data.entries,
+      });
+    }
+  }, [data, encodedPath, subPath]);
 
   return {
     data,
