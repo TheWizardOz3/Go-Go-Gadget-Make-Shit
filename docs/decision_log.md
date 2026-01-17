@@ -13,6 +13,7 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-020 | 2026-01-17 | data     | active | Git-based file tree using git ls-tree and git show        |
 | ADR-019 | 2026-01-17 | ui       | active | Web Audio API for real-time waveform visualization        |
 | ADR-018 | 2026-01-15 | infra    | active | Server-side notifications for programmatic sessions       |
 | ADR-017 | 2026-01-15 | infra    | active | In-memory rate limiting for notifications                 |
@@ -42,6 +43,41 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-020: Git-Based File Tree Using git ls-tree and git show
+**Date:** 2026-01-17 | **Category:** data | **Status:** active
+
+#### Trigger
+Implementing File Tree Viewing required choosing how to list project files and retrieve file contents for display.
+
+#### Options Considered
+1. **Filesystem access (fs.readdir)** — Direct filesystem traversal with .gitignore parsing via `ignore` npm package
+2. **Git CLI (git ls-tree, git show)** — Use Git's built-in commands to list and retrieve committed files
+
+#### Decision
+Use Git CLI commands (`git ls-tree -r HEAD --name-only` and `git show HEAD:filepath`) instead of direct filesystem access.
+
+#### Rationale
+- **Simplicity**: Git already knows which files are tracked—no need to parse .gitignore files
+- **Consistency**: Shows exactly what's committed, matching user expectations for "project files"
+- **Security**: No risk of exposing untracked secrets or build artifacts
+- **Dependencies**: No new npm packages needed—reuses existing `simple-git` library (ADR-013)
+- **Performance**: Git's internal indexing makes file listing fast
+
+#### Trade-offs
+- Cannot see uncommitted files (acceptable—users typically want to see "the code")
+- Requires project to be a Git repository (show error if not)
+- Binary file detection is basic (check for null bytes in first 8KB)
+
+#### AI Instructions
+When implementing file browsing features:
+1. Prefer Git commands over filesystem access for project files
+2. Use `git ls-tree -r HEAD --name-only` for flat file listing, then build tree structure
+3. Use `git show HEAD:filepath` for file content retrieval
+4. Always validate file paths to prevent path traversal attacks
+5. Check for binary files before returning content
+
+---
 
 ### ADR-019: Web Audio API for Real-Time Waveform Visualization
 **Date:** 2026-01-17 | **Category:** ui | **Status:** active

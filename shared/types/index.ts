@@ -230,6 +230,57 @@ export interface FileDiff {
 }
 
 // =============================================================================
+// File Tree Types (for file tree view feature)
+// =============================================================================
+
+/** Entry type in file tree */
+export type FileTreeEntryType = 'file' | 'directory';
+
+/** A single entry (file or folder) in the file tree */
+export interface FileTreeEntry {
+  /** File or folder name */
+  name: string;
+  /** Relative path from project root */
+  path: string;
+  /** Entry type */
+  type: FileTreeEntryType;
+  /** File extension (null for directories) */
+  extension: string | null;
+  /** Children entries (only for directories, populated on expand) */
+  children?: FileTreeEntry[];
+}
+
+/** Response from GET /api/projects/:id/tree */
+export interface FileTreeResponse {
+  /** Root or subdirectory path */
+  path: string;
+  /** GitHub repo URL (null if not a GitHub repo) */
+  githubUrl: string | null;
+  /** Current git branch */
+  branch: string;
+  /** Tree entries (files and folders) */
+  entries: FileTreeEntry[];
+}
+
+/** Response from GET /api/projects/:id/content/:filepath */
+export interface FileContentResponse {
+  /** File path relative to project root */
+  path: string;
+  /** File name */
+  name: string;
+  /** File extension (null if no extension) */
+  extension: string | null;
+  /** Detected language for syntax highlighting */
+  language: string;
+  /** File content (text) */
+  content: string;
+  /** Line count */
+  lineCount: number;
+  /** GitHub URL for this file (null if not GitHub) */
+  githubUrl: string | null;
+}
+
+// =============================================================================
 // Settings Types
 // =============================================================================
 

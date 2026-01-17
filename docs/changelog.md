@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.16.0 | 2026-01-17 | minor | File Tree Viewing |
 | 0.15.0 | 2026-01-17 | minor | Voice Input UX Improvements |
 | 0.14.1 | 2026-01-15 | patch | UX polish: HTTPS, notifications, new session flow |
 | 0.14.0 | 2026-01-15 | **MVP** | iMessage Notifications complete - MVP DONE! |
@@ -44,6 +45,36 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.16.0] - 2026-01-17
+
+### Added
+- **File Tree Viewing** — Browse all committed project files with in-app content viewing
+  - New "All Files" toggle in Files tab alongside "Changed" files view
+  - Hierarchical tree display using `git ls-tree` for committed files
+  - File content viewer with line numbers and language detection
+  - Expand/collapse directories with touch-friendly 48px targets
+  - File type icons color-coded by category (code, config, markdown, images)
+  - GitHub link for each file when repository is on GitHub
+  - Keyboard navigation support (Enter, Space, Arrow keys)
+
+### New Files
+- `client/src/components/files/tree/FileTreeView.tsx` — Main container component
+- `client/src/components/files/tree/FileTreeNode.tsx` — Recursive tree node
+- `client/src/components/files/tree/FileContentView.tsx` — File content viewer
+- `client/src/components/files/tree/FileIcon.tsx` — File type icons
+- `client/src/hooks/useFileTree.ts` — SWR hook for tree data
+- `client/src/hooks/useFileContent.ts` — SWR hook for file content
+- `server/src/services/gitService.ts` additions: `getCommittedTree`, `getCommittedFileContent`, `getGitHubUrl`
+
+### API Endpoints
+- `GET /api/projects/:encodedPath/tree` — Returns hierarchical file tree
+- `GET /api/projects/:encodedPath/content/*filepath` — Returns file content with metadata
+
+### Tests
+- 38 new tests (20 FileTreeNode + 18 FileContentView)
 
 ---
 

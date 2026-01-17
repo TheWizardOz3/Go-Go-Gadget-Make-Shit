@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-17 (V0.75 scope updated - model picker punted to V1)
+**Last Updated**: 2026-01-17 (File Tree Viewing complete)
 
 ---
 
@@ -57,6 +57,7 @@
 ### Completed
 | Feature/Task                | Completion Date | Notes                                                                                                                   |
 |-----------------------------|-----------------|-------------------------------------------------------------------------------------------------------------------------|
+| File Tree Viewing           | 2026-01-17      | Browse committed files in-app with content viewer - [feature doc](Features/file-tree-view.md)                           |
 | Voice Input UX Improvements | 2026-01-17      | Bigger button (56×56px), waveform visualization, lower latency - [feature doc](Features/voice-input-ux-improvements.md) |
 | Allow Edits Setting         | 2026-01-16      | Toggle in Settings to skip permission prompts                                                                           |
 | New Session Navigation Fix  | 2026-01-16      | Bug fix: new sessions now correctly navigate to the new session                                                         |
@@ -65,9 +66,9 @@
 *No features currently in progress.*
 
 ### Up Next
-| Feature/Task      | Notes                                                            |
-|-------------------|------------------------------------------------------------------|
-| File Tree Viewing | Browse project files with GitHub links - #3 in V0.75 build order |
+| Feature/Task      | Notes                                                                  |
+|-------------------|------------------------------------------------------------------------|
+| Scheduled Prompts | Schedule/cancel repeating prompts - #4 in V0.75 build order            |
 
 ---
 

@@ -8,7 +8,13 @@
 import { simpleGit, type SimpleGit, type StatusResult, type DiffResultTextFile } from 'simple-git';
 import { logger } from '../lib/logger.js';
 import path from 'path';
-import type { FileDiff, DiffHunk, FileChangeStatus } from 'shared';
+import type {
+  FileDiff,
+  DiffHunk,
+  FileChangeStatus,
+  FileTreeEntry,
+  FileContentResponse,
+} from 'shared';
 
 // ============================================================
 // Types (re-export shared types for convenience)
@@ -639,4 +645,382 @@ export async function getFileDiff(options: GetFileDiffOptions): Promise<FileDiff
     isTooBig,
     hunks,
   };
+}
+
+// ============================================================
+// File Tree Functions (for browsing committed files)
+// ============================================================
+
+export interface GetCommittedTreeOptions {
+  /** Absolute path to the project directory */
+  projectPath: string;
+  /** Subdirectory path to fetch (empty for root) */
+  subPath?: string;
+}
+
+export interface GetCommittedTreeResult {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Tree entries (files and folders) */
+  entries: FileTreeEntry[];
+  /** Error message if operation failed */
+  error?: string;
+}
+
+/**
+ * Build a tree structure from flat file paths
+ *
+ * Takes a list of file paths and builds a hierarchical tree structure.
+ * Handles nested directories by creating intermediate folder entries.
+ *
+ * @param filePaths - Array of file paths relative to repo root
+ * @param subPath - Optional subdirectory to filter by
+ * @returns Array of tree entries for the specified level
+ */
+function buildTreeFromPaths(filePaths: string[], subPath: string = ''): FileTreeEntry[] {
+  // Map to collect entries at the current level
+  const entriesMap = new Map<string, FileTreeEntry>();
+
+  for (const filePath of filePaths) {
+    // Skip files not under the subPath
+    if (subPath && !filePath.startsWith(subPath + '/') && filePath !== subPath) {
+      continue;
+    }
+
+    // Get the relative path from subPath
+    const relativePath = subPath ? filePath.slice(subPath.length + 1) : filePath;
+
+    // Skip empty paths (happens if subPath equals filePath exactly)
+    if (!relativePath) continue;
+
+    // Split into parts
+    const parts = relativePath.split('/');
+    const firstPart = parts[0];
+
+    // Determine if this is a file or directory at this level
+    const isFile = parts.length === 1;
+    const entryPath = subPath ? `${subPath}/${firstPart}` : firstPart;
+
+    if (!entriesMap.has(firstPart)) {
+      if (isFile) {
+        // It's a file
+        const ext = path.extname(firstPart);
+        entriesMap.set(firstPart, {
+          name: firstPart,
+          path: entryPath,
+          type: 'file',
+          extension: ext || null,
+        });
+      } else {
+        // It's a directory
+        entriesMap.set(firstPart, {
+          name: firstPart,
+          path: entryPath,
+          type: 'directory',
+          extension: null,
+        });
+      }
+    }
+  }
+
+  // Convert to array and sort: directories first, then alphabetically
+  const entries = Array.from(entriesMap.values());
+  entries.sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type === 'directory' ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return entries;
+}
+
+/**
+ * Get the committed file tree from a git repository
+ *
+ * Uses `git ls-tree` to list all committed files, then builds
+ * a hierarchical tree structure. Only shows files that are
+ * tracked and committed (not local changes).
+ *
+ * @param options - Options including project path and optional subdirectory
+ * @returns Result with tree entries
+ */
+export async function getCommittedTree(
+  options: GetCommittedTreeOptions
+): Promise<GetCommittedTreeResult> {
+  const { projectPath, subPath = '' } = options;
+
+  logger.debug('Getting committed file tree', { projectPath, subPath });
+
+  try {
+    // Check if this is a git repository
+    const isRepo = await isGitRepo(projectPath);
+    if (!isRepo) {
+      return {
+        success: false,
+        entries: [],
+        error: 'Not a git repository',
+      };
+    }
+
+    const git = createGit(projectPath);
+
+    // Get all committed files using git ls-tree
+    // -r = recursive, --name-only = only file names
+    const output = await git.raw(['ls-tree', '-r', 'HEAD', '--name-only']);
+
+    // Parse the output into an array of file paths
+    const filePaths = output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    // Build tree structure from flat paths
+    const entries = buildTreeFromPaths(filePaths, subPath);
+
+    logger.debug('Built file tree', {
+      projectPath,
+      subPath,
+      totalFiles: filePaths.length,
+      entriesAtLevel: entries.length,
+    });
+
+    return {
+      success: true,
+      entries,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    logger.error('Failed to get committed file tree', {
+      projectPath,
+      subPath,
+      error: errorMessage,
+    });
+
+    return {
+      success: false,
+      entries: [],
+      error: `Failed to get file tree: ${errorMessage}`,
+    };
+  }
+}
+
+export interface GetCommittedFileContentOptions {
+  /** Absolute path to the project directory */
+  projectPath: string;
+  /** Relative file path from project root */
+  filePath: string;
+}
+
+export interface GetCommittedFileContentResult {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** File content response (null if failed) */
+  file: FileContentResponse | null;
+  /** Error message if operation failed */
+  error?: string;
+}
+
+/**
+ * Check if content appears to be binary
+ *
+ * Simple heuristic: if there are null bytes in the first 8KB, it's binary.
+ *
+ * @param content - File content string
+ * @returns True if content appears to be binary
+ */
+function isBinaryContent(content: string): boolean {
+  // Check first 8KB for null bytes
+  const sample = content.slice(0, 8192);
+  return sample.includes('\0');
+}
+
+/**
+ * Get the committed content of a file from git
+ *
+ * Uses `git show HEAD:filepath` to retrieve the committed version
+ * of a file. This only shows committed content, not local changes.
+ *
+ * @param options - Options including project path and file path
+ * @returns Result with file content response
+ */
+export async function getCommittedFileContent(
+  options: GetCommittedFileContentOptions
+): Promise<GetCommittedFileContentResult> {
+  const { projectPath, filePath } = options;
+
+  logger.debug('Getting committed file content', { projectPath, filePath });
+
+  try {
+    // Validate file path (prevent path traversal)
+    const normalizedPath = path.normalize(filePath);
+    if (normalizedPath.startsWith('..') || path.isAbsolute(normalizedPath)) {
+      return {
+        success: false,
+        file: null,
+        error: 'Invalid file path',
+      };
+    }
+
+    // Check if this is a git repository
+    const isRepo = await isGitRepo(projectPath);
+    if (!isRepo) {
+      return {
+        success: false,
+        file: null,
+        error: 'Not a git repository',
+      };
+    }
+
+    const git = createGit(projectPath);
+
+    // Get file content using git show
+    let content: string;
+    try {
+      content = await git.show([`HEAD:${filePath}`]);
+    } catch (error) {
+      // File not found in git
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('does not exist') || errorMessage.includes('not in')) {
+        return {
+          success: false,
+          file: null,
+          error: 'File not found in repository',
+        };
+      }
+      throw error;
+    }
+
+    // Check if content is binary
+    if (isBinaryContent(content)) {
+      return {
+        success: false,
+        file: null,
+        error: 'Binary file cannot be displayed',
+      };
+    }
+
+    // Get file metadata
+    const fileName = path.basename(filePath);
+    const extension = path.extname(filePath) || null;
+    const language = detectLanguage(filePath);
+    const lineCount = content.split('\n').length;
+
+    logger.debug('Got file content', {
+      filePath,
+      lineCount,
+      language,
+      size: content.length,
+    });
+
+    return {
+      success: true,
+      file: {
+        path: filePath,
+        name: fileName,
+        extension,
+        language,
+        content,
+        lineCount,
+        githubUrl: null, // Will be populated by the API layer
+      },
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    logger.error('Failed to get committed file content', {
+      projectPath,
+      filePath,
+      error: errorMessage,
+    });
+
+    return {
+      success: false,
+      file: null,
+      error: `Failed to get file content: ${errorMessage}`,
+    };
+  }
+}
+
+// ============================================================
+// GitHub URL Functions
+// ============================================================
+
+/**
+ * Get the GitHub repository URL from git remote
+ *
+ * Extracts the GitHub URL from the origin remote, converting
+ * SSH URLs to HTTPS format for browser access.
+ *
+ * @param projectPath - Path to the git repository
+ * @returns GitHub repo URL (e.g., "https://github.com/user/repo") or null
+ */
+export async function getGitHubRepoUrl(projectPath: string): Promise<string | null> {
+  try {
+    const git = createGit(projectPath);
+    const remotes = await git.getRemotes(true);
+
+    // Find origin remote
+    const origin = remotes.find((r) => r.name === 'origin');
+    if (!origin?.refs?.fetch) return null;
+
+    const url = origin.refs.fetch;
+
+    // Convert SSH URL to HTTPS
+    // git@github.com:user/repo.git → https://github.com/user/repo
+    if (url.startsWith('git@github.com:')) {
+      return url.replace('git@github.com:', 'https://github.com/').replace(/\.git$/, '');
+    }
+
+    // Already HTTPS URL - just clean it up
+    if (url.includes('github.com')) {
+      return url.replace(/\.git$/, '');
+    }
+
+    // Not a GitHub repo
+    return null;
+  } catch (error) {
+    logger.debug('Failed to get GitHub URL', {
+      projectPath,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return null;
+  }
+}
+
+/**
+ * Get the current git branch name
+ *
+ * @param projectPath - Path to the git repository
+ * @returns Branch name or 'main' as fallback
+ */
+export async function getCurrentBranch(projectPath: string): Promise<string> {
+  try {
+    const git = createGit(projectPath);
+    const branch = await git.revparse(['--abbrev-ref', 'HEAD']);
+    return branch.trim() || 'main';
+  } catch {
+    return 'main';
+  }
+}
+
+/**
+ * Get the GitHub URL for a specific file
+ *
+ * Generates a URL to view the file on GitHub at the current branch.
+ *
+ * @param projectPath - Path to the git repository
+ * @param filePath - Relative file path from repo root
+ * @returns GitHub file URL or null if not a GitHub repo
+ */
+export async function getGitHubFileUrl(
+  projectPath: string,
+  filePath: string
+): Promise<string | null> {
+  const repoUrl = await getGitHubRepoUrl(projectPath);
+  if (!repoUrl) return null;
+
+  const branch = await getCurrentBranch(projectPath);
+  return `${repoUrl}/blob/${branch}/${filePath}`;
 }

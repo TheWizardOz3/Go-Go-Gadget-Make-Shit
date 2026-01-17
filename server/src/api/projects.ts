@@ -3,7 +3,15 @@ import { success, error, ErrorCodes } from '../lib/responses.js';
 import { logger } from '../lib/logger.js';
 import { scanProjects, getProject, getSessionsForProject } from '../services/projectScanner.js';
 import { getTemplates } from '../services/templateService.js';
-import { getChangedFiles, getFileDiff } from '../services/gitService.js';
+import {
+  getChangedFiles,
+  getFileDiff,
+  getCommittedTree,
+  getCommittedFileContent,
+  getGitHubRepoUrl,
+  getGitHubFileUrl,
+  getCurrentBranch,
+} from '../services/gitService.js';
 
 const router: RouterType = Router();
 
@@ -253,6 +261,151 @@ router.get('/:encodedPath/files/*', async (req, res) => {
 
     // Generic error
     res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get file diff'));
+  }
+});
+
+/**
+ * Get committed file tree for a project
+ * GET /api/projects/:encodedPath/tree
+ *
+ * Query parameters:
+ * - path: Subdirectory path to fetch (optional, defaults to root)
+ *
+ * Returns the committed file tree structure with GitHub URLs.
+ */
+router.get('/:encodedPath/tree', async (req, res) => {
+  try {
+    const { encodedPath } = req.params;
+    const subPath = (req.query.path as string) || '';
+
+    // Validate subPath to prevent path traversal
+    if (subPath.includes('..') || subPath.startsWith('/')) {
+      res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid path parameter'));
+      return;
+    }
+
+    // First check if project exists
+    const project = await getProject(encodedPath);
+    if (!project) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Project not found'));
+      return;
+    }
+
+    // Get the committed file tree
+    const result = await getCommittedTree({
+      projectPath: project.path,
+      subPath,
+    });
+
+    if (!result.success) {
+      if (result.error?.includes('Not a git repository')) {
+        res.status(400).json(error(ErrorCodes.BAD_REQUEST, 'Project is not a git repository'));
+        return;
+      }
+      res
+        .status(500)
+        .json(error(ErrorCodes.INTERNAL_ERROR, result.error || 'Failed to get file tree'));
+      return;
+    }
+
+    // Get GitHub info for the project
+    const [githubUrl, branch] = await Promise.all([
+      getGitHubRepoUrl(project.path),
+      getCurrentBranch(project.path),
+    ]);
+
+    res.json(
+      success({
+        path: subPath,
+        githubUrl,
+        branch,
+        entries: result.entries,
+      })
+    );
+  } catch (err) {
+    logger.error('Failed to get file tree', {
+      encodedPath: req.params.encodedPath,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get file tree'));
+  }
+});
+
+/**
+ * Get committed file content
+ * GET /api/projects/:encodedPath/content/*filepath
+ *
+ * Returns the committed content of a file with syntax highlighting info.
+ */
+router.get('/:encodedPath/content/*', async (req, res) => {
+  try {
+    const { encodedPath } = req.params;
+
+    // Extract file path from the wildcard
+    const filePath = (req.params as unknown as { '0': string })['0'] || '';
+
+    if (!filePath) {
+      res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'File path is required'));
+      return;
+    }
+
+    // Validate file path to prevent path traversal
+    if (filePath.includes('..') || filePath.startsWith('/')) {
+      res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid file path'));
+      return;
+    }
+
+    // First check if project exists
+    const project = await getProject(encodedPath);
+    if (!project) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Project not found'));
+      return;
+    }
+
+    // Get the committed file content
+    const result = await getCommittedFileContent({
+      projectPath: project.path,
+      filePath,
+    });
+
+    if (!result.success || !result.file) {
+      const errorMessage = result.error || 'Failed to get file content';
+
+      if (errorMessage.includes('Not a git repository')) {
+        res.status(400).json(error(ErrorCodes.BAD_REQUEST, 'Project is not a git repository'));
+        return;
+      }
+
+      if (errorMessage.includes('not found') || errorMessage.includes('does not exist')) {
+        res.status(404).json(error(ErrorCodes.NOT_FOUND, 'File not found'));
+        return;
+      }
+
+      if (errorMessage.includes('Binary file')) {
+        res.status(400).json(error(ErrorCodes.BAD_REQUEST, 'Binary file cannot be displayed'));
+        return;
+      }
+
+      res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, errorMessage));
+      return;
+    }
+
+    // Get GitHub URL for this file
+    const githubUrl = await getGitHubFileUrl(project.path, filePath);
+
+    res.json(
+      success({
+        ...result.file,
+        githubUrl,
+      })
+    );
+  } catch (err) {
+    logger.error('Failed to get file content', {
+      encodedPath: req.params.encodedPath,
+      filePath: (req.params as unknown as { '0': string })['0'],
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get file content'));
   }
 });
 
