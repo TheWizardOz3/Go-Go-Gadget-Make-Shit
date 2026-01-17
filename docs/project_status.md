@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-17 (Scheduled Prompts complete)
+**Last Updated**: 2026-01-17 (V1 Feature 1: Floating Voice Button - Complete)
 
 ---
 
@@ -54,10 +54,11 @@
 
 ## V0.75 Progress — COMPLETE ✅
 
-**Test Count: 631 tests** (398 client + 194 server + 39 new for Scheduled Prompts)
+**Test Count: 617 tests** (423 client + 194 server)
 
 | Feature/Task                | Completion Date | Notes                                                                                                           |
 |-----------------------------|-----------------|-----------------------------------------------------------------------------------------------------------------|
+| Floating Voice Button       | 2026-01-17      | Persistent mic on Files tab with long-press-to-send - [doc](Features/floating-voice-button.md)                  |
 | Scheduled Prompts           | 2026-01-17      | Calendar-based scheduling, project targeting, fire-and-forget execution - [doc](Features/scheduled-prompts.md)  |
 | File Tree Viewing           | 2026-01-17      | Browse committed files in-app with content viewer - [doc](Features/file-tree-view.md)                           |
 | Voice Input UX Improvements | 2026-01-17      | Bigger button (56×56px), waveform visualization, lower latency - [doc](Features/voice-input-ux-improvements.md) |
@@ -65,12 +66,32 @@
 | New Session Navigation Fix  | 2026-01-16      | Bug fix: new sessions now correctly navigate to the new session                                                 |
 | Voice Input PiP             | ❌ Cancelled     | iOS Safari doesn't support background audio recording for web apps                                              |
 
-### Next Milestone: V1 - Notifications & Serverless
-| Feature               | Priority | Notes                             |
-|-----------------------|----------|-----------------------------------|
-| Claude model picker   | Medium   | Change models from mobile UI      |
-| Notification channels | High     | Abstract layer for Slack/Telegram |
-| Serverless execution  | High     | Run agents without laptop awake   |
+---
+
+## Next Milestone: V1 - Floating Voice & Async Execution
+
+**Functionality Summary**: Persistent voice recording across views, push notifications, and serverless execution.
+
+### V1 Build Order
+
+| Order | Feature                        | Status     | Description                                                  |
+|-------|--------------------------------|------------|--------------------------------------------------------------|
+| 1     | Floating Voice Button          | ✅ Complete | Persistent mic across views; record while browsing file tree |
+| 2     | Notification Abstraction Layer | Pending    | Extract iMessage into pluggable abstraction for all channels |
+| 3     | ntfy Notifications             | Pending    | Push notifications via ntfy.sh (no SMS/carrier dependency)   |
+| 4     | Serverless/Async Execution     | Pending    | Run agents without laptop awake (Modal/Fly.io/Railway)       |
+
+### Dependency Notes
+- **Floating Voice Button** is independent (no backend dependencies beyond existing voice infrastructure)
+- **Notification Abstraction** must precede ntfy (ntfy builds on the abstraction)
+- **Serverless** benefits from notifications being complete (remote task completion alerts)
+
+### Technical Scope
+- SharedPromptContext for syncing prompt text between views
+- FloatingVoiceButton component with long-press-to-send gesture
+- Notification channel abstraction layer
+- ntfy.sh HTTP POST integration
+- Cloud compute integration (Modal/Fly.io/Railway)
 
 ---
 
@@ -118,22 +139,20 @@
 
 ## Future Milestones
 
-### V1: Notifications & Serverless
-**Functionality Summary**: Multiple notification channels, model control, and serverless execution
+### V1.2: Model Control & Notification Channels
+**Functionality Summary**: Multiple notification channels and model control from mobile
 
 **Key Features:**
 - Claude model picker (change models from mobile UI)
 - Notification channel abstraction layer
 - Slack webhook notifications
 - Telegram bot notifications
-- Serverless/async execution (run agents without laptop awake)
 
 **Technical Scope:**
 - Claude CLI model switching integration
 - Notification channel abstraction layer
 - Slack webhook integration
 - Telegram bot setup
-- Cloud compute integration for serverless mode
 
 ---
 

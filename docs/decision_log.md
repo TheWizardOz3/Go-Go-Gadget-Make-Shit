@@ -13,6 +13,7 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-022 | 2026-01-17 | arch     | active | SharedPromptContext for cross-view voice input sync       |
 | ADR-021 | 2026-01-17 | arch     | active | Fire-and-forget execution for scheduled prompts           |
 | ADR-020 | 2026-01-17 | data     | active | Git-based file tree using git ls-tree and git show        |
 | ADR-019 | 2026-01-17 | ui       | active | Web Audio API for real-time waveform visualization        |
@@ -44,6 +45,46 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-022: SharedPromptContext for Cross-View Voice Input Sync
+**Date:** 2026-01-17 | **Category:** arch | **Status:** active
+
+#### Trigger
+Implementing the Floating Voice Button required a way to share prompt text between the FloatingVoiceButton (on Files tab) and PromptInput (on Chat tab), so voice recordings from either location accumulate in the same shared prompt.
+
+#### Options Considered
+1. **Prop drilling** — Pass state up through App and down to both components
+2. **Global state (Zustand/Jotai)** — Full state management library
+3. **React Context** — Lightweight context for just the shared prompt text
+4. **localStorage + events** — Sync via localStorage with custom events
+
+#### Decision
+Use a minimal React Context (`SharedPromptContext`) that holds:
+- `promptText: string` — The current accumulated prompt text
+- `shouldSend: boolean` — Flag to request send from floating button
+- Functions: `setPromptText`, `appendText`, `clearText`, `requestSend`, `clearSendRequest`
+
+#### Rationale
+- **Minimal** — Only stores what's needed (text + send flag), no over-engineering
+- **No new dependencies** — Uses React's built-in Context API
+- **Bidirectional sync** — Both PromptInput and FloatingVoiceButton can read/write
+- **Clean separation** — PromptInput handles localStorage persistence, context handles cross-component sync
+- **Long-press send** — `shouldSend` flag enables FloatingVoiceButton to trigger send without direct reference
+
+#### Consequences
+- ✅ Voice recordings from Files tab appear in Chat tab's PromptInput
+- ✅ Long-press on floating button triggers send + tab switch
+- ✅ PromptInput still owns localStorage persistence
+- ✅ Zero new dependencies
+- ❌ PromptInput now has bidirectional sync useEffect (slightly more complex)
+
+#### Implementation Notes
+- `SharedPromptProvider` wraps the entire app in `App.tsx`
+- PromptInput initializes from localStorage, then syncs bidirectionally with context
+- FloatingVoiceButton calls `appendText()` for transcriptions, `requestSend()` for long-press
+- PromptInput watches `shouldSend` and triggers its own `handleSend` when true
+
+---
 
 ### ADR-021: Fire-and-Forget Execution for Scheduled Prompts
 **Date:** 2026-01-17 | **Category:** arch | **Status:** active

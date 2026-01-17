@@ -12,6 +12,7 @@ import { StopButton } from './StopButton';
 import { VoiceButton } from './VoiceButton';
 import { Waveform } from './Waveform';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useSharedPrompt } from '@/contexts/SharedPromptContext';
 import type { SessionStatus } from '@shared/types';
 
 interface PromptInputProps {
@@ -75,8 +76,13 @@ export function PromptInput({
   onVoiceError,
   className,
 }: PromptInputProps) {
-  // Initialize from localStorage to persist draft across app backgrounds
+  // Shared prompt context for sync with FloatingVoiceButton
+  const { promptText, setPromptText, shouldSend, clearSendRequest } = useSharedPrompt();
+
+  // Initialize from context if available, otherwise localStorage
   const [value, setValue] = useState(() => {
+    // Context takes priority if it has content
+    if (promptText) return promptText;
     try {
       return localStorage.getItem(STORAGE_KEY) || '';
     } catch {
@@ -84,6 +90,38 @@ export function PromptInput({
     }
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Track if we've initialized from localStorage (to avoid overwriting on first render)
+  const hasInitializedRef = useRef(false);
+
+  // Sync FROM context when it changes (e.g., FloatingVoiceButton adds transcription)
+  useEffect(() => {
+    // Skip the first render - we want to preserve localStorage value on initial mount
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      // On first render, sync local value TO context if we have content from localStorage
+      if (value && !promptText) {
+        setPromptText(value);
+      }
+      return;
+    }
+
+    // After initialization, sync from context to local state
+    if (promptText !== value) {
+      setValue(promptText);
+      // Also update localStorage to keep in sync
+      try {
+        if (promptText) {
+          localStorage.setItem(STORAGE_KEY, promptText);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
+    }
+    // Intentionally excluding 'value' - we only want to react to context changes
+  }, [promptText, setPromptText]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Insert text at cursor position (or append if no selection)
@@ -96,6 +134,7 @@ export function PromptInput({
         // Fallback: append to end
         const newValue = value.trim() ? `${value} ${text}` : text;
         setValue(newValue);
+        setPromptText(newValue); // Sync to shared context
         onValueChange?.(newValue);
         try {
           localStorage.setItem(STORAGE_KEY, newValue);
@@ -121,6 +160,7 @@ export function PromptInput({
       const newValue = before + insertedText + after;
 
       setValue(newValue);
+      setPromptText(newValue); // Sync to shared context
       onValueChange?.(newValue);
 
       // Persist to localStorage
@@ -137,7 +177,7 @@ export function PromptInput({
         textarea.setSelectionRange(newCursorPos, newCursorPos);
       });
     },
-    [value, onValueChange]
+    [value, onValueChange, setPromptText]
   );
 
   /**
@@ -195,11 +235,14 @@ export function PromptInput({
 
   /**
    * Handle textarea value change
-   * Persists to localStorage for background app recovery
+   * Persists to localStorage and syncs to shared context
    */
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     setValue(newValue);
+
+    // Sync to shared context for FloatingVoiceButton coordination
+    setPromptText(newValue);
 
     // Notify parent of value change
     onValueChange?.(newValue);
@@ -225,6 +268,7 @@ export function PromptInput({
     const trimmedValue = value.trim();
     onSend(trimmedValue);
     setValue('');
+    setPromptText(''); // Clear shared context
 
     // Clear localStorage draft
     try {
@@ -237,7 +281,36 @@ export function PromptInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = `${MIN_HEIGHT}px`;
     }
-  }, [canSend, value, onSend]);
+  }, [canSend, value, onSend, setPromptText]);
+
+  // Handle send request from FloatingVoiceButton (long-press to send)
+  useEffect(() => {
+    if (shouldSend && hasContent) {
+      // Clear the request flag first to prevent re-triggering
+      clearSendRequest();
+
+      // Send the prompt
+      const trimmedValue = value.trim();
+      onSend(trimmedValue);
+      setValue('');
+      setPromptText('');
+
+      // Clear localStorage draft
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Ignore localStorage errors
+      }
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = `${MIN_HEIGHT}px`;
+      }
+    } else if (shouldSend) {
+      // No content to send, just clear the flag
+      clearSendRequest();
+    }
+  }, [shouldSend, hasContent, value, onSend, setPromptText, clearSendRequest]);
 
   /**
    * Handle keyboard events for submit
@@ -266,6 +339,7 @@ export function PromptInput({
    */
   const handleClear = useCallback(() => {
     setValue('');
+    setPromptText(''); // Clear shared context
     onValueChange?.('');
     try {
       localStorage.removeItem(STORAGE_KEY);
@@ -277,7 +351,7 @@ export function PromptInput({
       textareaRef.current.style.height = `${MIN_HEIGHT}px`;
       textareaRef.current.focus();
     }
-  }, [onValueChange]);
+  }, [onValueChange, setPromptText]);
 
   return (
     <div

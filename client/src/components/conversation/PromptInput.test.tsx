@@ -8,6 +8,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PromptInput } from './PromptInput';
+import { SharedPromptProvider } from '@/contexts/SharedPromptContext';
+
+/**
+ * Helper to render PromptInput with required context providers
+ */
+function renderWithProviders(ui: React.ReactElement) {
+  return render(<SharedPromptProvider>{ui}</SharedPromptProvider>);
+}
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -57,20 +65,20 @@ describe('PromptInput', () => {
 
   describe('rendering', () => {
     it('should render textarea and send button', () => {
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       expect(screen.getByRole('textbox')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /send/i })).toBeInTheDocument();
     });
 
     it('should show placeholder text', () => {
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       expect(screen.getByPlaceholderText('Type a message...')).toBeInTheDocument();
     });
 
     it('should have proper aria labels', () => {
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       expect(screen.getByLabelText('Message input')).toBeInTheDocument();
       expect(screen.getByLabelText('Send message')).toBeInTheDocument();
@@ -79,7 +87,7 @@ describe('PromptInput', () => {
 
   describe('disabled states', () => {
     it('should disable send button when input is empty', () => {
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const sendButton = screen.getByRole('button', { name: /send/i });
       expect(sendButton).toBeDisabled();
@@ -87,7 +95,7 @@ describe('PromptInput', () => {
 
     it('should disable send button when input is whitespace only', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, '   ');
@@ -98,7 +106,7 @@ describe('PromptInput', () => {
 
     it('should enable send button when input has content', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, 'Hello');
@@ -108,21 +116,21 @@ describe('PromptInput', () => {
     });
 
     it('should disable textarea when disabled prop is true', () => {
-      render(<PromptInput onSend={mockOnSend} disabled />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} disabled />);
 
       const textarea = screen.getByRole('textbox');
       expect(textarea).toBeDisabled();
     });
 
     it('should disable textarea when isSending is true', () => {
-      render(<PromptInput onSend={mockOnSend} isSending />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} isSending />);
 
       const textarea = screen.getByRole('textbox');
       expect(textarea).toBeDisabled();
     });
 
     it('should show loading spinner when isSending', () => {
-      render(<PromptInput onSend={mockOnSend} isSending />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} isSending />);
 
       // The spinner has animate-spin class
       const button = screen.getByRole('button', { name: /send/i });
@@ -134,7 +142,7 @@ describe('PromptInput', () => {
   describe('send behavior', () => {
     it('should call onSend with trimmed value when send button clicked', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, '  Hello Claude  ');
@@ -147,7 +155,7 @@ describe('PromptInput', () => {
 
     it('should clear input after send', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, 'Hello');
@@ -158,7 +166,7 @@ describe('PromptInput', () => {
 
     it('should not call onSend when input is empty', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const sendButton = screen.getByRole('button', { name: /send/i });
       await user.click(sendButton);
@@ -168,7 +176,7 @@ describe('PromptInput', () => {
 
     it('should send on Enter key (desktop)', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, 'Hello');
@@ -179,7 +187,7 @@ describe('PromptInput', () => {
 
     it('should not send on Shift+Enter (allows newline)', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, 'Hello');
@@ -193,7 +201,7 @@ describe('PromptInput', () => {
     it('should load initial value from localStorage', () => {
       localStorageMock.getItem.mockReturnValue('Saved draft');
 
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       expect(textarea).toHaveValue('Saved draft');
@@ -201,7 +209,7 @@ describe('PromptInput', () => {
 
     it('should save value to localStorage on change', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, 'Draft message');
@@ -214,7 +222,7 @@ describe('PromptInput', () => {
 
     it('should remove from localStorage when input cleared', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, 'Test');
@@ -225,7 +233,7 @@ describe('PromptInput', () => {
 
     it('should clear localStorage on send', async () => {
       const user = userEvent.setup();
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       await user.type(textarea, 'Hello');
@@ -237,14 +245,14 @@ describe('PromptInput', () => {
 
   describe('auto-resize', () => {
     it('should have minimum height', () => {
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       expect(textarea).toHaveStyle({ minHeight: '44px' });
     });
 
     it('should have maximum height', () => {
-      render(<PromptInput onSend={mockOnSend} />);
+      renderWithProviders(<PromptInput onSend={mockOnSend} />);
 
       const textarea = screen.getByRole('textbox');
       expect(textarea).toHaveStyle({ maxHeight: '150px' });

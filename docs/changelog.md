@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.18.0 | 2026-01-17 | minor | Floating Voice Button |
 | 0.17.0 | 2026-01-17 | minor | Scheduled Prompts |
 | 0.16.1 | 2026-01-17 | patch | Fix production server startup path |
 | 0.16.0 | 2026-01-17 | minor | File Tree Viewing |
@@ -47,6 +48,32 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.18.0] - 2026-01-17
+
+### Summary
+**Floating Voice Button** - Persistent voice recording button on Files tab with press-and-hold to send.
+
+### Added
+- **FloatingVoiceButton component** - Fixed-position mic button visible on Files tab
+  - Tap to start/stop recording
+  - Long-press (500ms) to send accumulated prompt immediately
+  - Green badge indicator when prompt has text
+  - State-based styling (recording=red pulse, processing=spinner)
+  - Haptic feedback on interactions
+- **SharedPromptContext** - Shared state for prompt text between views
+  - `promptText`, `setPromptText`, `appendText`, `clearText`
+  - `shouldSend`, `requestSend`, `clearSendRequest` for cross-component send triggering
+- **PromptInput context integration** - Bidirectional sync with FloatingVoiceButton
+  - Voice recordings from either location append to same prompt
+  - Send from floating button triggers send in PromptInput
+
+### Technical Notes
+- Reuses existing `useVoiceInput` hook for recording/transcription
+- SharedPromptProvider wraps App content for global state
+- No new API endpoints or server changes required
 
 ---
 

@@ -532,8 +532,8 @@ export function ScheduledPromptForm({
                   'transition-colors duration-150',
                   'resize-none'
                 )}
-                // Force high contrast text
-                style={{ color: '#ffffff' }}
+                // Force high contrast for native textarea - uses white text on dark backgrounds
+                style={{ color: '#ffffff', colorScheme: 'dark' }}
               />
               {error && <p className="text-xs text-error">{error}</p>}
             </div>
