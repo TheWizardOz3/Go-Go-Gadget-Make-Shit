@@ -18,8 +18,14 @@ import { startScheduler, stopScheduler } from './services/schedulerService.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Path to built React app (relative to server/src/)
-const CLIENT_DIST_PATH = path.join(__dirname, '../../client/dist');
+// Path to built React app
+// When compiled: __dirname is server/dist/server/src, so go up 4 levels to project root
+// When running from source: __dirname is server/src, so go up 2 levels to project root
+const PROJECT_ROOT = path.resolve(
+  __dirname,
+  __dirname.includes('/dist/') ? '../../../..' : '../..'
+);
+const CLIENT_DIST_PATH = path.join(PROJECT_ROOT, 'client/dist');
 
 const app = express();
 const PORT = config.port;

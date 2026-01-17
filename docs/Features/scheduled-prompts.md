@@ -26,31 +26,31 @@ Developers often have recurring tasks they want Claude to handle on a schedule �
 
 ### 2.1 Functional Requirements
 
-| ID   | Requirement                                                            | Priority | Notes                                            |
-| ---- | ---------------------------------------------------------------------- | -------- | ------------------------------------------------ |
-| FR-1 | Create scheduled prompts with calendar-based recurrence                | MUST     | Daily, Weekly, Monthly, Yearly schedules         |
-| FR-2 | Specify time of day for execution                                      | MUST     | Hour and minute picker (e.g., 9:00 AM)           |
-| FR-3 | Specify day of week for weekly schedules                               | MUST     | Monday–Sunday picker                             |
-| FR-4 | Specify day of month for monthly schedules                             | MUST     | 1–28 (avoid 29-31 complexity)                    |
-| FR-5 | Assign scheduled prompt to specific project OR make global             | MUST     | Project picker or "Any project" option           |
-| FR-6 | Scheduled prompts always create a NEW session when executed            | MUST     | Never continues existing session                 |
-| FR-7 | View list of all scheduled prompts                                     | MUST     | Show prompt, schedule, project, next run time    |
-| FR-8 | Delete scheduled prompts                                               | MUST     | Single tap delete with confirmation              |
-| FR-9 | Enable/disable scheduled prompts without deleting                      | MUST     | Toggle on/off                                    |
-| FR-10 | Show next execution time for each scheduled prompt                    | MUST     | Absolute time display (e.g., "Mon Jan 20, 9:00 AM") |
-| FR-11 | Track last execution status for each prompt                           | MUST     | Timestamp + success/failed + error message      |
-| FR-12 | Display last execution info in prompt list                            | MUST     | "Last run: Today 9:00 AM ✓" or error details    |
-| FR-13 | Scheduled prompts persist across server restarts                      | MUST     | Stored in JSON file                              |
-| FR-14 | Scheduled prompts execute regardless of current agent state           | MUST     | Fire-and-forget, enables future serverless       |
-| FR-15 | Visual feedback when a scheduled prompt executes                      | SHOULD   | Toast notification                               |
+| ID    | Requirement                                                 | Priority | Notes                                               |
+|-------|-------------------------------------------------------------|----------|-----------------------------------------------------|
+| FR-1  | Create scheduled prompts with calendar-based recurrence     | MUST     | Daily, Weekly, Monthly, Yearly schedules            |
+| FR-2  | Specify time of day for execution                           | MUST     | Hour and minute picker (e.g., 9:00 AM)              |
+| FR-3  | Specify day of week for weekly schedules                    | MUST     | Monday–Sunday picker                                |
+| FR-4  | Specify day of month for monthly schedules                  | MUST     | 1–28 (avoid 29-31 complexity)                       |
+| FR-5  | Assign scheduled prompt to specific project OR make global  | MUST     | Project picker or "Any project" option              |
+| FR-6  | Scheduled prompts always create a NEW session when executed | MUST     | Never continues existing session                    |
+| FR-7  | View list of all scheduled prompts                          | MUST     | Show prompt, schedule, project, next run time       |
+| FR-8  | Delete scheduled prompts                                    | MUST     | Single tap delete with confirmation                 |
+| FR-9  | Enable/disable scheduled prompts without deleting           | MUST     | Toggle on/off                                       |
+| FR-10 | Show next execution time for each scheduled prompt          | MUST     | Absolute time display (e.g., "Mon Jan 20, 9:00 AM") |
+| FR-11 | Track last execution status for each prompt                 | MUST     | Timestamp + success/failed + error message          |
+| FR-12 | Display last execution info in prompt list                  | MUST     | "Last run: Today 9:00 AM ✓" or error details        |
+| FR-13 | Scheduled prompts persist across server restarts            | MUST     | Stored in JSON file                                 |
+| FR-14 | Scheduled prompts execute regardless of current agent state | MUST     | Fire-and-forget, enables future serverless          |
+| FR-15 | Visual feedback when a scheduled prompt executes            | SHOULD   | Toast notification                                  |
 
 ### 2.2 Non-Functional Requirements
 
-| Requirement | Target                                      | Measurement        |
-| ----------- | ------------------------------------------- | ------------------ |
-| Performance | Scheduler overhead < 1% CPU                | Process monitoring |
-| Reliability | Prompts execute within 60s of scheduled time | Manual testing   |
-| UX          | Create a scheduled prompt in < 45 seconds  | User testing       |
+| Requirement | Target                                       | Measurement        |
+|-------------|----------------------------------------------|--------------------|
+| Performance | Scheduler overhead < 1% CPU                  | Process monitoring |
+| Reliability | Prompts execute within 60s of scheduled time | Manual testing     |
+| UX          | Create a scheduled prompt in < 45 seconds    | User testing       |
 
 ### 2.3 Acceptance Criteria
 
@@ -136,12 +136,12 @@ Open App → Tap "Schedule" icon → See scheduled prompts list → Tap "+" to a
 
 ### 4.1 Architecture Fit
 
-| Area              | Impact | Description                                                                  |
-| ----------------- | ------ | ---------------------------------------------------------------------------- |
-| Frontend          | NEW    | ScheduledPromptsPanel, ScheduledPromptForm, useScheduledPrompts              |
-| Backend           | NEW    | schedulerService.ts, scheduled-prompts API routes                            |
-| Database          | NEW    | `~/.gogogadgetclaude/scheduled-prompts.json`                                 |
-| External Services | NONE   | Uses existing Claude CLI integration (spawns new session)                    |
+| Area              | Impact | Description                                                     |
+|-------------------|--------|-----------------------------------------------------------------|
+| Frontend          | NEW    | ScheduledPromptsPanel, ScheduledPromptForm, useScheduledPrompts |
+| Backend           | NEW    | schedulerService.ts, scheduled-prompts API routes               |
+| Database          | NEW    | `~/.gogogadgetclaude/scheduled-prompts.json`                    |
+| External Services | NONE   | Uses existing Claude CLI integration (spawns new session)       |
 
 **Alignment with Existing Patterns:**
 - New service follows existing service layer pattern (like `sessionManager.ts`)
@@ -194,13 +194,13 @@ No waiting for completion, no session tracking, no concurrency concerns. The app
 
 ### 4.4 API Endpoints
 
-| Method | Endpoint                            | Purpose                    | Request Body |
-| ------ | ----------------------------------- | -------------------------- | ------------ |
-| GET    | `/api/scheduled-prompts`            | List all scheduled prompts | — |
-| POST   | `/api/scheduled-prompts`            | Create new scheduled prompt | `ScheduledPromptInput` |
-| PUT    | `/api/scheduled-prompts/:id`        | Update prompt              | `Partial<ScheduledPromptInput>` |
-| DELETE | `/api/scheduled-prompts/:id`        | Delete scheduled prompt    | — |
-| PATCH  | `/api/scheduled-prompts/:id/toggle` | Toggle enabled/disabled    | — |
+| Method | Endpoint                            | Purpose                     | Request Body                    |
+|--------|-------------------------------------|-----------------------------|---------------------------------|
+| GET    | `/api/scheduled-prompts`            | List all scheduled prompts  | —                               |
+| POST   | `/api/scheduled-prompts`            | Create new scheduled prompt | `ScheduledPromptInput`          |
+| PUT    | `/api/scheduled-prompts/:id`        | Update prompt               | `Partial<ScheduledPromptInput>` |
+| DELETE | `/api/scheduled-prompts/:id`        | Delete scheduled prompt     | —                               |
+| PATCH  | `/api/scheduled-prompts/:id/toggle` | Toggle enabled/disabled     | —                               |
 
 ```typescript
 interface ScheduledPromptInput {
@@ -218,12 +218,12 @@ interface ScheduledPromptInput {
 **Library:** Use `node-cron` for cron-based scheduling (well-maintained, simple API)
 
 **Cron Pattern Mapping:**
-| Schedule Type | Cron Pattern Example | Description |
-|---------------|---------------------|-------------|
-| Daily         | `0 9 * * *`         | Every day at 9:00 AM |
-| Weekly        | `0 9 * * 1`         | Every Monday at 9:00 AM |
-| Monthly       | `0 9 1 * *`         | 1st of every month at 9:00 AM |
-| Yearly        | `0 9 1 1 *`         | January 1st at 9:00 AM |
+| Schedule Type | Cron Pattern Example | Description                   |
+|---------------|----------------------|-------------------------------|
+| Daily         | `0 9 * * *`          | Every day at 9:00 AM          |
+| Weekly        | `0 9 * * 1`          | Every Monday at 9:00 AM       |
+| Monthly       | `0 9 1 * *`          | 1st of every month at 9:00 AM |
+| Yearly        | `0 9 1 1 *`          | January 1st at 9:00 AM        |
 
 **Execution Flow:**
 1. Cron job fires at scheduled time
@@ -249,26 +249,26 @@ interface ScheduledPromptInput {
 ### Backend (Completed)
 
 | # | Task                                                          | Status |
-|---|--------------------------------------------------------------|--------|
-| 1 | Create ScheduledPrompt types and JSON storage utilities       | ✅     |
-| 2 | Add `node-cron` dependency and create cron pattern utilities  | ✅     |
-| 3 | Build SchedulerService core (register/unregister cron jobs)   | ✅     |
-| 4 | Implement new session execution (spawn Claude in project dir) | ✅     |
-| 5 | Create API endpoints for scheduled prompts CRUD               | ✅     |
-| 6 | Add server startup/shutdown lifecycle handling                | ✅     |
+|---|---------------------------------------------------------------|--------|
+| 1 | Create ScheduledPrompt types and JSON storage utilities       | ✅      |
+| 2 | Add `node-cron` dependency and create cron pattern utilities  | ✅      |
+| 3 | Build SchedulerService core (register/unregister cron jobs)   | ✅      |
+| 4 | Implement new session execution (spawn Claude in project dir) | ✅      |
+| 5 | Create API endpoints for scheduled prompts CRUD               | ✅      |
+| 6 | Add server startup/shutdown lifecycle handling                | ✅      |
 
 ### Frontend (Completed)
 
-| # | Task                                                          | Status |
-|---|--------------------------------------------------------------|--------|
-| 7 | Create useScheduledPrompts hook (fetch, mutate)               | ✅     |
-| 8 | Build ScheduledPromptsPanel with list view                    | ✅     |
-| 9 | Build ScheduledPromptForm with schedule type pickers          | ✅     |
-| 10 | Build time picker and conditional day pickers                 | ✅     |
-| 11 | Add project selector (list projects + global option)          | ✅     |
-| 12 | Add toggle and delete interactions                            | ✅     |
-| 13 | Add panel trigger button and integration                      | ✅     |
-| 14 | Add execution toast notifications via WebSocket/polling       | ✅     |
+| #  | Task                                                    | Status |
+|----|---------------------------------------------------------|--------|
+| 7  | Create useScheduledPrompts hook (fetch, mutate)         | ✅      |
+| 8  | Build ScheduledPromptsPanel with list view              | ✅      |
+| 9  | Build ScheduledPromptForm with schedule type pickers    | ✅      |
+| 10 | Build time picker and conditional day pickers           | ✅      |
+| 11 | Add project selector (list projects + global option)    | ✅      |
+| 12 | Add toggle and delete interactions                      | ✅      |
+| 13 | Add panel trigger button and integration                | ✅      |
+| 14 | Add execution toast notifications via WebSocket/polling | ✅      |
 
 ### Files Created/Modified
 

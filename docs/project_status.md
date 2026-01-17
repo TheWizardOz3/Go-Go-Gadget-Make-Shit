@@ -42,13 +42,13 @@
 
 ## V0.75 Build Order
 
-| Order | Feature                        | Status     | Description                                                |
-|-------|--------------------------------|------------|------------------------------------------------------------|
-| 1     | Voice Input UX Improvements    | ✅ Done    | Bigger button, waveform visualization, lower latency       |
-| 2     | Allow Edits Setting            | ✅ Done    | Toggle "ask before edits" in Settings panel                |
-| 3     | File Tree Viewing              | ✅ Done    | Browse project files with GitHub links                     |
-| 4     | Scheduled Prompts              | ✅ Done    | Calendar-based scheduling (daily/weekly/monthly/yearly)    |
-| 5     | Voice Input Picture-in-Picture | ❌ Cancelled | iOS Safari doesn't support background audio recording    |
+| Order | Feature                        | Status      | Description                                             |
+|-------|--------------------------------|-------------|---------------------------------------------------------|
+| 1     | Voice Input UX Improvements    | ✅ Done      | Bigger button, waveform visualization, lower latency    |
+| 2     | Allow Edits Setting            | ✅ Done      | Toggle "ask before edits" in Settings panel             |
+| 3     | File Tree Viewing              | ✅ Done      | Browse project files with GitHub links                  |
+| 4     | Scheduled Prompts              | ✅ Done      | Calendar-based scheduling (daily/weekly/monthly/yearly) |
+| 5     | Voice Input Picture-in-Picture | ❌ Cancelled | iOS Safari doesn't support background audio recording   |
 
 ---
 
@@ -56,21 +56,21 @@
 
 **Test Count: 631 tests** (398 client + 194 server + 39 new for Scheduled Prompts)
 
-| Feature/Task                | Completion Date | Notes                                                                                                                   |
-|-----------------------------|-----------------|-------------------------------------------------------------------------------------------------------------------------|
-| Scheduled Prompts           | 2026-01-17      | Calendar-based scheduling, project targeting, fire-and-forget execution - [doc](Features/scheduled-prompts.md)          |
-| File Tree Viewing           | 2026-01-17      | Browse committed files in-app with content viewer - [doc](Features/file-tree-view.md)                                   |
-| Voice Input UX Improvements | 2026-01-17      | Bigger button (56×56px), waveform visualization, lower latency - [doc](Features/voice-input-ux-improvements.md)         |
-| Allow Edits Setting         | 2026-01-16      | Toggle in Settings to skip permission prompts                                                                           |
-| New Session Navigation Fix  | 2026-01-16      | Bug fix: new sessions now correctly navigate to the new session                                                         |
-| Voice Input PiP             | ❌ Cancelled    | iOS Safari doesn't support background audio recording for web apps                                                      |
+| Feature/Task                | Completion Date | Notes                                                                                                           |
+|-----------------------------|-----------------|-----------------------------------------------------------------------------------------------------------------|
+| Scheduled Prompts           | 2026-01-17      | Calendar-based scheduling, project targeting, fire-and-forget execution - [doc](Features/scheduled-prompts.md)  |
+| File Tree Viewing           | 2026-01-17      | Browse committed files in-app with content viewer - [doc](Features/file-tree-view.md)                           |
+| Voice Input UX Improvements | 2026-01-17      | Bigger button (56×56px), waveform visualization, lower latency - [doc](Features/voice-input-ux-improvements.md) |
+| Allow Edits Setting         | 2026-01-16      | Toggle in Settings to skip permission prompts                                                                   |
+| New Session Navigation Fix  | 2026-01-16      | Bug fix: new sessions now correctly navigate to the new session                                                 |
+| Voice Input PiP             | ❌ Cancelled     | iOS Safari doesn't support background audio recording for web apps                                              |
 
 ### Next Milestone: V1 - Notifications & Serverless
-| Feature                     | Priority | Notes                                      |
-|-----------------------------|----------|--------------------------------------------|
-| Claude model picker         | Medium   | Change models from mobile UI               |
-| Notification channels       | High     | Abstract layer for Slack/Telegram          |
-| Serverless execution        | High     | Run agents without laptop awake            |
+| Feature               | Priority | Notes                             |
+|-----------------------|----------|-----------------------------------|
+| Claude model picker   | Medium   | Change models from mobile UI      |
+| Notification channels | High     | Abstract layer for Slack/Telegram |
+| Serverless execution  | High     | Run agents without laptop awake   |
 
 ---
 
