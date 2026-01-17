@@ -281,6 +281,73 @@ export interface FileContentResponse {
 }
 
 // =============================================================================
+// Scheduled Prompts Types
+// =============================================================================
+
+/** Schedule recurrence type */
+export type ScheduleType = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+/** Execution status for last run */
+export type ExecutionStatus = 'success' | 'failed';
+
+/** Last execution result */
+export interface LastExecution {
+  /** When the execution occurred */
+  timestamp: string;
+  /** Whether it succeeded or failed */
+  status: ExecutionStatus;
+  /** Error message if failed */
+  error?: string;
+}
+
+/** Scheduled prompt configuration */
+export interface ScheduledPrompt {
+  /** Unique identifier (UUID) */
+  id: string;
+  /** The prompt text to send */
+  prompt: string;
+  /** Recurrence pattern */
+  scheduleType: ScheduleType;
+  /** Time of day in "HH:MM" 24h format (e.g., "09:00") */
+  timeOfDay: string;
+  /** Day of week 0-6 (Sun-Sat), required for 'weekly' */
+  dayOfWeek?: number;
+  /** Day of month 1-28, required for 'monthly' */
+  dayOfMonth?: number;
+  /** Specific project path, or null for global (uses last active) */
+  projectPath: string | null;
+  /** Whether actively scheduled */
+  enabled: boolean;
+  /** When the prompt was created */
+  createdAt: string;
+  /** Most recent execution result */
+  lastExecution?: LastExecution;
+  /** Next scheduled run time */
+  nextRunAt?: string;
+}
+
+/** Input for creating/updating a scheduled prompt */
+export interface ScheduledPromptInput {
+  /** The prompt text to send */
+  prompt: string;
+  /** Recurrence pattern */
+  scheduleType: ScheduleType;
+  /** Time of day in "HH:MM" 24h format */
+  timeOfDay: string;
+  /** Day of week 0-6, required if weekly */
+  dayOfWeek?: number;
+  /** Day of month 1-28, required if monthly */
+  dayOfMonth?: number;
+  /** Project path or null for global */
+  projectPath: string | null;
+}
+
+/** Storage format for scheduled prompts file */
+export interface ScheduledPromptsFile {
+  prompts: ScheduledPrompt[];
+}
+
+// =============================================================================
 // Settings Types
 // =============================================================================
 
@@ -301,6 +368,8 @@ export interface AppSettings {
   theme: ThemePreference;
   /** Allow Claude to make edits without asking for permission (skips permission prompts) */
   allowEdits?: boolean;
+  /** Last active project path (used for global scheduled prompts) */
+  lastActiveProjectPath?: string;
 }
 
 // =============================================================================

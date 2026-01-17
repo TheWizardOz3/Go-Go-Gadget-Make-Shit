@@ -1,21 +1,21 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-17 (File Tree Viewing complete)
+**Last Updated**: 2026-01-17 (Scheduled Prompts complete)
 
 ---
 
-## Current Milestone: V0.75 - Navigation & Scheduling
+## Current Milestone: V0.75 - Navigation & Scheduling ✅ COMPLETE
 
 **Functionality Summary**: Enhanced project navigation, scheduled prompts, and voice input improvements.
 
 ### Scope Definition
 
-#### In Scope for This Milestone
-- **Voice Input UX Improvements**: Bigger button, lower latency start/stop, better mobile alignment, waveform visualization
-- **File Tree Viewing**: Browse project files with GitHub links for each file
-- **Allow Edits Setting**: Toggle "ask before edits" setting in Settings panel
-- **Scheduled Prompts**: Schedule/cancel repeating prompts
-- **Voice Input Picture-in-Picture**: Persist voice input when switching apps on mobile
+#### Completed Features
+- ✅ **Voice Input UX Improvements**: Bigger button, lower latency start/stop, better mobile alignment, waveform visualization
+- ✅ **File Tree Viewing**: Browse project files with GitHub links for each file
+- ✅ **Allow Edits Setting**: Toggle "ask before edits" setting in Settings panel
+- ✅ **Scheduled Prompts**: Schedule repeating prompts (daily/weekly/monthly/yearly)
+- ~~**Voice Input Picture-in-Picture**~~: *Cancelled - iOS Safari doesn't support background audio recording*
 
 #### Explicitly Out of Scope
 | Item                          | Reason for Exclusion                                        | Planned Milestone |
@@ -42,33 +42,35 @@
 
 ## V0.75 Build Order
 
-| Order | Feature                        | Description                                                                              | Dependencies                           |
-|-------|--------------------------------|------------------------------------------------------------------------------------------|----------------------------------------|
-| 1     | Voice Input UX Improvements    | Bigger button, lower latency start/stop, better mobile alignment, waveform visualization | Foundation for PiP; Web Audio API      |
-| 2     | Allow Edits Setting            | Toggle "ask before edits" in Settings panel                                              | Standalone                             |
-| 3     | File Tree Viewing              | Browse project files with GitHub links for each file                                     | Standalone                             |
-| 4     | Scheduled Prompts              | Schedule/cancel repeating prompts                                                        | Requires prompt sending infrastructure |
-| 5     | Voice Input Picture-in-Picture | Persist voice input when switching apps                                                  | Requires Voice UX improvements (#1)    |
+| Order | Feature                        | Status     | Description                                                |
+|-------|--------------------------------|------------|------------------------------------------------------------|
+| 1     | Voice Input UX Improvements    | ✅ Done    | Bigger button, waveform visualization, lower latency       |
+| 2     | Allow Edits Setting            | ✅ Done    | Toggle "ask before edits" in Settings panel                |
+| 3     | File Tree Viewing              | ✅ Done    | Browse project files with GitHub links                     |
+| 4     | Scheduled Prompts              | ✅ Done    | Calendar-based scheduling (daily/weekly/monthly/yearly)    |
+| 5     | Voice Input Picture-in-Picture | ❌ Cancelled | iOS Safari doesn't support background audio recording    |
 
 ---
 
-## V0.75 Progress
+## V0.75 Progress — COMPLETE ✅
 
-### Completed
+**Test Count: 631 tests** (398 client + 194 server + 39 new for Scheduled Prompts)
+
 | Feature/Task                | Completion Date | Notes                                                                                                                   |
 |-----------------------------|-----------------|-------------------------------------------------------------------------------------------------------------------------|
-| File Tree Viewing           | 2026-01-17      | Browse committed files in-app with content viewer - [feature doc](Features/file-tree-view.md)                           |
-| Voice Input UX Improvements | 2026-01-17      | Bigger button (56×56px), waveform visualization, lower latency - [feature doc](Features/voice-input-ux-improvements.md) |
+| Scheduled Prompts           | 2026-01-17      | Calendar-based scheduling, project targeting, fire-and-forget execution - [doc](Features/scheduled-prompts.md)          |
+| File Tree Viewing           | 2026-01-17      | Browse committed files in-app with content viewer - [doc](Features/file-tree-view.md)                                   |
+| Voice Input UX Improvements | 2026-01-17      | Bigger button (56×56px), waveform visualization, lower latency - [doc](Features/voice-input-ux-improvements.md)         |
 | Allow Edits Setting         | 2026-01-16      | Toggle in Settings to skip permission prompts                                                                           |
 | New Session Navigation Fix  | 2026-01-16      | Bug fix: new sessions now correctly navigate to the new session                                                         |
+| Voice Input PiP             | ❌ Cancelled    | iOS Safari doesn't support background audio recording for web apps                                                      |
 
-### In Progress
-*No features currently in progress.*
-
-### Up Next
-| Feature/Task      | Notes                                                       |
-|-------------------|-------------------------------------------------------------|
-| Scheduled Prompts | Schedule/cancel repeating prompts - #4 in V0.75 build order |
+### Next Milestone: V1 - Notifications & Serverless
+| Feature                     | Priority | Notes                                      |
+|-----------------------------|----------|--------------------------------------------|
+| Claude model picker         | Medium   | Change models from mobile UI               |
+| Notification channels       | High     | Abstract layer for Slack/Telegram          |
+| Serverless execution        | High     | Run agents without laptop awake            |
 
 ---
 

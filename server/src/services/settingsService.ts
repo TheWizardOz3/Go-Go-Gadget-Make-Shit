@@ -42,6 +42,8 @@ export interface AppSettings {
   theme: ThemePreference;
   /** Allow Claude to make edits without asking for permission (skips permission prompts) */
   allowEdits?: boolean;
+  /** Last active project path (used for global scheduled prompts) */
+  lastActiveProjectPath?: string;
 }
 
 // ============================================================
@@ -73,6 +75,7 @@ const AppSettingsSchema = z.object({
   defaultTemplates: z.array(TemplateSchema),
   theme: z.enum(['light', 'dark', 'system']),
   allowEdits: z.boolean().optional(),
+  lastActiveProjectPath: z.string().optional(),
 });
 
 /** Partial settings schema for updates */
@@ -147,6 +150,7 @@ function mergeWithDefaults(settings: Partial<AppSettings>): AppSettings {
     defaultTemplates: settings.defaultTemplates ?? DEFAULT_SETTINGS.defaultTemplates,
     theme: settings.theme ?? DEFAULT_SETTINGS.theme,
     allowEdits: settings.allowEdits,
+    lastActiveProjectPath: settings.lastActiveProjectPath,
   };
 }
 

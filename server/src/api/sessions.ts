@@ -9,6 +9,7 @@ import {
   getRecentSessions,
 } from '../services/sessionManager.js';
 import { sendPrompt, stopAgent, startNewSession } from '../services/claudeService.js';
+import { updateSettings } from '../services/settingsService.js';
 
 const router: RouterType = Router();
 
@@ -233,6 +234,13 @@ router.post('/new', validateRequest({ body: newSessionSchema }), async (req, res
       return;
     }
 
+    // Track last active project for global scheduled prompts
+    await updateSettings({ lastActiveProjectPath: projectPath }).catch((err) => {
+      logger.warn('Failed to update last active project', {
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+    });
+
     res.status(201).json(
       success({
         success: true,
@@ -288,6 +296,13 @@ router.post('/:id/send', validateRequest({ body: sendPromptSchema }), async (req
         .json(error(ErrorCodes.INTERNAL_ERROR, result.error || 'Failed to send prompt'));
       return;
     }
+
+    // Track last active project for global scheduled prompts
+    await updateSettings({ lastActiveProjectPath: session.projectPath }).catch((err) => {
+      logger.warn('Failed to update last active project', {
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+    });
 
     res.json(
       success({

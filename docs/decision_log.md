@@ -13,6 +13,7 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-021 | 2026-01-17 | arch     | active | Fire-and-forget execution for scheduled prompts           |
 | ADR-020 | 2026-01-17 | data     | active | Git-based file tree using git ls-tree and git show        |
 | ADR-019 | 2026-01-17 | ui       | active | Web Audio API for real-time waveform visualization        |
 | ADR-018 | 2026-01-15 | infra    | active | Server-side notifications for programmatic sessions       |
@@ -43,6 +44,47 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-021: Fire-and-Forget Execution for Scheduled Prompts
+**Date:** 2026-01-17 | **Category:** arch | **Status:** active
+
+#### Trigger
+Implementing Scheduled Prompts required deciding how the system should handle execution—whether to track session state, wait for completion, or simply dispatch and move on.
+
+#### Options Considered
+1. **Managed execution** — Track spawned sessions, monitor progress, handle concurrency conflicts, implement retries
+2. **Fire-and-forget** — Spawn Claude CLI process and immediately return; let Claude handle everything independently
+
+#### Decision
+Use fire-and-forget execution model: spawn `claude -p "<prompt>" --allowedTools "Task,Bash,..." [projectPath]` and move on immediately without tracking the process.
+
+#### Rationale
+- **Simplicity** — No session tracking, no process monitoring, no concurrency handling needed
+- **Reliability** — Claude CLI handles all complexity; we just trigger it
+- **Lightweight** — App remains simple and focused on scheduling, not process management
+- **Future-proof** — Works equally well for local and future serverless deployments
+- **User expectation** — Scheduled prompts are "set and forget"; detailed monitoring is out of scope
+
+#### Consequences
+- ✅ Drastically simplified codebase (no process manager state)
+- ✅ No concurrency issues even with overlapping schedules
+- ✅ Server restarts don't lose running sessions (they're independent)
+- ❌ No real-time progress tracking for scheduled prompts
+- ❌ Failed prompts only detected via lastExecution status (not live)
+- ❌ Can't cancel a running scheduled prompt (only prevent next occurrence)
+
+#### Related Decisions
+- Calendar-based scheduling (daily/weekly/monthly/yearly) instead of interval-based
+- Last execution tracking stores only most recent status (timestamp + success/failure)
+- Global prompts use `lastActiveProjectPath` from settings (tracked on each user prompt)
+
+#### AI Instructions
+When working on scheduled prompts or similar async execution features:
+1. Favor fire-and-forget over managed execution when process lifecycle isn't critical
+2. Store minimal status (last run, not full history) unless explicit requirement
+3. Let external tools (Claude CLI) handle their own complexity
+
+---
 
 ### ADR-020: Git-Based File Tree Using git ls-tree and git show
 **Date:** 2026-01-17 | **Category:** data | **Status:** active

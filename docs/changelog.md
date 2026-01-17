@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.17.0 | 2026-01-17 | minor | Scheduled Prompts |
 | 0.16.1 | 2026-01-17 | patch | Fix production server startup path |
 | 0.16.0 | 2026-01-17 | minor | File Tree Viewing |
 | 0.15.0 | 2026-01-17 | minor | Voice Input UX Improvements |
@@ -46,6 +47,49 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.17.0] - 2026-01-17
+
+### Added
+
+- **Scheduled Prompts Feature** — Schedule prompts to run automatically at specific times
+  - Calendar-based scheduling: daily, weekly, monthly, yearly
+  - Time-of-day picker with conditional day selectors
+  - Project-specific or global (uses last active project)
+  - Fire-and-forget execution — always starts new Claude Code session
+  - Last execution tracking with success/failure status
+  - Toast notifications when scheduled prompts execute
+  - Full CRUD API (`/api/scheduled-prompts`) with validation
+  - `node-cron` for reliable scheduling with server lifecycle management
+  - Persistent storage in `~/.gogogadgetclaude/scheduled-prompts.json`
+
+### New Files
+
+**Server:**
+- `server/src/services/scheduledPromptsStorage.ts` — JSON storage with Zod validation
+- `server/src/services/schedulerService.ts` — Cron job management and execution
+- `server/src/lib/cronUtils.ts` — Cron pattern generation utilities
+- `server/src/api/scheduledPrompts.ts` — REST API endpoints
+
+**Client:**
+- `client/src/components/scheduled/ScheduledPromptsPanel.tsx` — List view modal
+- `client/src/components/scheduled/ScheduledPromptListItem.tsx` — Individual prompt row
+- `client/src/components/scheduled/ScheduledPromptForm.tsx` — Create/edit form
+- `client/src/components/ui/Toast.tsx` — Toast notification system
+- `client/src/hooks/useScheduledPrompts.ts` — SWR data hook
+- `client/src/hooks/useScheduledPromptNotifications.ts` — Execution notification hook
+
+**Shared:**
+- Added `ScheduledPrompt`, `ScheduledPromptInput`, `ScheduleType` types
+- Added `lastActiveProjectPath` to `AppSettings`
+
+### Changed
+
+- Header now includes calendar-clock icon for scheduled prompts access
+- App wrapped with `ToastProvider` for notifications
+- Sessions API updates `lastActiveProjectPath` when sending prompts
 
 ---
 

@@ -18,10 +18,13 @@ import { StatusIndicator, StatusIndicatorSkeleton } from '@/components/ui/Status
 import { ProjectPicker } from '@/components/project';
 import { SessionPicker } from '@/components/session';
 import { SettingsModal } from '@/components/settings';
+import { ScheduledPromptsPanel, ScheduledPromptForm } from '@/components/scheduled';
 import { FilesChangedView, FilesBadge } from '@/components/files';
 import { DiffViewer } from '@/components/files/diff';
 import { FileTreeView } from '@/components/files/tree';
-import type { SessionStatus, SessionSummarySerialized } from '@shared/types';
+import { useScheduledPrompts } from '@/hooks/useScheduledPrompts';
+import { useScheduledPromptNotifications } from '@/hooks/useScheduledPromptNotifications';
+import type { SessionStatus, SessionSummarySerialized, ScheduledPromptInput } from '@shared/types';
 
 /** Active tab type */
 type ActiveTab = 'conversation' | 'files';
@@ -121,6 +124,8 @@ export default function App() {
   const [isProjectPickerOpen, setIsProjectPickerOpen] = useState(false);
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isScheduledPromptsOpen, setIsScheduledPromptsOpen] = useState(false);
+  const [isScheduledPromptFormOpen, setIsScheduledPromptFormOpen] = useState(false);
 
   // Fetch projects
   const {
@@ -143,6 +148,13 @@ export default function App() {
 
   // Fetch files changed for badge count
   const { count: filesChangedCount } = useFilesChanged(selectedProject);
+
+  // Scheduled prompts hook
+  const { createPrompt: createScheduledPrompt, isLoading: scheduledPromptsLoading } =
+    useScheduledPrompts();
+
+  // Monitor scheduled prompt executions and show toast notifications
+  useScheduledPromptNotifications();
 
   // Persist selected project to localStorage
   useEffect(() => {
@@ -309,6 +321,7 @@ export default function App() {
         onProjectClick={() => setIsProjectPickerOpen(true)}
         onSessionClick={() => setIsSessionPickerOpen(true)}
         onSettingsClick={() => setIsSettingsOpen(true)}
+        onScheduledPromptsClick={() => setIsScheduledPromptsOpen(true)}
         hasProjects={projects.length > 0}
         hasSessions={(sessions?.length ?? 0) > 0}
       />
@@ -442,6 +455,27 @@ export default function App() {
 
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+      {/* Scheduled Prompts Panel */}
+      <ScheduledPromptsPanel
+        isOpen={isScheduledPromptsOpen}
+        onClose={() => setIsScheduledPromptsOpen(false)}
+        onAddNew={() => {
+          setIsScheduledPromptsOpen(false);
+          setIsScheduledPromptFormOpen(true);
+        }}
+      />
+
+      {/* Scheduled Prompt Form */}
+      <ScheduledPromptForm
+        isOpen={isScheduledPromptFormOpen}
+        onClose={() => setIsScheduledPromptFormOpen(false)}
+        onSubmit={async (input: ScheduledPromptInput) => {
+          await createScheduledPrompt(input);
+        }}
+        projects={projects?.map((p) => ({ path: p.path, name: p.name })) ?? []}
+        isSubmitting={scheduledPromptsLoading}
+      />
     </div>
   );
 }
@@ -488,6 +522,29 @@ function SettingsIcon({ className }: { className?: string }) {
 }
 
 /**
+ * Calendar/Clock icon for scheduled prompts
+ */
+function CalendarClockIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
+      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 12.75v1.5l1.125.75" />
+    </svg>
+  );
+}
+
+/**
  * App header with project name, session indicator, and status
  */
 interface HeaderProps {
@@ -500,6 +557,7 @@ interface HeaderProps {
   onProjectClick?: () => void;
   onSessionClick?: () => void;
   onSettingsClick?: () => void;
+  onScheduledPromptsClick?: () => void;
   hasProjects?: boolean;
   hasSessions?: boolean;
 }
@@ -543,6 +601,7 @@ function Header({
   onProjectClick,
   onSessionClick,
   onSettingsClick,
+  onScheduledPromptsClick,
   hasProjects,
   hasSessions,
 }: HeaderProps) {
@@ -614,8 +673,26 @@ function Header({
           )}
         </div>
 
-        {/* Right side: Settings + Status */}
-        <div className="flex-shrink-0 flex items-center gap-2">
+        {/* Right side: Scheduled Prompts + Settings + Status */}
+        <div className="flex-shrink-0 flex items-center gap-1">
+          {/* Scheduled Prompts button */}
+          {onScheduledPromptsClick && (
+            <button
+              type="button"
+              onClick={onScheduledPromptsClick}
+              className={cn(
+                'p-2 rounded-lg',
+                'text-text-muted hover:text-text-primary',
+                'hover:bg-text-primary/5 active:bg-text-primary/10',
+                'transition-colors duration-150',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              )}
+              aria-label="Scheduled prompts"
+            >
+              <CalendarClockIcon />
+            </button>
+          )}
+
           {/* Settings button */}
           {onSettingsClick && (
             <button

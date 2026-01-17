@@ -12,6 +12,7 @@ import { config } from './lib/config.js';
 import { logger } from './lib/logger.js';
 import { startWatching, onSessionChange } from './lib/fileWatcher.js';
 import { invalidateSessionCache } from './services/sessionManager.js';
+import { startScheduler, stopScheduler } from './services/schedulerService.js';
 
 // ES Module dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -105,6 +106,49 @@ function initializeWatcher() {
   });
 }
 
+/**
+ * Initialize the scheduled prompts scheduler
+ */
+async function initializeScheduler() {
+  try {
+    await startScheduler();
+    logger.info('Scheduled prompts scheduler initialized');
+  } catch (err) {
+    logger.error('Failed to start scheduler', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    // Non-fatal - server can still run without scheduler
+  }
+}
+
+/**
+ * Set up graceful shutdown handlers
+ */
+function setupGracefulShutdown() {
+  const shutdown = (signal: string) => {
+    logger.info(`Received ${signal}, shutting down gracefully...`);
+
+    // Stop the scheduler
+    stopScheduler();
+
+    // Exit the process
+    process.exit(0);
+  };
+
+  // Handle termination signals
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+/**
+ * Initialize all services after server starts
+ */
+async function initializeServices() {
+  initializeWatcher();
+  await initializeScheduler();
+  setupGracefulShutdown();
+}
+
 // When HTTPS is enabled:
 //   - HTTPS runs on main port (3456) - for iOS voice input
 //   - HTTP runs on secondary port (3457) - for local dev without certs
@@ -128,7 +172,7 @@ if (config.httpsEnabled) {
         voiceInput: '✅ Voice input enabled (secure context)',
       });
 
-      initializeWatcher();
+      initializeServices();
     });
 
     // Start HTTP on secondary port (3457) for convenience
@@ -154,7 +198,7 @@ if (config.httpsEnabled) {
         url: `http://localhost:${PORT}`,
         warning: '⚠️ Voice input will not work on iOS - fix SSL cert paths',
       });
-      initializeWatcher();
+      initializeServices();
     });
   }
 } else {
@@ -166,6 +210,6 @@ if (config.httpsEnabled) {
       healthCheck: `http://localhost:${PORT}/api/status`,
       note: '⚠️ Voice input requires HTTPS - run scripts/setup-https.sh',
     });
-    initializeWatcher();
+    initializeServices();
   });
 }

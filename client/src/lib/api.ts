@@ -71,7 +71,7 @@ const BASE_URL = getBaseUrl();
  * Make an API request and handle the response
  */
 async function request<T>(
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown
 ): Promise<T> {
@@ -144,6 +144,14 @@ export const api = {
    */
   delete<T>(path: string): Promise<T> {
     return request<T>('DELETE', path);
+  },
+
+  /**
+   * PATCH request
+   * @example await api.patch('/scheduled-prompts/abc/toggle');
+   */
+  patch<T>(path: string, body?: unknown): Promise<T> {
+    return request<T>('PATCH', path, body);
   },
 
   /**
