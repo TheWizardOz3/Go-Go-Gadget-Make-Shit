@@ -129,6 +129,13 @@ export function getApiMode(): ApiEndpointMode {
 }
 
 /**
+ * Get the cloud API URL (Modal) if configured
+ */
+export function getCloudApiUrl(): string | null {
+  return import.meta.env.VITE_MODAL_API_URL || null;
+}
+
+/**
  * Subscribe to base URL changes
  *
  * @param callback - Function to call when base URL changes

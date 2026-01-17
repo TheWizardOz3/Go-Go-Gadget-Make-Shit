@@ -429,6 +429,100 @@ def get_sessions(encoded_path: str) -> list[dict[str, Any]]:
 
 @app.function(
     image=image,
+    timeout=120,
+)
+def fetch_repo_tree(repo_url: str, branch: str | None = None) -> dict[str, Any]:
+    """
+    Clone a git repo and return its file tree.
+    Supports private repos if GITHUB_TOKEN secret is configured.
+
+    Args:
+        repo_url: Git repository URL (HTTPS or SSH)
+        branch: Optional branch name (defaults to main/master)
+
+    Returns:
+        dict with 'entries' (list of tree entries) or 'error'
+    """
+    import tempfile
+    import shutil
+
+    # Try to get GitHub token from environment
+    # To use: modal secret create GITHUB_TOKEN GITHUB_TOKEN=your_pat_here
+    # Then add it to the function decorator when available
+    github_token = os.environ.get("GITHUB_TOKEN")
+    print(f"GitHub token available: {bool(github_token)}")
+
+    # Prepare the URL with auth if token is available and it's a GitHub HTTPS URL
+    clone_url = repo_url
+    if github_token and "github.com" in repo_url and repo_url.startswith("https://"):
+        # Insert token into HTTPS URL: https://TOKEN@github.com/...
+        clone_url = repo_url.replace("https://github.com", f"https://{github_token}@github.com")
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            work_dir = Path(tmpdir) / "repo"
+
+            # Clone with depth=1 for speed
+            clone_cmd = ["git", "clone", "--depth=1"]
+            if branch:
+                clone_cmd.extend(["-b", branch])
+            clone_cmd.extend([clone_url, str(work_dir)])
+
+            result = subprocess.run(
+                clone_cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or "Failed to clone repository"
+                # Don't expose token in error
+                error_msg = error_msg.replace(github_token, "***") if github_token else error_msg
+                return {"error": error_msg, "entries": []}
+
+            # Get the current branch name
+            branch_result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+            )
+            current_branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "main"
+
+            # Build file tree recursively
+            entries = []
+            for item in sorted(work_dir.rglob("*")):
+                # Skip .git directory
+                if ".git" in item.parts:
+                    continue
+
+                rel_path = item.relative_to(work_dir)
+                name = item.name
+                is_dir = item.is_dir()
+
+                entry = {
+                    "name": name,
+                    "path": str(rel_path),
+                    "type": "directory" if is_dir else "file",
+                    "extension": None if is_dir else (item.suffix[1:] if item.suffix else None),
+                }
+                entries.append(entry)
+
+            return {
+                "entries": entries,
+                "branch": current_branch,
+                "githubUrl": repo_url if "github.com" in repo_url else None,
+            }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Clone timed out - repository may be too large", "entries": []}
+    except Exception as e:
+        return {"error": str(e), "entries": []}
+
+
+@app.function(
+    image=image,
     volumes={"/root/.claude": volume},
 )
 def get_messages(session_id: str, encoded_path: str) -> dict[str, Any]:
@@ -574,6 +668,26 @@ async def api_get_settings():
             "theme": "system",
         }
     }
+
+
+class FetchTreeRequest(BaseModel):
+    repoUrl: str
+    branch: str | None = None
+
+
+@web_app.post("/api/cloud/tree")
+async def api_fetch_tree(request: FetchTreeRequest):
+    """
+    Fetch file tree from a git repository.
+    Works with private repos if GITHUB_TOKEN secret is configured.
+    """
+    result = fetch_repo_tree.remote(request.repoUrl, request.branch)
+    if result.get("error"):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "FETCH_ERROR", "message": result["error"]}},
+        )
+    return {"data": result}
 
 
 @web_app.get("/api/scheduled-prompts")

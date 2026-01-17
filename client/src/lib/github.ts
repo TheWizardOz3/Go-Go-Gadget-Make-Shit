@@ -1,9 +1,15 @@
 /**
- * GitHub API utilities for fetching repo data
+ * GitHub/Git utilities for fetching repo data
  *
  * Used in cloud mode to fetch file trees directly from GitHub
  * when the laptop is unavailable.
+ *
+ * Two fetch strategies:
+ * 1. Modal endpoint (for private repos) - clones using stored GitHub token
+ * 2. GitHub API (for public repos) - direct API call, no auth needed
  */
+
+import { getApiMode, getCloudApiUrl } from './api';
 
 // ============================================================
 // Types
@@ -178,4 +184,177 @@ function getExtension(filename: string): string | null {
   const lastDot = filename.lastIndexOf('.');
   if (lastDot === -1 || lastDot === 0) return null;
   return filename.slice(lastDot + 1);
+}
+
+// ============================================================
+// Modal Cloud Fetch (works with private repos)
+// ============================================================
+
+interface ModalTreeResponse {
+  data: {
+    entries: Array<{
+      name: string;
+      path: string;
+      type: 'file' | 'directory';
+      extension: string | null;
+    }>;
+    branch: string;
+    githubUrl: string | null;
+    error?: string;
+  };
+}
+
+/**
+ * Fetch file tree via Modal cloud endpoint
+ * This works with private repos if GITHUB_TOKEN is configured in Modal
+ */
+export async function fetchTreeViaModal(repoUrl: string): Promise<{
+  entries: NestedTreeEntry[];
+  branch: string;
+  error?: string;
+} | null> {
+  const cloudUrl = getCloudApiUrl();
+  if (!cloudUrl) return null;
+
+  try {
+    const response = await fetch(`${cloudUrl}/api/cloud/tree`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ repoUrl }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        entries: [],
+        branch: 'main',
+        error: errorData?.detail?.error?.message || 'Failed to fetch from Modal',
+      };
+    }
+
+    const data: ModalTreeResponse = await response.json();
+
+    if (data.data.error) {
+      return {
+        entries: [],
+        branch: 'main',
+        error: data.data.error,
+      };
+    }
+
+    // Convert flat entries to nested tree
+    const nested = buildNestedTreeFromFlat(data.data.entries);
+
+    return {
+      entries: nested,
+      branch: data.data.branch,
+    };
+  } catch (error) {
+    console.error('Modal tree fetch failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Build nested tree from flat entries (Modal returns flat list)
+ */
+function buildNestedTreeFromFlat(
+  entries: Array<{
+    name: string;
+    path: string;
+    type: 'file' | 'directory';
+    extension: string | null;
+  }>
+): NestedTreeEntry[] {
+  const root: NestedTreeEntry[] = [];
+  const pathMap = new Map<string, NestedTreeEntry>();
+
+  // Sort by path to ensure parents come before children
+  const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path));
+
+  for (const entry of sorted) {
+    const parts = entry.path.split('/');
+    const parentPath = parts.slice(0, -1).join('/');
+
+    const node: NestedTreeEntry = {
+      name: entry.name,
+      path: entry.path,
+      type: entry.type,
+      extension: entry.extension,
+      children: entry.type === 'directory' ? [] : undefined,
+    };
+
+    pathMap.set(entry.path, node);
+
+    if (parentPath === '') {
+      root.push(node);
+    } else {
+      const parent = pathMap.get(parentPath);
+      if (parent && parent.children) {
+        parent.children.push(node);
+      }
+    }
+  }
+
+  return root;
+}
+
+/**
+ * Smart fetch that tries Modal first (for private repos), then GitHub API
+ */
+export async function fetchRepoTree(repoUrl: string): Promise<{
+  entries: NestedTreeEntry[];
+  branch: string;
+  source: 'modal' | 'github';
+  error?: string;
+}> {
+  // In cloud mode, try Modal first (works with private repos)
+  if (getApiMode() === 'cloud') {
+    const modalResult = await fetchTreeViaModal(repoUrl);
+    if (modalResult && !modalResult.error && modalResult.entries.length > 0) {
+      return {
+        entries: modalResult.entries,
+        branch: modalResult.branch,
+        source: 'modal',
+      };
+    }
+    // If Modal returned an error (like auth failure for private repo), include it
+    if (modalResult?.error) {
+      return {
+        entries: [],
+        branch: 'main',
+        source: 'modal',
+        error: modalResult.error,
+      };
+    }
+  }
+
+  // Fall back to GitHub API (public repos only)
+  const parsed = parseGitHubUrl(repoUrl);
+  if (!parsed) {
+    return {
+      entries: [],
+      branch: 'main',
+      source: 'github',
+      error: 'Invalid GitHub URL',
+    };
+  }
+
+  const entries = await fetchGitHubTree(parsed.owner, parsed.repo);
+  if (!entries) {
+    return {
+      entries: [],
+      branch: 'main',
+      source: 'github',
+      error: 'Could not fetch from GitHub (may be private repo)',
+    };
+  }
+
+  return {
+    entries: buildNestedTree(entries),
+    branch: 'main', // GitHub API doesn't easily tell us the branch
+    source: 'github',
+  };
 }
