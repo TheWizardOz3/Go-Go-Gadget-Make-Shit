@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.16.1 | 2026-01-17 | patch | Fix production server startup path |
 | 0.16.0 | 2026-01-17 | minor | File Tree Viewing |
 | 0.15.0 | 2026-01-17 | minor | Voice Input UX Improvements |
 | 0.14.1 | 2026-01-15 | patch | UX polish: HTTPS, notifications, new session flow |
@@ -45,6 +46,16 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.16.1] - 2026-01-17
+
+### Fixed
+- **Production Server Startup** — Server failed to start in production mode due to incorrect path in start script
+  - TypeScript outputs to `dist/server/src/` (not `dist/`) because shared types are included in build
+  - Updated `server/package.json` start script from `node dist/index.js` to `node dist/server/src/index.js`
+  - Also cleaned up duplicate test files (`*.test 2.ts`) and docs that were accidentally created
 
 ---
 
