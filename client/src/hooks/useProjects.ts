@@ -2,11 +2,13 @@
  * Hook for fetching projects list
  *
  * Uses SWR for caching and automatic revalidation.
+ * Waits for API endpoint initialization before fetching to ensure correct URL.
  */
 
 import useSWR from 'swr';
-import { api } from '@/lib/api';
+import { api, subscribeToBaseUrl, getApiBaseUrl } from '@/lib/api';
 import type { ProjectSerialized } from '@shared/types';
+import { useEffect, useState } from 'react';
 
 /**
  * SWR fetcher that uses our typed API client
@@ -32,6 +34,9 @@ export interface UseProjectsReturn {
 /**
  * Hook for fetching list of projects with Claude sessions
  *
+ * Waits for the API endpoint to be determined before fetching.
+ * This prevents fetching with the wrong URL while connectivity is being checked.
+ *
  * @returns Object containing projects, loading state, error, and refresh function
  *
  * @example
@@ -44,9 +49,21 @@ export interface UseProjectsReturn {
  * ```
  */
 export function useProjects(): UseProjectsReturn {
+  // Track the base URL to include in the SWR key
+  // This ensures SWR refetches when the API endpoint changes (local → cloud)
+  const [baseUrl, setBaseUrl] = useState(getApiBaseUrl);
+
+  // Subscribe to base URL changes
+  useEffect(() => {
+    return subscribeToBaseUrl((newUrl) => {
+      setBaseUrl(newUrl);
+    });
+  }, []);
+
+  // Use baseUrl in SWR key to trigger refetch when endpoint changes
   const { data, error, isLoading, mutate } = useSWR<ProjectSerialized[]>(
-    '/projects',
-    fetcher<ProjectSerialized[]>,
+    baseUrl ? ['/projects', baseUrl] : null,
+    () => fetcher<ProjectSerialized[]>('/projects'),
     {
       // Revalidate every 30 seconds (projects don't change often)
       refreshInterval: 30000,

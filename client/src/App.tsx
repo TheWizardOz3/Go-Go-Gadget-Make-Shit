@@ -101,7 +101,23 @@ function setStoredSession(encodedPath: string | null, sessionId: string | null):
 }
 
 /**
- * Main App component
+ * Loading screen shown while determining API endpoint
+ */
+function InitializationLoader() {
+  return (
+    <div className="dark h-dvh flex flex-col items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        {/* Spinner */}
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        {/* Text */}
+        <p className="text-text-muted text-sm">Connecting...</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Main App content (rendered after API endpoint is determined)
  *
  * For MVP:
  * - Restores last selected project from localStorage
@@ -109,7 +125,23 @@ function setStoredSession(encodedPath: string | null, sessionId: string | null):
  * - Auto-selects the most recent session
  * - Full-screen conversation view
  */
-export default function App() {
+function AppContent() {
+  // Get initialization state from context
+  const { isInitialized } = useApiEndpointContext();
+
+  // Show loading screen while determining API endpoint
+  // This prevents fetching from the wrong URL (laptop vs cloud)
+  if (!isInitialized) {
+    return <InitializationLoader />;
+  }
+
+  return <AppMain />;
+}
+
+/**
+ * App main content (after initialization)
+ */
+function AppMain() {
   // Selected project and session state
   // Initialize from localStorage if available
   const [selectedProject, setSelectedProject] = useState<string | null>(() => getStoredProject());
@@ -328,186 +360,191 @@ export default function App() {
 
   // Main app with tab navigation
   return (
-    <ApiEndpointProvider>
-      <SharedPromptProvider>
-        <div
-          className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}
-        >
-          <Header
-            projectName={currentProject?.name || null}
-            currentSession={currentSession}
-            status={status}
-            statusLoading={statusLoading}
-            sessionLoading={sessionsLoading}
-            sessionError={sessionsError}
-            onProjectClick={() => setIsProjectPickerOpen(true)}
-            onSessionClick={() => setIsSessionPickerOpen(true)}
-            onSettingsClick={() => setIsSettingsOpen(true)}
-            onScheduledPromptsClick={() => setIsScheduledPromptsOpen(true)}
-            hasProjects={projects.length > 0}
-            hasSessions={(sessions?.length ?? 0) > 0}
-          />
+    <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
+      <Header
+        projectName={currentProject?.name || null}
+        currentSession={currentSession}
+        status={status}
+        statusLoading={statusLoading}
+        sessionLoading={sessionsLoading}
+        sessionError={sessionsError}
+        onProjectClick={() => setIsProjectPickerOpen(true)}
+        onSessionClick={() => setIsSessionPickerOpen(true)}
+        onSettingsClick={() => setIsSettingsOpen(true)}
+        onScheduledPromptsClick={() => setIsScheduledPromptsOpen(true)}
+        hasProjects={projects.length > 0}
+        hasSessions={(sessions?.length ?? 0) > 0}
+      />
 
-          {/* Main content area - conditionally render based on active tab */}
-          <div className="flex-1 overflow-hidden">
-            {activeTab === 'conversation' ? (
-              <ConversationView
-                sessionId={selectedSession}
-                encodedPath={selectedProject}
-                projectPath={currentProject?.path}
-                projectName={currentProject?.name}
-                gitRemoteUrl={currentProject?.gitRemoteUrl}
-                onNewSessionStarted={async () => {
-                  // Poll for new session with direct API calls (bypasses SWR cache)
-                  // Claude takes a few seconds to write the JSONL
+      {/* Main content area - conditionally render based on active tab */}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'conversation' ? (
+          <ConversationView
+            sessionId={selectedSession}
+            encodedPath={selectedProject}
+            projectPath={currentProject?.path}
+            projectName={currentProject?.name}
+            gitRemoteUrl={currentProject?.gitRemoteUrl}
+            onNewSessionStarted={async () => {
+              // Poll for new session with direct API calls (bypasses SWR cache)
+              // Claude takes a few seconds to write the JSONL
 
-                  // First, capture the existing session IDs before the new session is created
-                  const existingSessionIds = new Set(sessions?.map((s) => s.id) ?? []);
+              // First, capture the existing session IDs before the new session is created
+              const existingSessionIds = new Set(sessions?.map((s) => s.id) ?? []);
 
-                  for (let attempt = 0; attempt < 8; attempt++) {
-                    await new Promise((r) => setTimeout(r, 1500));
+              for (let attempt = 0; attempt < 8; attempt++) {
+                await new Promise((r) => setTimeout(r, 1500));
 
-                    try {
-                      // Direct API call to bypass SWR cache
-                      const freshSessions = await api.get<SessionSummarySerialized[]>(
-                        `/projects/${selectedProject}/sessions`
-                      );
+                try {
+                  // Direct API call to bypass SWR cache
+                  const freshSessions = await api.get<SessionSummarySerialized[]>(
+                    `/projects/${selectedProject}/sessions`
+                  );
 
-                      if (freshSessions && freshSessions.length > 0) {
-                        // Find any session that wasn't in our original list (the new session)
-                        const newSession = freshSessions.find((s) => !existingSessionIds.has(s.id));
+                  if (freshSessions && freshSessions.length > 0) {
+                    // Find any session that wasn't in our original list (the new session)
+                    const newSession = freshSessions.find((s) => !existingSessionIds.has(s.id));
 
-                        if (newSession) {
-                          // Found the new session - select it
+                    if (newSession) {
+                      // Found the new session - select it
+                      setIsNewSessionMode(false);
+                      setSelectedSession(newSession.id);
+                      setStoredSession(selectedProject, newSession.id);
+                      // Also refresh SWR cache
+                      _refreshSessions();
+                      return;
+                    }
+
+                    // Fallback: If no new session ID found but count increased,
+                    // select the most recent session created within last 60 seconds
+                    if (freshSessions.length > existingSessionIds.size) {
+                      const sorted = [...freshSessions].sort((a, b) => {
+                        const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+                        const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+                        return bTime - aTime;
+                      });
+
+                      const newest = sorted[0];
+                      if (newest?.lastActivityAt) {
+                        const newestTime = new Date(newest.lastActivityAt).getTime();
+                        if (Date.now() - newestTime < 60000) {
                           setIsNewSessionMode(false);
-                          setSelectedSession(newSession.id);
-                          setStoredSession(selectedProject, newSession.id);
-                          // Also refresh SWR cache
+                          setSelectedSession(newest.id);
+                          setStoredSession(selectedProject, newest.id);
                           _refreshSessions();
                           return;
                         }
-
-                        // Fallback: If no new session ID found but count increased,
-                        // select the most recent session created within last 60 seconds
-                        if (freshSessions.length > existingSessionIds.size) {
-                          const sorted = [...freshSessions].sort((a, b) => {
-                            const aTime = a.lastActivityAt
-                              ? new Date(a.lastActivityAt).getTime()
-                              : 0;
-                            const bTime = b.lastActivityAt
-                              ? new Date(b.lastActivityAt).getTime()
-                              : 0;
-                            return bTime - aTime;
-                          });
-
-                          const newest = sorted[0];
-                          if (newest?.lastActivityAt) {
-                            const newestTime = new Date(newest.lastActivityAt).getTime();
-                            if (Date.now() - newestTime < 60000) {
-                              setIsNewSessionMode(false);
-                              setSelectedSession(newest.id);
-                              setStoredSession(selectedProject, newest.id);
-                              _refreshSessions();
-                              return;
-                            }
-                          }
-                        }
                       }
-                    } catch {
-                      // Ignore errors, keep polling
                     }
                   }
-                  // Even if we didn't find a new session, exit new session mode
-                  setIsNewSessionMode(false);
-                  _refreshSessions();
-                }}
-                className="h-full"
-              />
-            ) : selectedFilePath && selectedProject ? (
-              <DiffViewer
+                } catch {
+                  // Ignore errors, keep polling
+                }
+              }
+              // Even if we didn't find a new session, exit new session mode
+              setIsNewSessionMode(false);
+              _refreshSessions();
+            }}
+            className="h-full"
+          />
+        ) : selectedFilePath && selectedProject ? (
+          <DiffViewer
+            encodedPath={selectedProject}
+            filePath={selectedFilePath}
+            onBack={() => setSelectedFilePath(null)}
+          />
+        ) : (
+          <div className="flex flex-col h-full overflow-hidden">
+            {/* Files sub-navigation */}
+            <FilesSubNav activeView={filesSubView} onViewChange={setFilesSubView} />
+
+            {/* Files content based on sub-view */}
+            {filesSubView === 'changed' ? (
+              <FilesChangedView
                 encodedPath={selectedProject}
-                filePath={selectedFilePath}
-                onBack={() => setSelectedFilePath(null)}
+                onFilePress={setSelectedFilePath}
+                className="flex-1"
               />
             ) : (
-              <div className="flex flex-col h-full overflow-hidden">
-                {/* Files sub-navigation */}
-                <FilesSubNav activeView={filesSubView} onViewChange={setFilesSubView} />
-
-                {/* Files content based on sub-view */}
-                {filesSubView === 'changed' ? (
-                  <FilesChangedView
-                    encodedPath={selectedProject}
-                    onFilePress={setSelectedFilePath}
-                    className="flex-1"
-                  />
-                ) : (
-                  <FileTreeView encodedPath={selectedProject} className="flex-1" />
-                )}
-              </div>
+              <FileTreeView encodedPath={selectedProject} className="flex-1" />
             )}
           </div>
+        )}
+      </div>
 
-          {/* Floating Voice Button - visible on Files tab only */}
-          <FloatingVoiceButton hidden={activeTab === 'conversation'} onSend={handleFloatingSend} />
+      {/* Floating Voice Button - visible on Files tab only */}
+      <FloatingVoiceButton hidden={activeTab === 'conversation'} onSend={handleFloatingSend} />
 
-          {/* Bottom Tab Bar - fixed at bottom */}
-          <TabBar
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            filesChangedCount={filesChangedCount}
-          />
+      {/* Bottom Tab Bar - fixed at bottom */}
+      <TabBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        filesChangedCount={filesChangedCount}
+      />
 
-          {/* Project Picker Modal */}
-          <ProjectPicker
-            isOpen={isProjectPickerOpen}
-            onClose={() => setIsProjectPickerOpen(false)}
-            projects={projects}
-            selectedProject={selectedProject}
-            onSelectProject={handleSelectProject}
-          />
+      {/* Project Picker Modal */}
+      <ProjectPicker
+        isOpen={isProjectPickerOpen}
+        onClose={() => setIsProjectPickerOpen(false)}
+        projects={projects}
+        selectedProject={selectedProject}
+        onSelectProject={handleSelectProject}
+      />
 
-          {/* Session Picker Modal */}
-          <SessionPicker
-            isOpen={isSessionPickerOpen}
-            onClose={() => setIsSessionPickerOpen(false)}
-            sessions={sessions ?? []}
-            selectedSession={selectedSession}
-            onSelectSession={handleSelectSession}
-            projectPath={currentProject?.path}
-            onNewSession={() => {
-              // Enter "new session" mode - prevents auto-select from re-selecting
-              setIsNewSessionMode(true);
-              // Clear the session selection - this shows the "new conversation" state
-              setSelectedSession(null);
-              setStoredSession(selectedProject, null);
-            }}
-          />
+      {/* Session Picker Modal */}
+      <SessionPicker
+        isOpen={isSessionPickerOpen}
+        onClose={() => setIsSessionPickerOpen(false)}
+        sessions={sessions ?? []}
+        selectedSession={selectedSession}
+        onSelectSession={handleSelectSession}
+        projectPath={currentProject?.path}
+        onNewSession={() => {
+          // Enter "new session" mode - prevents auto-select from re-selecting
+          setIsNewSessionMode(true);
+          // Clear the session selection - this shows the "new conversation" state
+          setSelectedSession(null);
+          setStoredSession(selectedProject, null);
+        }}
+      />
 
-          {/* Settings Modal */}
-          <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      {/* Settings Modal */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
-          {/* Scheduled Prompts Panel */}
-          <ScheduledPromptsPanel
-            isOpen={isScheduledPromptsOpen}
-            onClose={() => setIsScheduledPromptsOpen(false)}
-            onAddNew={() => {
-              setIsScheduledPromptsOpen(false);
-              setIsScheduledPromptFormOpen(true);
-            }}
-          />
+      {/* Scheduled Prompts Panel */}
+      <ScheduledPromptsPanel
+        isOpen={isScheduledPromptsOpen}
+        onClose={() => setIsScheduledPromptsOpen(false)}
+        onAddNew={() => {
+          setIsScheduledPromptsOpen(false);
+          setIsScheduledPromptFormOpen(true);
+        }}
+      />
 
-          {/* Scheduled Prompt Form */}
-          <ScheduledPromptForm
-            isOpen={isScheduledPromptFormOpen}
-            onClose={() => setIsScheduledPromptFormOpen(false)}
-            onSubmit={async (input: ScheduledPromptInput) => {
-              await createScheduledPrompt(input);
-            }}
-            projects={projects?.map((p) => ({ path: p.path, name: p.name })) ?? []}
-            isSubmitting={scheduledPromptsLoading}
-          />
-        </div>
+      {/* Scheduled Prompt Form */}
+      <ScheduledPromptForm
+        isOpen={isScheduledPromptFormOpen}
+        onClose={() => setIsScheduledPromptFormOpen(false)}
+        onSubmit={async (input: ScheduledPromptInput) => {
+          await createScheduledPrompt(input);
+        }}
+        projects={projects?.map((p) => ({ path: p.path, name: p.name })) ?? []}
+        isSubmitting={scheduledPromptsLoading}
+      />
+    </div>
+  );
+}
+
+/**
+ * Root App component
+ *
+ * Wraps everything in providers and handles initialization.
+ */
+export default function App() {
+  return (
+    <ApiEndpointProvider>
+      <SharedPromptProvider>
+        <AppContent />
       </SharedPromptProvider>
     </ApiEndpointProvider>
   );

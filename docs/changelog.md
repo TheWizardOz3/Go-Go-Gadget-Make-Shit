@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.21.3 | 2026-01-17 | patch | Cloud mode initialization fix - wait for endpoint check |
 | 0.21.2 | 2026-01-17 | patch | Cloud mode fix - single FastAPI app |
 | 0.21.1 | 2026-01-17 | patch | Auto Git Remote URLs for cloud execution |
 | 0.21.0 | 2026-01-17 | minor | Serverless/Async Execution |
@@ -53,6 +54,23 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.21.3] - 2026-01-17
+
+### Summary
+**Cloud Mode Initialization Fix** - App now waits for API endpoint detection before fetching data, fixing the empty screen issue when laptop is asleep.
+
+### Changed
+- Added `isInitialized` state to `useApiEndpoint` hook to track when connectivity check completes
+- `App.tsx` refactored into `AppContent` wrapper that shows loading screen until initialized
+- `useProjects` now includes baseUrl in SWR key to refetch when endpoint changes
+- Shows "Connecting..." loading screen during initial endpoint detection
+
+### Fixed
+- App showing empty content when laptop was asleep (was fetching from laptop URL before cloud fallback)
+- Race condition where SWR started fetching before API endpoint was determined
 
 ---
 

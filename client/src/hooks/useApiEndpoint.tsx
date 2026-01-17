@@ -64,6 +64,8 @@ export interface UseApiEndpointReturn {
   mode: ApiEndpointMode;
   /** Whether a connectivity check is in progress */
   isChecking: boolean;
+  /** Whether initial connectivity check has completed (safe to start fetching) */
+  isInitialized: boolean;
   /** Last successful check timestamp */
   lastCheckedAt: Date | null;
   /** Whether laptop is available */
@@ -155,6 +157,10 @@ export function useApiEndpoint(): UseApiEndpointReturn {
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Track if initial connectivity check has completed
+  // This prevents SWR from fetching with wrong URL during startup
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // Track if component is mounted to avoid state updates after unmount
   const isMountedRef = useRef(true);
 
@@ -202,6 +208,7 @@ export function useApiEndpoint(): UseApiEndpointReturn {
     } finally {
       if (isMountedRef.current) {
         setIsChecking(false);
+        setIsInitialized(true);
       }
     }
   }, [laptopUrl, isCloudConfigured, forcedMode]);
@@ -296,6 +303,7 @@ export function useApiEndpoint(): UseApiEndpointReturn {
     baseUrl,
     mode: effectiveMode,
     isChecking,
+    isInitialized,
     lastCheckedAt,
     isLaptopAvailable,
     isCloudConfigured,
