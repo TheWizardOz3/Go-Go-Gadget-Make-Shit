@@ -59,6 +59,28 @@ function BellIcon({ className }: { className?: string }) {
 }
 
 /**
+ * Pencil icon for edits section
+ */
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+      />
+    </svg>
+  );
+}
+
+/**
  * Toggle switch component
  */
 interface ToggleProps {
@@ -344,8 +366,41 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Notifications Section */}
+              {/* Claude Code Section */}
               <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <PencilIcon className="text-text-muted" />
+                  <h3 className="text-base font-medium text-text-primary">Claude Code</h3>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Allow Edits toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0 pr-4">
+                      <p className="text-sm font-medium text-text-primary">
+                        Allow Edits Automatically
+                      </p>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        Skip permission prompts for file edits and commands
+                      </p>
+                    </div>
+                    <Toggle
+                      enabled={settings?.allowEdits ?? false}
+                      onChange={(enabled) => updateSettings({ allowEdits: enabled })}
+                      disabled={isUpdating}
+                      label="Allow edits automatically"
+                    />
+                  </div>
+
+                  <p className="text-xs text-text-muted">
+                    When enabled, Claude can create, edit, and delete files without asking. Disable
+                    this if you want to review each action before it runs.
+                  </p>
+                </div>
+              </section>
+
+              {/* Notifications Section */}
+              <section className="pt-4 border-t border-text-primary/10">
                 <div className="flex items-center gap-2 mb-4">
                   <BellIcon className="text-text-muted" />
                   <h3 className="text-base font-medium text-text-primary">Notifications</h3>

@@ -13,6 +13,17 @@ vi.mock('execa', () => ({
   execa: vi.fn(),
 }));
 
+// Mock settings service to return allowEdits: false by default
+vi.mock('./settingsService.js', () => ({
+  getSettings: vi.fn().mockResolvedValue({
+    notificationsEnabled: false,
+    phoneNumber: null,
+    serverHostname: 'localhost',
+    allowEdits: false,
+  }),
+  updateSettings: vi.fn(),
+}));
+
 // Import the mocked execa
 import { execa } from 'execa';
 const mockExeca = vi.mocked(execa);

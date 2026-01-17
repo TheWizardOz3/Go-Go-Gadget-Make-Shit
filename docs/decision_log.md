@@ -11,26 +11,27 @@
 
 ## Quick Reference Index
 
-| ID | Date | Category | Status | Summary |
-|----|------|----------|--------|---------|
-| ADR-018 | 2026-01-15 | infra | active | Server-side notifications for programmatic sessions |
-| ADR-017 | 2026-01-15 | infra | active | In-memory rate limiting for notifications |
-| ADR-016 | 2026-01-15 | ui | active | Dynamic viewport height (dvh) for mobile Safari |
-| ADR-015 | 2026-01-15 | api | active | Groq Whisper API with Web Speech fallback for voice input |
-| ADR-014 | 2026-01-15 | data | active | Unified diff parsing for File Diff View |
-| ADR-013 | 2026-01-14 | infra | active | simple-git for Git CLI operations |
-| ADR-012 | 2026-01-14 | ui | active | Pure CSS animations for modal transitions |
-| ADR-011 | 2026-01-14 | infra | active | Signal escalation for stopping Claude processes |
-| ADR-010 | 2026-01-14 | infra | active | Detached process spawning for Claude CLI |
-| ADR-009 | 2026-01-14 | ui | active | Cursor-style layout for conversation view |
-| ADR-008 | 2026-01-14 | data | active | Extract project paths from JSONL cwd field |
-| ADR-007 | 2026-01-14 | api | active | Standardized API response format |
-| ADR-001 | 2026-01-13 | arch | active | Local-first architecture via Tailscale |
-| ADR-002 | 2026-01-13 | data | active | File-based storage (no database) |
-| ADR-003 | 2026-01-13 | infra | active | Polling over WebSockets for conversation updates |
-| ADR-004 | 2026-01-13 | infra | active | AppleScript for iMessage notifications |
-| ADR-005 | 2026-01-13 | arch | active | pnpm + single repo structure |
-| ADR-006 | 2026-01-13 | infra | active | ESLint 9 flat config |
+| ID      | Date       | Category | Status | Summary                                                   |
+|---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-019 | 2026-01-17 | ui       | active | Web Audio API for real-time waveform visualization        |
+| ADR-018 | 2026-01-15 | infra    | active | Server-side notifications for programmatic sessions       |
+| ADR-017 | 2026-01-15 | infra    | active | In-memory rate limiting for notifications                 |
+| ADR-016 | 2026-01-15 | ui       | active | Dynamic viewport height (dvh) for mobile Safari           |
+| ADR-015 | 2026-01-15 | api      | active | Groq Whisper API with Web Speech fallback for voice input |
+| ADR-014 | 2026-01-15 | data     | active | Unified diff parsing for File Diff View                   |
+| ADR-013 | 2026-01-14 | infra    | active | simple-git for Git CLI operations                         |
+| ADR-012 | 2026-01-14 | ui       | active | Pure CSS animations for modal transitions                 |
+| ADR-011 | 2026-01-14 | infra    | active | Signal escalation for stopping Claude processes           |
+| ADR-010 | 2026-01-14 | infra    | active | Detached process spawning for Claude CLI                  |
+| ADR-009 | 2026-01-14 | ui       | active | Cursor-style layout for conversation view                 |
+| ADR-008 | 2026-01-14 | data     | active | Extract project paths from JSONL cwd field                |
+| ADR-007 | 2026-01-14 | api      | active | Standardized API response format                          |
+| ADR-001 | 2026-01-13 | arch     | active | Local-first architecture via Tailscale                    |
+| ADR-002 | 2026-01-13 | data     | active | File-based storage (no database)                          |
+| ADR-003 | 2026-01-13 | infra    | active | Polling over WebSockets for conversation updates          |
+| ADR-004 | 2026-01-13 | infra    | active | AppleScript for iMessage notifications                    |
+| ADR-005 | 2026-01-13 | arch     | active | pnpm + single repo structure                              |
+| ADR-006 | 2026-01-13 | infra    | active | ESLint 9 flat config                                      |
 
 **Categories:** `arch` | `data` | `api` | `ui` | `test` | `infra` | `error`
 
@@ -41,6 +42,61 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-019: Web Audio API for Real-Time Waveform Visualization
+**Date:** 2026-01-17 | **Category:** ui | **Status:** active
+
+#### Trigger
+Implementing waveform visualization for voice recording required choosing an approach to display real-time audio levels during recording.
+
+#### Decision
+Use the **Web Audio API** with `AnalyserNode` for real-time frequency analysis:
+
+1. **Hook-based architecture:** `useAudioAnalyser` hook manages `AudioContext` lifecycle
+2. **FFT analysis:** Use `getByteFrequencyData()` to get 128 frequency bins (FFT size 256)
+3. **Animation:** Update at ~60fps via `requestAnimationFrame`
+4. **Downsampling:** Average frequency bins to match bar count (default 45 bars)
+5. **Cleanup:** Properly close `AudioContext` and cancel animation frames on unmount
+
+```typescript
+// Key components
+const audioContext = new AudioContext();
+const analyser = audioContext.createAnalyser();
+analyser.fftSize = 256;
+const source = audioContext.createMediaStreamSource(stream);
+source.connect(analyser);
+```
+
+#### Rationale
+1. **Built-in browser API:** No external dependencies needed
+2. **Performant:** Native implementation, hardware-accelerated where available
+3. **Real-time:** Can achieve 60fps updates without performance issues
+4. **Flexible:** FFT data allows various visualization styles (bars, waves, etc.)
+5. **Cross-browser:** Supported in all modern browsers including iOS Safari
+
+#### Alternatives Considered
+| Option                            | Pros                 | Cons                                   |
+|-----------------------------------|----------------------|----------------------------------------|
+| Canvas/WebGL visualization        | More visual control  | Overkill for simple bars, more complex |
+| Volume meter only                 | Simpler to implement | Less visual feedback, less engaging    |
+| Pre-built library (wavesurfer.js) | Feature-rich         | Heavy dependency for simple use case   |
+| CSS-only animation                | No JS needed         | Can't react to actual audio levels     |
+
+#### Consequences
+- **Positive:** Zero additional dependencies, smooth 60fps animation
+- **Positive:** Works with existing MediaStream from voice recording
+- **Positive:** Easy to customize bar count, height, smoothing
+- **Negative:** Requires `AudioContext` cleanup to avoid memory leaks
+- **Negative:** Need to mock Web Audio API in tests
+
+#### AI Instructions
+- Always close `AudioContext` in cleanup functions
+- Cancel `requestAnimationFrame` before component unmount
+- Use `smoothingTimeConstant` (0.8) for smooth bar transitions
+- Apply power easing (`Math.pow(normalized, 1.5)`) to emphasize loud sounds
+- Respect `prefers-reduced-motion` by disabling transition animations
+
+---
 
 ### ADR-018: Server-Side Notifications for Programmatic Sessions
 **Date:** 2026-01-15 | **Category:** infra | **Status:** active
@@ -177,12 +233,12 @@ Use **Groq Whisper API** as primary transcription with **Web Speech API** as par
 
 #### Alternatives Considered
 
-| Option | Pros | Cons |
-|--------|------|------|
-| OpenAI Whisper directly | Same model quality | Requires separate API key, higher cost |
-| Web Speech API only | No server needed, free | iOS Safari has quirks, lower accuracy |
-| AssemblyAI | Good accuracy | Additional subscription, more complex setup |
-| Deepgram | Real-time streaming | Overkill for this use case |
+| Option                  | Pros                   | Cons                                        |
+|-------------------------|------------------------|---------------------------------------------|
+| OpenAI Whisper directly | Same model quality     | Requires separate API key, higher cost      |
+| Web Speech API only     | No server needed, free | iOS Safari has quirks, lower accuracy       |
+| AssemblyAI              | Good accuracy          | Additional subscription, more complex setup |
+| Deepgram                | Real-time streaming    | Overkill for this use case                  |
 
 #### Consequences
 - **Positive**: High accuracy transcription with graceful degradation

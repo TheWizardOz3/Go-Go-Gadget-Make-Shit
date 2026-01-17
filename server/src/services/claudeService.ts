@@ -11,6 +11,7 @@ import { execa } from 'execa';
 import { logger } from '../lib/logger.js';
 import { trackProcess, untrackProcess, getActiveProcess } from './processManager.js';
 import { sendTaskCompleteNotification } from './notificationService.js';
+import { getSettings } from './settingsService.js';
 
 // ============================================================
 // Types
@@ -103,10 +104,27 @@ export async function sendPrompt(options: SendPromptOptions): Promise<SendPrompt
   });
 
   try {
+    // Check settings for allowEdits flag
+    const settings = await getSettings();
+    const allowEdits = settings.allowEdits ?? false;
+
+    // Build args: -p for prompt, --continue for existing session
+    // If allowEdits is true, add --dangerously-skip-permissions to auto-approve actions
+    const args = ['-p', prompt, '--continue'];
+    if (allowEdits) {
+      args.push('--dangerously-skip-permissions');
+    }
+
+    logger.debug('Spawning Claude with args', {
+      sessionId,
+      allowEdits,
+      argsCount: args.length,
+    });
+
     // Spawn claude command
     // -p: Provide the prompt directly (non-interactive)
     // --continue: Continue the most recent session in this directory
-    const subprocess = execa('claude', ['-p', prompt, '--continue'], {
+    const subprocess = execa('claude', args, {
       cwd: projectPath,
       detached: true, // Allow process to run independently
       stdio: 'ignore', // Don't capture output (it goes to JSONL)
@@ -237,6 +255,10 @@ export async function startNewSession(
   });
 
   try {
+    // Check settings for allowEdits flag
+    const settings = await getSettings();
+    const allowEdits = settings.allowEdits ?? false;
+
     // Build args: -p for prompt (or empty to just start), no --continue
     const args: string[] = [];
 
@@ -246,6 +268,16 @@ export async function startNewSession(
       // Start with a minimal prompt if none provided
       args.push('-p', 'Hello');
     }
+
+    // If allowEdits is true, add --dangerously-skip-permissions to auto-approve actions
+    if (allowEdits) {
+      args.push('--dangerously-skip-permissions');
+    }
+
+    logger.debug('Spawning new Claude session with args', {
+      allowEdits,
+      argsCount: args.length,
+    });
 
     // Spawn claude command WITHOUT --continue to start a new session
     const subprocess = execa('claude', args, {

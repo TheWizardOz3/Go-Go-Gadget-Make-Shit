@@ -10,6 +10,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { StopButton } from './StopButton';
 import { VoiceButton } from './VoiceButton';
+import { Waveform } from './Waveform';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import type { SessionStatus } from '@shared/types';
 
@@ -151,7 +152,7 @@ export function PromptInput({
   );
 
   // Voice input hook
-  const { isRecording, isProcessing, startRecording, stopRecording } = useVoiceInput({
+  const { audioStream, isRecording, isProcessing, startRecording, stopRecording } = useVoiceInput({
     onTranscription: handleTranscription,
     onError: onVoiceError,
   });
@@ -280,8 +281,8 @@ export function PromptInput({
   return (
     <div
       className={cn(
-        // Container styling
-        'flex items-end gap-2',
+        // Container styling - vertical layout for waveform
+        'flex flex-col gap-2',
         'px-4 py-2',
         'bg-surface border-t border-text-primary/10',
         // Safe area for notched devices
@@ -289,138 +290,149 @@ export function PromptInput({
         className
       )}
     >
-      {/* Text input */}
-      <div className="relative flex-1">
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
-          disabled={isDisabled}
-          aria-label="Message input"
-          rows={1}
-          className={cn(
-            // Base styling
-            'w-full resize-none',
-            'px-4 py-3',
-            // Add right padding for clear button
-            hasContent && 'pr-10',
-            'bg-background rounded-xl',
-            'border border-text-primary/10',
-            // Typography (16px prevents iOS zoom)
-            'text-base text-text-primary',
-            'placeholder:text-text-muted',
-            // Focus state
-            'focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50',
-            // Disabled state
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            // Scrollbar styling
-            'scrollbar-hide'
+      {/* Waveform visualization - only shown when recording */}
+      {isRecording && <Waveform audioStream={audioStream} />}
+
+      {/* Input row with larger buttons and increased gap */}
+      <div className="flex items-end gap-3">
+        {/* Text input */}
+        <div className="relative flex-1">
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a message..."
+            disabled={isDisabled}
+            aria-label="Message input"
+            rows={1}
+            className={cn(
+              // Base styling
+              'w-full resize-none',
+              'px-4 py-3',
+              // Add right padding for clear button
+              hasContent && 'pr-10',
+              'bg-background rounded-xl',
+              'border border-text-primary/10',
+              // Typography (16px prevents iOS zoom)
+              'text-base text-text-primary',
+              'placeholder:text-text-muted',
+              // Focus state
+              'focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50',
+              // Disabled state
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+              // Scrollbar styling
+              'scrollbar-hide'
+            )}
+            style={{
+              minHeight: `${MIN_HEIGHT}px`,
+              maxHeight: `${MAX_HEIGHT}px`,
+            }}
+          />
+
+          {/* Clear button - appears when there's content */}
+          {hasContent && !isDisabled && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className={cn(
+                'absolute right-2 top-1/2 -translate-y-1/2',
+                'p-1.5 rounded-full',
+                'text-text-muted hover:text-text-primary',
+                'hover:bg-text-primary/10 active:bg-text-primary/20',
+                'transition-colors duration-150',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              )}
+              aria-label="Clear input"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           )}
-          style={{
-            minHeight: `${MIN_HEIGHT}px`,
-            maxHeight: `${MAX_HEIGHT}px`,
-          }}
+        </div>
+
+        {/* Voice input button - larger size */}
+        <VoiceButton
+          isRecording={isRecording}
+          isProcessing={isProcessing}
+          disabled={isVoiceDisabled}
+          onStart={startRecording}
+          onStop={stopRecording}
+          size={56}
         />
 
-        {/* Clear button - appears when there's content */}
-        {hasContent && !isDisabled && (
+        {/* Action button: Stop when working, Send otherwise - larger size */}
+        {status === 'working' && onStop ? (
+          <StopButton
+            onStop={onStop}
+            isStopping={isStopping}
+            className="w-14 h-14 rounded-[14px]"
+          />
+        ) : (
           <button
             type="button"
-            onClick={handleClear}
+            onClick={handleSend}
+            disabled={!canSend}
+            aria-label="Send message"
             className={cn(
-              'absolute right-2 top-1/2 -translate-y-1/2',
-              'p-1.5 rounded-full',
-              'text-text-muted hover:text-text-primary',
-              'hover:bg-text-primary/10 active:bg-text-primary/20',
+              // Base styling - larger size
+              'flex-shrink-0',
+              'flex items-center justify-center',
+              'w-14 h-14',
+              'rounded-[14px]',
               'transition-colors duration-150',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              // Enabled state
+              canSend && 'bg-accent text-white hover:bg-accent/90 active:bg-accent/80',
+              // Disabled state
+              !canSend && 'bg-text-primary/10 text-text-muted cursor-not-allowed'
             )}
-            aria-label="Clear input"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            {isSending ? (
+              // Loading spinner - larger
+              <svg
+                className="w-6 h-6 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            ) : (
+              // Send arrow icon - larger
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
+              </svg>
+            )}
           </button>
         )}
       </div>
-
-      {/* Voice input button */}
-      <VoiceButton
-        isRecording={isRecording}
-        isProcessing={isProcessing}
-        disabled={isVoiceDisabled}
-        onStart={startRecording}
-        onStop={stopRecording}
-      />
-
-      {/* Action button: Stop when working, Send otherwise */}
-      {status === 'working' && onStop ? (
-        <StopButton onStop={onStop} isStopping={isStopping} />
-      ) : (
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={!canSend}
-          aria-label="Send message"
-          className={cn(
-            // Base styling
-            'flex-shrink-0',
-            'flex items-center justify-center',
-            'w-11 h-11',
-            'rounded-xl',
-            'transition-colors duration-150',
-            // Enabled state
-            canSend && 'bg-accent text-white hover:bg-accent/90 active:bg-accent/80',
-            // Disabled state
-            !canSend && 'bg-text-primary/10 text-text-muted cursor-not-allowed'
-          )}
-        >
-          {isSending ? (
-            // Loading spinner
-            <svg
-              className="w-5 h-5 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-          ) : (
-            // Send arrow icon
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
-            </svg>
-          )}
-        </button>
-      )}
     </div>
   );
 }

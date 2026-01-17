@@ -7,7 +7,7 @@
  * - Processing: Spinner, transcription in progress
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { cn } from '@/lib/cn';
 
 // ============================================================
@@ -25,6 +25,8 @@ interface VoiceButtonProps {
   onStart: () => void;
   /** Callback to stop recording */
   onStop: () => void;
+  /** Button size in pixels - 44px or 56px (default: 56) */
+  size?: 44 | 56;
   /** Additional CSS classes */
   className?: string;
 }
@@ -56,7 +58,7 @@ function triggerHapticFeedback(): void {
 function MicrophoneIcon() {
   return (
     <svg
-      className="w-5 h-5"
+      className="w-full h-full"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -74,7 +76,7 @@ function MicrophoneIcon() {
 
 function StopIcon() {
   return (
-    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <rect x="6" y="6" width="12" height="12" rx="2" />
     </svg>
   );
@@ -82,7 +84,7 @@ function StopIcon() {
 
 function SpinnerIcon() {
   return (
-    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="w-full h-full animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path
         className="opacity-75"
@@ -111,6 +113,7 @@ function SpinnerIcon() {
  *   onStart={startRecording}
  *   onStop={stopRecording}
  *   disabled={isSending}
+ *   size={56}
  * />
  * ```
  */
@@ -120,15 +123,25 @@ export function VoiceButton({
   disabled = false,
   onStart,
   onStop,
+  size = 56,
   className,
 }: VoiceButtonProps) {
   const isDisabled = disabled || isProcessing;
+  const lastClickTimeRef = useRef<number>(0);
 
   /**
    * Handle button click - toggle recording state
+   * Includes debouncing to prevent rapid clicks (300ms)
    */
   const handleClick = useCallback(() => {
     if (isDisabled) return;
+
+    // Debounce: prevent rapid clicks (300ms minimum between clicks)
+    const now = Date.now();
+    if (now - lastClickTimeRef.current < 300) {
+      return;
+    }
+    lastClickTimeRef.current = now;
 
     // Trigger haptic feedback
     triggerHapticFeedback();
@@ -147,6 +160,11 @@ export function VoiceButton({
       ? 'Processing audio'
       : 'Start voice input';
 
+  // Size-dependent classes
+  const sizeClass = size === 56 ? 'w-14 h-14' : 'w-11 h-11';
+  const iconSize = size === 56 ? 'w-6 h-6' : 'w-5 h-5';
+  const borderRadius = size === 56 ? 'rounded-[14px]' : 'rounded-xl';
+
   return (
     <button
       type="button"
@@ -154,11 +172,11 @@ export function VoiceButton({
       disabled={isDisabled}
       aria-label={ariaLabel}
       className={cn(
-        // Base styling - matches send button size
+        // Base styling
         'flex-shrink-0',
         'flex items-center justify-center',
-        'w-11 h-11',
-        'rounded-xl',
+        sizeClass,
+        borderRadius,
         'transition-colors duration-150',
 
         // Recording state - red with pulse animation
@@ -182,7 +200,9 @@ export function VoiceButton({
         className
       )}
     >
-      {isProcessing ? <SpinnerIcon /> : isRecording ? <StopIcon /> : <MicrophoneIcon />}
+      <div className={iconSize}>
+        {isProcessing ? <SpinnerIcon /> : isRecording ? <StopIcon /> : <MicrophoneIcon />}
+      </div>
     </button>
   );
 }

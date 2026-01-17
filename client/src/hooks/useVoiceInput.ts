@@ -91,6 +91,8 @@ export interface UseVoiceInputReturn {
   state: VoiceState;
   /** Current error (if any) */
   error: Error | null;
+  /** MediaStream for waveform visualization (null when not recording) */
+  audioStream: MediaStream | null;
   /** Whether currently recording */
   isRecording: boolean;
   /** Whether currently processing/transcribing */
@@ -215,6 +217,7 @@ export function useVoiceInput({
   // State
   const [state, setState] = useState<VoiceState>('idle');
   const [error, setError] = useState<Error | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [duration, setDuration] = useState(0);
 
   // Refs for recording
@@ -252,6 +255,9 @@ export function useVoiceInput({
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+
+    // Clear audio stream state for waveform
+    setAudioStream(null);
 
     // Clear media recorder reference
     mediaRecorderRef.current = null;
@@ -320,8 +326,7 @@ export function useVoiceInput({
    */
   const processAudio = useCallback(
     async (audioBlob: Blob) => {
-      setState('processing');
-
+      // State is already set to 'processing' in stopRecording for lower latency
       // Capture Web Speech result before it gets cleared
       const webSpeechBackup = webSpeechResultRef.current;
 
@@ -552,7 +557,7 @@ export function useVoiceInput({
         // Create audio blob from chunks
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
 
-        // Process the audio
+        // Process the audio (state already set to 'processing' in stopRecording)
         await processAudio(audioBlob);
       };
 
@@ -565,10 +570,15 @@ export function useVoiceInput({
         onError?.(recordError);
       };
 
-      // Store reference and start recording
+      // Store reference and start recording immediately (reduces latency)
       mediaRecorderRef.current = mediaRecorder;
       recordingStartTimeRef.current = Date.now();
       mediaRecorder.start(1000); // Collect data every second
+
+      // Update state synchronously before async operations (reduces perceived latency)
+      setState('recording');
+      setError(null);
+      setAudioStream(stream); // Expose stream for waveform visualization
 
       // Start duration counter
       setDuration(0);
@@ -588,10 +598,6 @@ export function useVoiceInput({
       if (isWebSpeechSupported()) {
         startWebSpeechFallback();
       }
-
-      // Update state
-      setState('recording');
-      setError(null);
     } catch (err) {
       cleanupRecording();
 
@@ -620,8 +626,11 @@ export function useVoiceInput({
    */
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current?.state === 'recording') {
+      // Update state synchronously before async stop (reduces perceived latency)
+      setState('processing');
+
+      // Stop recording - will trigger onstop handler
       mediaRecorderRef.current.stop();
-      // State will be updated in onstop handler
     }
   }, []);
 
@@ -639,6 +648,7 @@ export function useVoiceInput({
   return {
     state,
     error,
+    audioStream,
     isRecording: state === 'recording',
     isProcessing: state === 'processing',
     startRecording,

@@ -316,6 +316,10 @@ export default function App() {
             onNewSessionStarted={async () => {
               // Poll for new session with direct API calls (bypasses SWR cache)
               // Claude takes a few seconds to write the JSONL
+
+              // First, capture the existing session IDs before the new session is created
+              const existingSessionIds = new Set(sessions?.map((s) => s.id) ?? []);
+
               for (let attempt = 0; attempt < 8; attempt++) {
                 await new Promise((r) => setTimeout(r, 1500));
 
@@ -326,25 +330,38 @@ export default function App() {
                   );
 
                   if (freshSessions && freshSessions.length > 0) {
-                    // Sort by lastActivityAt descending
-                    const sorted = [...freshSessions].sort((a, b) => {
-                      const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
-                      const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
-                      return bTime - aTime;
-                    });
+                    // Find any session that wasn't in our original list (the new session)
+                    const newSession = freshSessions.find((s) => !existingSessionIds.has(s.id));
 
-                    // If the newest session was created within last 60 seconds, select it
-                    const newest = sorted[0];
-                    if (newest?.lastActivityAt) {
-                      const newestTime = new Date(newest.lastActivityAt).getTime();
-                      if (Date.now() - newestTime < 60000) {
-                        // Exit "new session" mode and select the new session
-                        setIsNewSessionMode(false);
-                        setSelectedSession(newest.id);
-                        setStoredSession(selectedProject, newest.id);
-                        // Also refresh SWR cache
-                        _refreshSessions();
-                        return;
+                    if (newSession) {
+                      // Found the new session - select it
+                      setIsNewSessionMode(false);
+                      setSelectedSession(newSession.id);
+                      setStoredSession(selectedProject, newSession.id);
+                      // Also refresh SWR cache
+                      _refreshSessions();
+                      return;
+                    }
+
+                    // Fallback: If no new session ID found but count increased,
+                    // select the most recent session created within last 60 seconds
+                    if (freshSessions.length > existingSessionIds.size) {
+                      const sorted = [...freshSessions].sort((a, b) => {
+                        const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+                        const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+                        return bTime - aTime;
+                      });
+
+                      const newest = sorted[0];
+                      if (newest?.lastActivityAt) {
+                        const newestTime = new Date(newest.lastActivityAt).getTime();
+                        if (Date.now() - newestTime < 60000) {
+                          setIsNewSessionMode(false);
+                          setSelectedSession(newest.id);
+                          setStoredSession(selectedProject, newest.id);
+                          _refreshSessions();
+                          return;
+                        }
                       }
                     }
                   }

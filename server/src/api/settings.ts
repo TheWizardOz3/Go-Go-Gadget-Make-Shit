@@ -24,6 +24,7 @@ const updateSettingsSchema = z.object({
   notificationPhoneNumber: z.string().optional(),
   serverHostname: z.string().optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
+  allowEdits: z.boolean().optional(),
   // defaultTemplates intentionally omitted - managed separately
 });
 

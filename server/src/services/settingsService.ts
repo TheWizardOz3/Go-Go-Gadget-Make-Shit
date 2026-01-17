@@ -40,6 +40,8 @@ export interface AppSettings {
   defaultTemplates: Template[];
   /** Theme preference */
   theme: ThemePreference;
+  /** Allow Claude to make edits without asking for permission (skips permission prompts) */
+  allowEdits?: boolean;
 }
 
 // ============================================================
@@ -70,6 +72,7 @@ const AppSettingsSchema = z.object({
   serverHostname: z.string().optional(),
   defaultTemplates: z.array(TemplateSchema),
   theme: z.enum(['light', 'dark', 'system']),
+  allowEdits: z.boolean().optional(),
 });
 
 /** Partial settings schema for updates */
@@ -143,6 +146,7 @@ function mergeWithDefaults(settings: Partial<AppSettings>): AppSettings {
     serverHostname: settings.serverHostname,
     defaultTemplates: settings.defaultTemplates ?? DEFAULT_SETTINGS.defaultTemplates,
     theme: settings.theme ?? DEFAULT_SETTINGS.theme,
+    allowEdits: settings.allowEdits,
   };
 }
 

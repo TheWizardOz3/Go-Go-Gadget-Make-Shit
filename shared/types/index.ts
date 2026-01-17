@@ -248,6 +248,8 @@ export interface AppSettings {
   defaultTemplates: Template[];
   /** Theme preference */
   theme: ThemePreference;
+  /** Allow Claude to make edits without asking for permission (skips permission prompts) */
+  allowEdits?: boolean;
 }
 
 // =============================================================================

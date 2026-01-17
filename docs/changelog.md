@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.15.0 | 2026-01-17 | minor | Voice Input UX Improvements |
 | 0.14.1 | 2026-01-15 | patch | UX polish: HTTPS, notifications, new session flow |
 | 0.14.0 | 2026-01-15 | **MVP** | iMessage Notifications complete - MVP DONE! |
 | 0.13.1 | 2026-01-15 | patch | UI Polish & Mobile Improvements |
@@ -42,7 +43,67 @@
 
 ## [Unreleased]
 
-*Nothing unreleased*
+*No unreleased changes.*
+
+---
+
+## [0.15.0] - 2026-01-17
+
+### Added
+- **Voice Input UX Improvements** — Enhanced voice recording experience with larger buttons and real-time audio visualization
+  - Bigger voice button (56×56px, up from 44×44px) for easier one-handed use
+  - Real-time waveform visualization during recording using Web Audio API
+  - Lower latency start/stop (state updates synchronously)
+  - Better mobile alignment with 12px gap between controls
+  - Slide-up animation when waveform appears
+  - Reduced motion support (static bars when user prefers reduced motion)
+
+- **Waveform Component** — `client/src/components/conversation/Waveform.tsx`
+  - 45 animated vertical bars reflecting audio frequency data
+  - Uses Web Audio API `AnalyserNode` for real-time FFT analysis
+  - ~60fps animation via `requestAnimationFrame`
+  - Configurable bar count and container height
+  - Accessible with ARIA attributes (`role="status"`, `aria-live="polite"`)
+
+- **useAudioAnalyser Hook** — `client/src/hooks/useAudioAnalyser.ts`
+  - Creates `AudioContext` and `AnalyserNode` from MediaStream
+  - Returns frequency data as `Uint8Array` (0-255 values)
+  - Proper cleanup on unmount (cancels animation frame, closes context)
+  - Configurable FFT size and smoothing constant
+
+### Changed
+- **VoiceButton** — Added `size` prop (44 or 56), defaults to 56px
+- **PromptInput** — Integrated waveform visualization, increased gap to 12px
+- **useVoiceInput** — Exposes `audioStream` for waveform component
+
+### Fixed
+- **Allow Edits Setting** — Toggle to skip Claude Code permission prompts when running from mobile
+  - New setting in Settings modal: "Allow Edits Automatically"
+  - When enabled, Claude Code runs with `--dangerously-skip-permissions` flag
+- **New Session Navigation Bug** — Creating a new session now correctly navigates to the new session
+
+### Technical Details
+- **Files Created:**
+  - `client/src/components/conversation/Waveform.tsx` — Waveform visualization
+  - `client/src/components/conversation/Waveform.test.tsx` — 12 unit tests
+  - `client/src/hooks/useAudioAnalyser.ts` — Web Audio API hook
+  - `client/src/hooks/useAudioAnalyser.test.ts` — 10 unit tests
+
+- **Files Modified:**
+  - `client/src/components/conversation/VoiceButton.tsx` — Size prop, larger default
+  - `client/src/components/conversation/PromptInput.tsx` — Waveform integration
+  - `client/src/hooks/useVoiceInput.ts` — Expose audioStream state
+  - `client/src/index.css` — slide-up-fade animation keyframes
+  - `client/src/test/setup.ts` — matchMedia mock for tests
+  - `shared/types/index.ts` — Added `allowEdits?: boolean` to AppSettings
+  - `server/src/services/settingsService.ts` — Added allowEdits to schema
+  - `server/src/services/claudeService.ts` — Check allowEdits, add CLI flag
+  - `client/src/App.tsx` — Fixed new session detection
+  - `client/src/components/settings/SettingsModal.tsx` — Allow edits toggle
+
+### Tests
+- 22 new tests for Voice Input UX Improvements
+- **Total test count: 515 tests** (342 client + 173 server)
 
 ---
 
