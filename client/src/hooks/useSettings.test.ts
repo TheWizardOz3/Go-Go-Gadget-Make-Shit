@@ -231,13 +231,17 @@ describe('sendTestNotification', () => {
     vi.clearAllMocks();
   });
 
-  it('should call API with phone number', async () => {
+  it('should call API with channel ID and settings', async () => {
     mockApi.post.mockResolvedValueOnce({ sent: true, message: 'Test notification sent' });
 
-    const result = await sendTestNotification('+1234567890');
-
-    expect(mockApi.post).toHaveBeenCalledWith('/notifications/test', {
+    const result = await sendTestNotification('imessage', {
+      enabled: true,
       phoneNumber: '+1234567890',
+    });
+
+    expect(mockApi.post).toHaveBeenCalledWith('/notifications/imessage/test', {
+      channelId: 'imessage',
+      settings: { enabled: true, phoneNumber: '+1234567890' },
     });
     expect(result.sent).toBe(true);
   });
@@ -245,7 +249,10 @@ describe('sendTestNotification', () => {
   it('should return result from API', async () => {
     mockApi.post.mockResolvedValueOnce({ sent: false, message: 'Failed to send' });
 
-    const result = await sendTestNotification('+1234567890');
+    const result = await sendTestNotification('imessage', {
+      enabled: true,
+      phoneNumber: '+1234567890',
+    });
 
     expect(result.sent).toBe(false);
     expect(result.message).toBe('Failed to send');

@@ -3,6 +3,8 @@
  *
  * Manages application settings stored in ~/.gogogadgetclaude/settings.json
  * Handles reading, writing, and validation of settings.
+ * Includes migration logic for upgrading from legacy notification settings
+ * to the new channel-based structure.
  */
 
 import { readFile, writeFile, mkdir } from 'fs/promises';
@@ -28,19 +30,80 @@ export interface Template {
 /** App theme preference */
 export type ThemePreference = 'light' | 'dark' | 'system';
 
+// -----------------------------------------------------------------------------
+// Notification Channel Settings Types
+// -----------------------------------------------------------------------------
+
+/** Settings for iMessage channel */
+export interface IMessageChannelSettings {
+  enabled: boolean;
+  phoneNumber?: string;
+}
+
+/** Settings for ntfy channel */
+export interface NtfyChannelSettings {
+  enabled: boolean;
+  serverUrl?: string;
+  topic?: string;
+  authToken?: string;
+}
+
+/** Settings for Slack channel */
+export interface SlackChannelSettings {
+  enabled: boolean;
+  webhookUrl?: string;
+}
+
+/** Settings for Telegram channel */
+export interface TelegramChannelSettings {
+  enabled: boolean;
+  botToken?: string;
+  chatId?: string;
+}
+
+/** Settings for Email channel */
+export interface EmailChannelSettings {
+  enabled: boolean;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUser?: string;
+  smtpPass?: string;
+  recipient?: string;
+}
+
+/** All notification channel settings */
+export interface NotificationChannelSettings {
+  imessage?: IMessageChannelSettings;
+  ntfy?: NtfyChannelSettings;
+  slack?: SlackChannelSettings;
+  telegram?: TelegramChannelSettings;
+  email?: EmailChannelSettings;
+}
+
+// -----------------------------------------------------------------------------
+// App Settings Type
+// -----------------------------------------------------------------------------
+
 /** App settings stored in ~/.gogogadgetclaude/settings.json */
 export interface AppSettings {
-  /** Whether notifications are enabled */
-  notificationsEnabled: boolean;
-  /** Phone number for iMessage notifications */
+  // === LEGACY (deprecated, migrated to channels) ===
+  /** @deprecated Use channels.imessage.enabled instead */
+  notificationsEnabled?: boolean;
+  /** @deprecated Use channels.imessage.phoneNumber instead */
   notificationPhoneNumber?: string;
-  /** Server hostname for notification links (e.g., "dereks-macbook-pro" or "my-mac.tailnet.ts.net") */
+
+  // === NEW: Channel-based notifications ===
+  /** Notification channel configurations */
+  channels?: NotificationChannelSettings;
+
+  // === UNCHANGED ===
+  /** Server hostname for notification links */
   serverHostname?: string;
   /** User's custom templates */
   defaultTemplates: Template[];
   /** Theme preference */
   theme: ThemePreference;
-  /** Allow Claude to make edits without asking for permission (skips permission prompts) */
+  /** Allow Claude to make edits without asking for permission */
   allowEdits?: boolean;
   /** Last active project path (used for global scheduled prompts) */
   lastActiveProjectPath?: string;
@@ -67,10 +130,60 @@ const TemplateSchema = z.object({
   prompt: z.string(),
 });
 
-/** App settings schema */
+/** iMessage channel settings schema */
+const IMessageChannelSettingsSchema = z.object({
+  enabled: z.boolean(),
+  phoneNumber: z.string().optional(),
+});
+
+/** ntfy channel settings schema */
+const NtfyChannelSettingsSchema = z.object({
+  enabled: z.boolean(),
+  serverUrl: z.string().optional(),
+  topic: z.string().optional(),
+  authToken: z.string().optional(),
+});
+
+/** Slack channel settings schema */
+const SlackChannelSettingsSchema = z.object({
+  enabled: z.boolean(),
+  webhookUrl: z.string().optional(),
+});
+
+/** Telegram channel settings schema */
+const TelegramChannelSettingsSchema = z.object({
+  enabled: z.boolean(),
+  botToken: z.string().optional(),
+  chatId: z.string().optional(),
+});
+
+/** Email channel settings schema */
+const EmailChannelSettingsSchema = z.object({
+  enabled: z.boolean(),
+  smtpHost: z.string().optional(),
+  smtpPort: z.number().optional(),
+  smtpUser: z.string().optional(),
+  smtpPass: z.string().optional(),
+  recipient: z.string().optional(),
+});
+
+/** Notification channel settings schema */
+const NotificationChannelSettingsSchema = z.object({
+  imessage: IMessageChannelSettingsSchema.optional(),
+  ntfy: NtfyChannelSettingsSchema.optional(),
+  slack: SlackChannelSettingsSchema.optional(),
+  telegram: TelegramChannelSettingsSchema.optional(),
+  email: EmailChannelSettingsSchema.optional(),
+});
+
+/** App settings schema (supports both legacy and new format) */
 const AppSettingsSchema = z.object({
-  notificationsEnabled: z.boolean(),
+  // Legacy fields (optional for backward compatibility)
+  notificationsEnabled: z.boolean().optional(),
   notificationPhoneNumber: z.string().optional(),
+  // New channel-based settings
+  channels: NotificationChannelSettingsSchema.optional(),
+  // Unchanged fields
   serverHostname: z.string().optional(),
   defaultTemplates: z.array(TemplateSchema),
   theme: z.enum(['light', 'dark', 'system']),
@@ -88,13 +201,80 @@ const PartialSettingsSchema = AppSettingsSchema.partial();
 /** Default templates (empty - user can define their own) */
 const DEFAULT_TEMPLATES: Template[] = [];
 
-/** Default settings */
+/** Default settings (new format with channels) */
 const DEFAULT_SETTINGS: AppSettings = {
-  notificationsEnabled: false,
-  notificationPhoneNumber: undefined,
+  channels: {
+    imessage: {
+      enabled: false,
+      phoneNumber: undefined,
+    },
+  },
   defaultTemplates: DEFAULT_TEMPLATES,
   theme: 'system' as ThemePreference,
 };
+
+// ============================================================
+// Migration Logic
+// ============================================================
+
+/**
+ * Check if settings need migration from legacy format.
+ * Returns true if settings have legacy notification fields but no channels.
+ */
+function needsMigration(settings: Partial<AppSettings>): boolean {
+  // Has channels already? No migration needed
+  if (settings.channels) {
+    return false;
+  }
+
+  // Has legacy notification fields? Migration needed
+  return (
+    settings.notificationsEnabled !== undefined || settings.notificationPhoneNumber !== undefined
+  );
+}
+
+/**
+ * Migrate settings from legacy format to new channel-based format.
+ *
+ * Converts:
+ *   { notificationsEnabled: true, notificationPhoneNumber: "+1234567890" }
+ * To:
+ *   { channels: { imessage: { enabled: true, phoneNumber: "+1234567890" } } }
+ *
+ * The legacy fields are removed after migration.
+ */
+function migrateSettings(settings: Partial<AppSettings>): AppSettings {
+  // If already has channels, just merge with defaults
+  if (settings.channels) {
+    return mergeWithDefaults(settings);
+  }
+
+  logger.info('Migrating settings from legacy format to channel-based format');
+
+  // Create the migrated settings
+  const migrated: AppSettings = {
+    // Copy all non-notification fields
+    serverHostname: settings.serverHostname,
+    defaultTemplates: settings.defaultTemplates ?? DEFAULT_TEMPLATES,
+    theme: settings.theme ?? DEFAULT_SETTINGS.theme,
+    allowEdits: settings.allowEdits,
+    lastActiveProjectPath: settings.lastActiveProjectPath,
+    // Create channels from legacy fields
+    channels: {
+      imessage: {
+        enabled: settings.notificationsEnabled ?? false,
+        phoneNumber: settings.notificationPhoneNumber,
+      },
+    },
+  };
+
+  logger.debug('Settings migrated', {
+    wasEnabled: settings.notificationsEnabled,
+    hadPhoneNumber: !!settings.notificationPhoneNumber,
+  });
+
+  return migrated;
+}
 
 // ============================================================
 // Internal Functions
@@ -140,12 +320,26 @@ async function writeSettingsFile(settings: AppSettings): Promise<void> {
 }
 
 /**
- * Merge settings with defaults, ensuring all required fields exist
+ * Merge settings with defaults, ensuring all required fields exist.
+ * Assumes settings are already in the new channel-based format.
  */
 function mergeWithDefaults(settings: Partial<AppSettings>): AppSettings {
   return {
-    notificationsEnabled: settings.notificationsEnabled ?? DEFAULT_SETTINGS.notificationsEnabled,
-    notificationPhoneNumber: settings.notificationPhoneNumber,
+    // Merge channels with defaults
+    channels: {
+      imessage: {
+        enabled:
+          settings.channels?.imessage?.enabled ??
+          DEFAULT_SETTINGS.channels?.imessage?.enabled ??
+          false,
+        phoneNumber: settings.channels?.imessage?.phoneNumber,
+      },
+      // Preserve any other channel settings (ntfy, slack, etc.)
+      ...(settings.channels?.ntfy && { ntfy: settings.channels.ntfy }),
+      ...(settings.channels?.slack && { slack: settings.channels.slack }),
+      ...(settings.channels?.telegram && { telegram: settings.channels.telegram }),
+      ...(settings.channels?.email && { email: settings.channels.email }),
+    },
     serverHostname: settings.serverHostname,
     defaultTemplates: settings.defaultTemplates ?? DEFAULT_SETTINGS.defaultTemplates,
     theme: settings.theme ?? DEFAULT_SETTINGS.theme,
@@ -162,6 +356,7 @@ function mergeWithDefaults(settings: Partial<AppSettings>): AppSettings {
  * Get current settings
  *
  * Reads settings from file, creating default settings if file doesn't exist.
+ * Automatically migrates legacy notification settings to the new channel-based format.
  * Invalid or corrupted settings are replaced with defaults.
  *
  * @returns Current app settings
@@ -179,7 +374,7 @@ export async function getSettings(): Promise<AppSettings> {
       return DEFAULT_SETTINGS;
     }
 
-    // Validate and merge with defaults
+    // Validate the raw settings
     const parseResult = PartialSettingsSchema.safeParse(rawSettings);
 
     if (!parseResult.success) {
@@ -190,8 +385,27 @@ export async function getSettings(): Promise<AppSettings> {
       return DEFAULT_SETTINGS;
     }
 
-    // Merge with defaults to ensure all fields exist
-    return mergeWithDefaults(parseResult.data);
+    const parsedSettings = parseResult.data;
+
+    // Check if migration is needed (legacy format detected)
+    if (needsMigration(parsedSettings)) {
+      const migratedSettings = migrateSettings(parsedSettings);
+
+      // Save the migrated settings to persist the migration
+      try {
+        await writeSettingsFile(migratedSettings);
+        logger.info('Migrated settings saved to disk', { path: SETTINGS_FILE });
+      } catch (writeErr) {
+        logger.warn('Failed to persist migrated settings', {
+          error: writeErr instanceof Error ? writeErr.message : 'Unknown error',
+        });
+      }
+
+      return migratedSettings;
+    }
+
+    // Already in new format, just merge with defaults
+    return mergeWithDefaults(parsedSettings);
   } catch (err) {
     logger.error('Failed to read settings', {
       path: SETTINGS_FILE,
@@ -258,4 +472,32 @@ export async function updateSettings(partial: Partial<AppSettings>): Promise<App
  */
 export function getSettingsPath(): string {
   return SETTINGS_FILE;
+}
+
+// ============================================================
+// Backward Compatibility Helpers
+// ============================================================
+
+/**
+ * Check if iMessage notifications are enabled.
+ *
+ * Helper for backward compatibility - checks the new channel-based settings.
+ *
+ * @param settings - App settings
+ * @returns true if iMessage notifications are enabled
+ */
+export function isIMessageEnabled(settings: AppSettings): boolean {
+  return settings.channels?.imessage?.enabled ?? false;
+}
+
+/**
+ * Get the iMessage phone number.
+ *
+ * Helper for backward compatibility - gets from the new channel-based settings.
+ *
+ * @param settings - App settings
+ * @returns Phone number or undefined
+ */
+export function getIMessagePhoneNumber(settings: AppSettings): string | undefined {
+  return settings.channels?.imessage?.phoneNumber;
 }

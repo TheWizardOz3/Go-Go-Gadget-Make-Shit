@@ -1,13 +1,15 @@
 /**
  * SettingsModal - Full-screen modal for app settings
  *
- * Allows users to configure notifications (enable/disable, phone number).
+ * Allows users to configure notifications with channel-based UI.
+ * Currently supports iMessage; ready for ntfy, Slack, Telegram, Email.
  * Slides up from bottom with dark backdrop overlay.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef } from 'react';
 import { cn } from '@/lib/cn';
 import { useSettings, sendTestNotification } from '@/hooks/useSettings';
+import type { IMessageChannelSettings, NotificationChannelSettings } from '@shared/types';
 
 interface SettingsModalProps {
   /** Whether the modal is open */
@@ -81,6 +83,28 @@ function PencilIcon({ className }: { className?: string }) {
 }
 
 /**
+ * Message bubble icon for iMessage
+ */
+function MessageIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+      />
+    </svg>
+  );
+}
+
+/**
  * Toggle switch component
  */
 interface ToggleProps {
@@ -119,6 +143,39 @@ function Toggle({ enabled, onChange, disabled, label }: ToggleProps) {
 }
 
 /**
+ * Styled input component with proper contrast
+ */
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  error?: string;
+}
+
+const Input = forwardRef<HTMLInputElement, InputProps>(({ error, className, ...props }, ref) => {
+  return (
+    <input
+      ref={ref}
+      {...props}
+      className={cn(
+        'w-full px-3 py-2.5',
+        // Background with better contrast
+        'bg-surface-elevated',
+        'rounded-lg',
+        // Text colors - use CSS variable for proper light/dark mode
+        'text-text-primary',
+        'placeholder:text-text-muted',
+        // Border
+        'border',
+        error ? 'border-error' : 'border-text-primary/10',
+        // Focus state
+        'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
+        'transition-colors duration-150',
+        className
+      )}
+    />
+  );
+});
+Input.displayName = 'Input';
+
+/**
  * Validate phone number format
  * Basic validation - allows common formats
  */
@@ -145,15 +202,33 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Get iMessage settings from new channels structure (with fallback for legacy)
+  const getIMessageSettings = (): IMessageChannelSettings => {
+    if (settings?.channels?.imessage) {
+      return settings.channels.imessage;
+    }
+    // Fallback to legacy format
+    return {
+      enabled: settings?.notificationsEnabled ?? false,
+      phoneNumber: settings?.notificationPhoneNumber,
+    };
+  };
+
+  const imessageSettings = getIMessageSettings();
+
   // Sync values from settings when modal opens or settings change
   useEffect(() => {
-    if (settings?.notificationPhoneNumber) {
-      setPhoneNumber(settings.notificationPhoneNumber);
+    // Get iMessage settings, handling legacy and new formats
+    const imessageSettings = settings?.channels?.imessage;
+    const phoneFromSettings = imessageSettings?.phoneNumber ?? settings?.notificationPhoneNumber;
+
+    if (phoneFromSettings) {
+      setPhoneNumber(phoneFromSettings);
     }
     if (settings?.serverHostname) {
       setServerHostname(settings.serverHostname);
     }
-  }, [settings?.notificationPhoneNumber, settings?.serverHostname]);
+  }, [settings?.channels?.imessage, settings?.notificationPhoneNumber, settings?.serverHostname]);
 
   // Clear test result after 5 seconds
   useEffect(() => {
@@ -205,8 +280,27 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
     }
   };
 
-  // Handle notifications toggle
-  const handleToggleNotifications = async (enabled: boolean) => {
+  // Helper to update channel settings
+  const updateChannelSettings = async (
+    channelId: keyof NotificationChannelSettings,
+    channelSettings: Partial<IMessageChannelSettings>
+  ) => {
+    const currentChannels = settings?.channels ?? {};
+    const currentChannelSettings = currentChannels[channelId] ?? { enabled: false };
+
+    const updatedChannels: NotificationChannelSettings = {
+      ...currentChannels,
+      [channelId]: {
+        ...currentChannelSettings,
+        ...channelSettings,
+      },
+    };
+
+    await updateSettings({ channels: updatedChannels });
+  };
+
+  // Handle iMessage toggle
+  const handleToggleIMessage = async (enabled: boolean) => {
     // If enabling, check if phone number is valid
     if (enabled && !isValidPhoneNumber(phoneNumber)) {
       setPhoneError('Please enter a valid phone number first');
@@ -215,7 +309,7 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
     }
 
     try {
-      await updateSettings({ notificationsEnabled: enabled });
+      await updateChannelSettings('imessage', { enabled });
     } catch {
       // Error handled by hook
     }
@@ -232,7 +326,7 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
   const handlePhoneBlur = async () => {
     if (!phoneNumber.trim()) {
       // Clear phone number
-      await updateSettings({ notificationPhoneNumber: undefined });
+      await updateChannelSettings('imessage', { phoneNumber: undefined });
       return;
     }
 
@@ -242,7 +336,7 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
     }
 
     try {
-      await updateSettings({ notificationPhoneNumber: phoneNumber });
+      await updateChannelSettings('imessage', { phoneNumber });
     } catch {
       setPhoneError('Failed to save phone number');
     }
@@ -275,18 +369,14 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
 
     try {
       // Save phone number and hostname first if changed
-      const updates: Record<string, string | undefined> = {};
-      if (phoneNumber !== settings?.notificationPhoneNumber) {
-        updates.notificationPhoneNumber = phoneNumber;
+      if (phoneNumber !== imessageSettings.phoneNumber) {
+        await updateChannelSettings('imessage', { phoneNumber });
       }
       if (serverHostname !== settings?.serverHostname) {
-        updates.serverHostname = serverHostname.trim() || undefined;
-      }
-      if (Object.keys(updates).length > 0) {
-        await updateSettings(updates);
+        await updateSettings({ serverHostname: serverHostname.trim() || undefined });
       }
 
-      const result = await sendTestNotification(phoneNumber, serverHostname.trim() || undefined);
+      const result = await sendTestNotification('imessage', { enabled: true, phoneNumber });
       setTestResult({ success: result.sent, message: result.message });
     } catch (err) {
       setTestResult({
@@ -300,7 +390,7 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
 
   if (!isOpen) return null;
 
-  const isNotificationsEnabled = settings?.notificationsEnabled ?? false;
+  const isIMessageEnabled = imessageSettings.enabled;
   const hasValidPhone = isValidPhoneNumber(phoneNumber);
 
   return (
@@ -399,103 +489,69 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                 </div>
               </section>
 
-              {/* Notifications Section */}
+              {/* Notification Channels Section */}
               <section className="pt-4 border-t border-text-primary/10">
                 <div className="flex items-center gap-2 mb-4">
                   <BellIcon className="text-text-muted" />
-                  <h3 className="text-base font-medium text-text-primary">Notifications</h3>
+                  <h3 className="text-base font-medium text-text-primary">Notification Channels</h3>
                 </div>
 
+                <p className="text-xs text-text-muted mb-4">
+                  Get notified when Claude finishes a task. Enable one or more channels below.
+                </p>
+
                 <div className="space-y-4">
-                  {/* Enable toggle */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0 pr-4">
-                      <p className="text-sm font-medium text-text-primary">Enable Notifications</p>
-                      <p className="text-xs text-text-muted mt-0.5">
-                        Get an iMessage when Claude finishes a task
+                  {/* iMessage Channel */}
+                  <div className="rounded-lg border border-text-primary/10 p-4 space-y-4">
+                    {/* Channel header with toggle */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-accent/10">
+                          <MessageIcon className="text-accent" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-text-primary">iMessage</p>
+                          <p className="text-xs text-text-muted">macOS Messages.app</p>
+                        </div>
+                      </div>
+                      <Toggle
+                        enabled={isIMessageEnabled}
+                        onChange={handleToggleIMessage}
+                        disabled={isUpdating}
+                        label="Enable iMessage notifications"
+                      />
+                    </div>
+
+                    {/* Phone number input */}
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="phone-number"
+                        className="block text-sm font-medium text-text-primary"
+                      >
+                        Phone Number
+                      </label>
+                      <Input
+                        ref={phoneInputRef}
+                        id="phone-number"
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={handlePhoneChange}
+                        onBlur={handlePhoneBlur}
+                        placeholder="+1234567890"
+                        error={phoneError ?? undefined}
+                        aria-describedby={phoneError ? 'phone-error' : undefined}
+                      />
+                      {phoneError && (
+                        <p id="phone-error" className="text-xs text-error">
+                          {phoneError}
+                        </p>
+                      )}
+                      <p className="text-xs text-text-muted">
+                        The phone number to receive iMessage notifications
                       </p>
                     </div>
-                    <Toggle
-                      enabled={isNotificationsEnabled}
-                      onChange={handleToggleNotifications}
-                      disabled={isUpdating}
-                      label="Enable notifications"
-                    />
-                  </div>
 
-                  {/* Phone number input - always visible for easier setup */}
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="phone-number"
-                      className="block text-sm font-medium text-text-primary"
-                    >
-                      Phone Number
-                    </label>
-                    <input
-                      ref={phoneInputRef}
-                      id="phone-number"
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={handlePhoneChange}
-                      onBlur={handlePhoneBlur}
-                      placeholder="+1234567890"
-                      className={cn(
-                        'w-full px-3 py-2.5',
-                        'bg-text-primary/5 rounded-lg',
-                        'placeholder:text-text-muted/70',
-                        'border',
-                        phoneError ? 'border-error' : 'border-transparent',
-                        'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
-                        'transition-colors duration-150'
-                      )}
-                      // Force high contrast text for native input
-                      style={{ color: '#ffffff' }}
-                      aria-describedby={phoneError ? 'phone-error' : undefined}
-                    />
-                    {phoneError && (
-                      <p id="phone-error" className="text-xs text-error">
-                        {phoneError}
-                      </p>
-                    )}
-                    <p className="text-xs text-text-muted">
-                      The phone number to receive iMessage notifications
-                    </p>
-                  </div>
-
-                  {/* Server hostname input */}
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="server-hostname"
-                      className="block text-sm font-medium text-text-primary"
-                    >
-                      Server Hostname
-                    </label>
-                    <input
-                      id="server-hostname"
-                      type="text"
-                      value={serverHostname}
-                      onChange={handleHostnameChange}
-                      onBlur={handleHostnameBlur}
-                      placeholder="dereks-macbook-pro"
-                      className={cn(
-                        'w-full px-3 py-2.5',
-                        'bg-text-primary/5 rounded-lg',
-                        'placeholder:text-text-muted/70',
-                        'border border-transparent',
-                        'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
-                        'transition-colors duration-150'
-                      )}
-                      // Force high contrast text for native input
-                      style={{ color: '#ffffff' }}
-                    />
-                    <p className="text-xs text-text-muted">
-                      Your Tailscale hostname for notification links (run `tailscale status` to find
-                      it)
-                    </p>
-                  </div>
-
-                  {/* Test notification button */}
-                  <div className="pt-2">
+                    {/* Test button */}
                     <button
                       type="button"
                       onClick={handleTestNotification}
@@ -516,7 +572,7 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                           Sending...
                         </span>
                       ) : (
-                        'Send Test Notification'
+                        'Test iMessage'
                       )}
                     </button>
 
@@ -524,7 +580,7 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                     {testResult && (
                       <p
                         className={cn(
-                          'text-xs mt-2 text-center',
+                          'text-xs text-center',
                           testResult.success ? 'text-success' : 'text-error'
                         )}
                       >
@@ -532,13 +588,64 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                       </p>
                     )}
                   </div>
+
+                  {/* Placeholder for future channels */}
+                  <div className="rounded-lg border border-text-primary/5 border-dashed p-4">
+                    <p className="text-xs text-text-muted text-center">
+                      More channels coming soon: ntfy, Slack, Telegram
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Server Settings Section */}
+              <section className="pt-4 border-t border-text-primary/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg
+                    className="h-5 w-5 text-text-muted"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"
+                    />
+                  </svg>
+                  <h3 className="text-base font-medium text-text-primary">Server</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="server-hostname"
+                    className="block text-sm font-medium text-text-primary"
+                  >
+                    Tailscale Hostname
+                  </label>
+                  <Input
+                    id="server-hostname"
+                    type="text"
+                    value={serverHostname}
+                    onChange={handleHostnameChange}
+                    onBlur={handleHostnameBlur}
+                    placeholder="my-macbook.tailnet.ts.net"
+                  />
+                  <p className="text-xs text-text-muted">
+                    Your Tailscale hostname for notification links. Run{' '}
+                    <code className="px-1 py-0.5 rounded bg-text-primary/5 text-text-secondary font-mono text-xs">
+                      tailscale status
+                    </code>{' '}
+                    to find it.
+                  </p>
                 </div>
               </section>
 
               {/* Info Section */}
               <section className="pt-4 border-t border-text-primary/10">
                 <p className="text-xs text-text-muted text-center">
-                  Notifications require Messages.app to be set up on your Mac.
+                  iMessage requires Messages.app to be set up on your Mac.
                 </p>
               </section>
             </div>

@@ -354,12 +354,90 @@ export interface ScheduledPromptsFile {
 /** App theme preference */
 export type ThemePreference = 'light' | 'dark' | 'system';
 
+// -----------------------------------------------------------------------------
+// Notification Channel Settings
+// -----------------------------------------------------------------------------
+
+/** Settings for iMessage channel */
+export interface IMessageChannelSettings {
+  enabled: boolean;
+  phoneNumber?: string;
+}
+
+/** Settings for ntfy channel (V1 Order 3) */
+export interface NtfyChannelSettings {
+  enabled: boolean;
+  /** Server URL, e.g., "https://ntfy.sh" or self-hosted */
+  serverUrl?: string;
+  /** The topic name to publish to */
+  topic?: string;
+  /** Optional auth token for private servers */
+  authToken?: string;
+}
+
+/** Settings for Slack channel (V1.2) */
+export interface SlackChannelSettings {
+  enabled: boolean;
+  /** Slack webhook URL */
+  webhookUrl?: string;
+}
+
+/** Settings for Telegram channel (V1.2) */
+export interface TelegramChannelSettings {
+  enabled: boolean;
+  /** Telegram bot token */
+  botToken?: string;
+  /** Chat ID to send messages to */
+  chatId?: string;
+}
+
+/** Settings for Email channel (V2) */
+export interface EmailChannelSettings {
+  enabled: boolean;
+  /** SMTP host */
+  smtpHost?: string;
+  /** SMTP port */
+  smtpPort?: number;
+  /** SMTP username */
+  smtpUser?: string;
+  /** SMTP password */
+  smtpPass?: string;
+  /** Email recipient */
+  recipient?: string;
+}
+
+/** All notification channel settings */
+export interface NotificationChannelSettings {
+  imessage?: IMessageChannelSettings;
+  ntfy?: NtfyChannelSettings;
+  slack?: SlackChannelSettings;
+  telegram?: TelegramChannelSettings;
+  email?: EmailChannelSettings;
+}
+
+// -----------------------------------------------------------------------------
+// App Settings
+// -----------------------------------------------------------------------------
+
 /** App settings stored in ~/.gogogadgetclaude/settings.json */
 export interface AppSettings {
-  /** Whether notifications are enabled */
-  notificationsEnabled: boolean;
-  /** Phone number for iMessage notifications */
+  // === LEGACY (deprecated, migrated to channels) ===
+  /**
+   * @deprecated Use channels.imessage.enabled instead
+   * Whether notifications are enabled (legacy field)
+   */
+  notificationsEnabled?: boolean;
+  /**
+   * @deprecated Use channels.imessage.phoneNumber instead
+   * Phone number for iMessage notifications (legacy field)
+   */
   notificationPhoneNumber?: string;
+
+  // === NEW: Channel-based notifications ===
+  /** Notification channel configurations */
+  channels?: NotificationChannelSettings;
+
+  // === UNCHANGED ===
   /** Server hostname for notification links (e.g., "dereks-macbook-pro" or "my-mac.tailnet.ts.net") */
   serverHostname?: string;
   /** User's custom templates */

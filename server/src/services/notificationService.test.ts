@@ -1,6 +1,7 @@
 /**
  * Tests for Notification Service
  *
+ * Tests the NotificationManager and IMessageChannel through the legacy facade.
  * Tests rate limiting logic and notification triggering.
  * AppleScript execution is mocked since it requires macOS.
  */
@@ -12,6 +13,7 @@ import {
   getRateLimitStatus,
   resetRateLimit,
 } from './notificationService.js';
+import { NotificationManager } from './notifications/NotificationManager.js';
 
 // Mock execa
 vi.mock('execa', () => ({
@@ -28,6 +30,7 @@ vi.mock('../lib/config.js', () => ({
   config: {
     port: 3456,
     tailscaleHostname: 'test-host.tailnet.ts.net',
+    httpsEnabled: false,
   },
 }));
 
@@ -51,6 +54,8 @@ describe('notificationService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetRateLimit(); // Reset rate limit before each test
+    // Reset the NotificationManager singleton to get fresh channels
+    NotificationManager.resetInstance();
   });
 
   afterEach(() => {
@@ -58,10 +63,14 @@ describe('notificationService', () => {
   });
 
   describe('sendTaskCompleteNotification', () => {
-    it('should return false when notifications are disabled', async () => {
+    it('should return false when channel is disabled', async () => {
       mockGetSettings.mockResolvedValueOnce({
-        notificationsEnabled: false,
-        notificationPhoneNumber: '+1234567890',
+        channels: {
+          imessage: {
+            enabled: false,
+            phoneNumber: '+1234567890',
+          },
+        },
         defaultTemplates: [],
         theme: 'system',
       });
@@ -74,8 +83,12 @@ describe('notificationService', () => {
 
     it('should return false when no phone number is configured', async () => {
       mockGetSettings.mockResolvedValueOnce({
-        notificationsEnabled: true,
-        notificationPhoneNumber: undefined,
+        channels: {
+          imessage: {
+            enabled: true,
+            phoneNumber: undefined,
+          },
+        },
         defaultTemplates: [],
         theme: 'system',
       });
@@ -88,8 +101,12 @@ describe('notificationService', () => {
 
     it('should send notification when enabled and phone configured', async () => {
       mockGetSettings.mockResolvedValueOnce({
-        notificationsEnabled: true,
-        notificationPhoneNumber: '+1234567890',
+        channels: {
+          imessage: {
+            enabled: true,
+            phoneNumber: '+1234567890',
+          },
+        },
         defaultTemplates: [],
         theme: 'system',
       });
@@ -107,8 +124,12 @@ describe('notificationService', () => {
 
     it('should include app URL in notification message', async () => {
       mockGetSettings.mockResolvedValueOnce({
-        notificationsEnabled: true,
-        notificationPhoneNumber: '+1234567890',
+        channels: {
+          imessage: {
+            enabled: true,
+            phoneNumber: '+1234567890',
+          },
+        },
         defaultTemplates: [],
         theme: 'system',
       });
@@ -125,8 +146,12 @@ describe('notificationService', () => {
 
     it('should return false when rate limited', async () => {
       mockGetSettings.mockResolvedValue({
-        notificationsEnabled: true,
-        notificationPhoneNumber: '+1234567890',
+        channels: {
+          imessage: {
+            enabled: true,
+            phoneNumber: '+1234567890',
+          },
+        },
         defaultTemplates: [],
         theme: 'system',
       });
@@ -146,8 +171,12 @@ describe('notificationService', () => {
 
     it('should return false when AppleScript fails', async () => {
       mockGetSettings.mockResolvedValueOnce({
-        notificationsEnabled: true,
-        notificationPhoneNumber: '+1234567890',
+        channels: {
+          imessage: {
+            enabled: true,
+            phoneNumber: '+1234567890',
+          },
+        },
         defaultTemplates: [],
         theme: 'system',
       });
@@ -157,10 +186,23 @@ describe('notificationService', () => {
 
       expect(result).toBe(false);
     });
+
+    it('should return false when no channels configured', async () => {
+      mockGetSettings.mockResolvedValueOnce({
+        defaultTemplates: [],
+        theme: 'system',
+        // No channels configured
+      });
+
+      const result = await sendTaskCompleteNotification('TestProject');
+
+      expect(result).toBe(false);
+      expect(mockExeca).not.toHaveBeenCalled();
+    });
   });
 
   describe('sendTestNotification', () => {
-    it('should send test notification regardless of settings', async () => {
+    it('should send test notification with phone number', async () => {
       mockExeca.mockResolvedValueOnce({} as never);
 
       const result = await sendTestNotification('+1234567890');
@@ -207,8 +249,12 @@ describe('notificationService', () => {
 
     it('should return limited after notification sent', async () => {
       mockGetSettings.mockResolvedValueOnce({
-        notificationsEnabled: true,
-        notificationPhoneNumber: '+1234567890',
+        channels: {
+          imessage: {
+            enabled: true,
+            phoneNumber: '+1234567890',
+          },
+        },
         defaultTemplates: [],
         theme: 'system',
       });
@@ -227,8 +273,12 @@ describe('notificationService', () => {
   describe('resetRateLimit', () => {
     it('should clear rate limit state', async () => {
       mockGetSettings.mockResolvedValueOnce({
-        notificationsEnabled: true,
-        notificationPhoneNumber: '+1234567890',
+        channels: {
+          imessage: {
+            enabled: true,
+            phoneNumber: '+1234567890',
+          },
+        },
         defaultTemplates: [],
         theme: 'system',
       });

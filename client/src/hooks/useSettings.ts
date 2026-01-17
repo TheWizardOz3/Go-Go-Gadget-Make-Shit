@@ -8,7 +8,7 @@
 import useSWR from 'swr';
 import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
-import type { AppSettings } from '@shared/types';
+import type { AppSettings, IMessageChannelSettings } from '@shared/types';
 
 /**
  * SWR fetcher that uses our typed API client
@@ -46,11 +46,13 @@ export interface UseSettingsReturn {
  * ```tsx
  * const { settings, isLoading, updateSettings } = useSettings();
  *
- * // Toggle notifications
- * await updateSettings({ notificationsEnabled: !settings.notificationsEnabled });
- *
- * // Update phone number
- * await updateSettings({ notificationPhoneNumber: '+1234567890' });
+ * // Toggle iMessage notifications
+ * await updateSettings({
+ *   channels: {
+ *     ...settings.channels,
+ *     imessage: { enabled: true, phoneNumber: '+1234567890' }
+ *   }
+ * });
  * ```
  */
 export function useSettings(): UseSettingsReturn {
@@ -122,16 +124,41 @@ export function useSettings(): UseSettingsReturn {
 }
 
 /**
- * Send a test notification
+ * Test notification settings for a specific channel
+ */
+export type TestNotificationSettings = IMessageChannelSettings;
+
+/**
+ * Send a test notification to a specific channel
  *
- * Separate function (not part of the hook) for sending test notifications.
- *
- * @param phoneNumber - Phone number to send test notification to
- * @param serverHostname - Optional server hostname for notification links
+ * @param channelId - The notification channel to test (e.g., 'imessage')
+ * @param settings - Channel-specific settings for the test
  * @returns Promise that resolves when notification is sent
  * @throws Error if notification fails
+ *
+ * @example
+ * ```tsx
+ * // Send test iMessage
+ * await sendTestNotification('imessage', { phoneNumber: '+1234567890' });
+ * ```
  */
 export async function sendTestNotification(
+  channelId: string,
+  settings: TestNotificationSettings
+): Promise<{ sent: boolean; message: string }> {
+  return api.post<{ sent: boolean; message: string }>(`/notifications/${channelId}/test`, {
+    channelId,
+    settings,
+  });
+}
+
+/**
+ * @deprecated Use sendTestNotification('imessage', { phoneNumber }) instead
+ *
+ * Legacy function for sending a test iMessage notification.
+ * Maintained for backward compatibility.
+ */
+export async function sendTestNotificationLegacy(
   phoneNumber: string,
   serverHostname?: string
 ): Promise<{ sent: boolean; message: string }> {

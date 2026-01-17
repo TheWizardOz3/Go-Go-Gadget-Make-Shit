@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.19.0 | 2026-01-17 | minor | Notification Abstraction Layer |
 | 0.18.0 | 2026-01-17 | minor | Floating Voice Button |
 | 0.17.0 | 2026-01-17 | minor | Scheduled Prompts |
 | 0.16.1 | 2026-01-17 | patch | Fix production server startup path |
@@ -48,6 +49,64 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.19.0] - 2026-01-17
+
+### Summary
+**Notification Abstraction Layer** - Extracted iMessage into a pluggable channel system, enabling future support for ntfy, Slack, Telegram, and Email.
+
+### Added
+- **NotificationChannel interface** - Common contract for all notification channels
+  - `id`, `displayName`, `description` properties
+  - `isAvailable()` - platform availability check
+  - `isConfigured()` - configuration validation
+  - `send()` - send notification with payload
+  - `sendTest()` - send test notification (bypasses rate limiting)
+  - `getRateLimitStatus()`, `resetRateLimit()` - rate limit management
+- **BaseChannel abstract class** - Shared rate limiting logic for all channels
+  - Configurable rate limit window (default 60s)
+  - Protected helpers: `isRateLimited()`, `recordNotification()`, `createRateLimitedResult()`, etc.
+- **IMessageChannel class** - Concrete implementation for iMessage
+  - AppleScript execution for macOS Messages.app
+  - Phone number masking for logging privacy
+  - Platform check (`process.platform === 'darwin'`)
+- **NotificationManager singleton** - Orchestrates multiple channels
+  - `sendTaskComplete()` - broadcasts to all enabled channels in parallel
+  - `sendTest()` - tests a specific channel
+  - `getChannels()`, `getChannel()`, `getAvailableChannels()` - channel introspection
+  - `getChannelInfo()` - combined info for settings UI
+- **Channel-based settings structure** - New `channels` object in AppSettings
+  - `channels.imessage: { enabled, phoneNumber }`
+  - Prepared for: `ntfy`, `slack`, `telegram`, `email`
+- **Settings migration** - Automatic migration from legacy flat settings
+  - Converts `notificationsEnabled` → `channels.imessage.enabled`
+  - Converts `notificationPhoneNumber` → `channels.imessage.phoneNumber`
+  - Persists migrated settings on first read
+- **Updated SettingsModal UI** - Channel-based notification settings
+  - Channel cards with icon, toggle, and configuration
+  - "More channels coming soon" placeholder
+  - Fixed input contrast for better accessibility in dark mode
+
+### Changed
+- **hooks.ts API** - Updated to use NotificationManager
+  - `POST /api/hooks/task-complete` broadcasts to all enabled channels
+  - `POST /api/notifications/test` supports channel-specific testing
+  - New `POST /api/notifications/:channelId/test` endpoint
+- **notificationService.ts** - Converted to facade for backward compatibility
+  - Re-exports functions from NotificationManager
+  - Deprecated functions emit warnings
+- **useSettings hook** - Updated for channel-based API
+  - `sendTestNotification(channelId, settings)` signature
+  - Legacy function preserved as `sendTestNotificationLegacy`
+
+### Technical Notes
+- All channel implementations share BaseChannel's rate limiting
+- Each channel manages its own enabled state
+- Failure in one channel doesn't block others (parallel sending)
+- Settings file auto-migrates without user intervention
+- Input fields now use `bg-surface-elevated` and `text-text-primary` for proper contrast
 
 ---
 

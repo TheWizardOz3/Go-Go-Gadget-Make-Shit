@@ -13,6 +13,7 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-023 | 2026-01-17 | arch     | active | Notification channel abstraction layer                    |
 | ADR-022 | 2026-01-17 | arch     | active | SharedPromptContext for cross-view voice input sync       |
 | ADR-021 | 2026-01-17 | arch     | active | Fire-and-forget execution for scheduled prompts           |
 | ADR-020 | 2026-01-17 | data     | active | Git-based file tree using git ls-tree and git show        |
@@ -45,6 +46,47 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-023: Notification Channel Abstraction Layer
+**Date:** 2026-01-17 | **Category:** arch | **Status:** active
+
+**Trigger:**
+- User requested ability to add ntfy notifications alongside existing iMessage
+- Tightly coupled iMessage logic in `notificationService.ts` made adding new channels difficult
+- Settings schema only supported single notification type
+
+**Decision:**
+Implement a pluggable notification channel architecture:
+1. **NotificationChannel interface** - Common contract with `isAvailable()`, `isConfigured()`, `send()`, `sendTest()`, rate limiting methods
+2. **BaseChannel abstract class** - Shared rate limiting logic (60s window) with protected helpers
+3. **IMessageChannel** - Concrete implementation extracting logic from legacy notificationService
+4. **NotificationManager singleton** - Orchestrates all channels, broadcasts in parallel, handles errors gracefully
+5. **Channel-based settings** - `channels.imessage`, `channels.ntfy`, etc. instead of flat structure
+
+**Rationale:**
+- **Open/Closed Principle**: Adding new channels (ntfy, Slack, Telegram) requires only a new class implementing NotificationChannel, no changes to existing code
+- **Encapsulation**: Each channel manages its own availability, configuration validation, and rate limiting
+- **Resilience**: One channel failing doesn't prevent others from sending (parallel execution with error isolation)
+- **Backward Compatibility**: Legacy settings auto-migrate on first read; facade maintains old API signatures
+
+**Alternatives Considered:**
+- **Single service with switch statements**: Rejected - violates OCP, scales poorly with more channels
+- **Event-based pub/sub**: Rejected - overengineered for 2-5 notification types
+- **External notification service**: Rejected - adds dependency and latency for simple push notifications
+
+**AI Instructions:**
+- When adding new notification channels, create a class extending `BaseChannel`
+- Register new channels in `NotificationManager.constructor()`
+- Add channel-specific settings type to `AppSettings.channels`
+- Update `SettingsModal` with channel card UI
+- Add endpoint validation in `api/hooks.ts` for channel-specific test
+
+**References:**
+- [Feature doc](Features/notification-abstraction-layer.md)
+- [NotificationChannel interface](../server/src/services/notifications/types.ts)
+- [NotificationManager](../server/src/services/notifications/NotificationManager.ts)
+
+---
 
 ### ADR-022: SharedPromptContext for Cross-View Voice Input Sync
 **Date:** 2026-01-17 | **Category:** arch | **Status:** active

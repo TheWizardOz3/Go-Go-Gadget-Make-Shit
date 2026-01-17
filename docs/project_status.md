@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-17 (V1 Feature 1: Floating Voice Button - Complete)
+**Last Updated**: 2026-01-17 (V1 Feature 2: Notification Abstraction Layer - Complete)
 
 ---
 
@@ -56,6 +56,8 @@
 
 **Test Count: 617 tests** (423 client + 194 server)
 
+**Note**: Test count now at 682 tests (423 client + 259 server) after V1 features.
+
 | Feature/Task                | Completion Date | Notes                                                                                                           |
 |-----------------------------|-----------------|-----------------------------------------------------------------------------------------------------------------|
 | Floating Voice Button       | 2026-01-17      | Persistent mic on Files tab with long-press-to-send - [doc](Features/floating-voice-button.md)                  |
@@ -74,12 +76,12 @@
 
 ### V1 Build Order
 
-| Order | Feature                        | Status     | Description                                                  |
-|-------|--------------------------------|------------|--------------------------------------------------------------|
-| 1     | Floating Voice Button          | ✅ Complete | Persistent mic across views; record while browsing file tree |
-| 2     | Notification Abstraction Layer | Pending    | Extract iMessage into pluggable abstraction for all channels |
-| 3     | ntfy Notifications             | Pending    | Push notifications via ntfy.sh (no SMS/carrier dependency)   |
-| 4     | Serverless/Async Execution     | Pending    | Run agents without laptop awake (Modal/Fly.io/Railway)       |
+| Order | Feature                        | Status      | Description                                                                       |
+|-------|--------------------------------|-------------|-----------------------------------------------------------------------------------|
+| 1     | Floating Voice Button          | ✅ Complete  | Persistent mic across views; record while browsing file tree                      |
+| 2     | Notification Abstraction Layer | ✅ Complete  | Extract iMessage into pluggable abstraction for all channels                      |
+| 3     | ntfy Notifications             | In Progress | Push notifications via ntfy.sh - [doc](Features/ntfy-notifications.md)            |
+| 4     | Serverless/Async Execution     | In Progress | Run agents without laptop awake (Modal) - [doc](Features/serverless-execution.md) |
 
 ### Dependency Notes
 - **Floating Voice Button** is independent (no backend dependencies beyond existing voice infrastructure)
@@ -89,9 +91,22 @@
 ### Technical Scope
 - SharedPromptContext for syncing prompt text between views
 - FloatingVoiceButton component with long-press-to-send gesture
-- Notification channel abstraction layer
-- ntfy.sh HTTP POST integration
-- Cloud compute integration (Modal/Fly.io/Railway)
+- Notification channel abstraction layer - [doc](Features/notification-abstraction-layer.md)
+- NtfyChannel class with HTTP POST to ntfy.sh - [doc](Features/ntfy-notifications.md)
+- Modal cloud compute integration - [doc](Features/serverless-execution.md)
+
+---
+
+## V1 Progress
+
+**Test Count: 682 tests** (423 client + 259 server)
+
+| Feature/Task                   | Completion Date | Notes                                                                                           |
+|--------------------------------|-----------------|-------------------------------------------------------------------------------------------------|
+| Floating Voice Button          | 2026-01-17      | Persistent mic on Files tab with long-press-to-send - [doc](Features/floating-voice-button.md) |
+| Notification Abstraction Layer | 2026-01-17      | Pluggable channel system (iMessage, ntfy, Slack, etc.) - [doc](Features/notification-abstraction-layer.md) |
+| ntfy Notifications             | Pending         | Push notifications via ntfy.sh                                                                  |
+| Serverless/Async Execution     | Pending         | Run agents without laptop awake (Modal/Fly.io/Railway)                                          |
 
 ---
 
