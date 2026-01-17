@@ -7,12 +7,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
+import { getCachedProjects, getLastSyncRelative, getCachedFileTree } from '@/lib/localCache';
 import {
-  getCachedProjects,
-  getLastSyncRelative,
-  getCachedFileTree,
-  type CachedFileTreeEntry,
-} from '@/lib/localCache';
+  parseGitHubUrl,
+  fetchGitHubTree,
+  buildNestedTree,
+  type NestedTreeEntry,
+} from '@/lib/github';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { useConversation } from '@/hooks/useConversation';
@@ -112,7 +113,18 @@ function setStoredSession(encodedPath: string | null, sessionId: string | null):
 }
 
 /**
- * Recursive tree view for cached file tree
+ * Common tree entry shape (works for cached or GitHub trees)
+ */
+interface TreeEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  extension?: string | null;
+  children?: TreeEntry[];
+}
+
+/**
+ * Recursive tree view for file trees (cached or from GitHub)
  */
 function CachedTreeView({
   entries,
@@ -120,7 +132,7 @@ function CachedTreeView({
   onToggleFolder,
   depth = 0,
 }: {
-  entries: CachedFileTreeEntry[];
+  entries: TreeEntry[];
   expandedFolders: Set<string>;
   onToggleFolder: (path: string) => void;
   depth?: number;
@@ -262,6 +274,11 @@ function CloudEmptyState({
     ? getCachedFileTree(selectedCachedProject.encodedPath)
     : null;
 
+  // GitHub tree fetching state
+  const [githubTree, setGithubTree] = useState<NestedTreeEntry[] | null>(null);
+  const [isLoadingGithub, setIsLoadingGithub] = useState(false);
+  const [githubError, setGithubError] = useState<string | null>(null);
+
   // Track expanded folders in the tree
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
@@ -276,6 +293,48 @@ function CloudEmptyState({
       return next;
     });
   };
+
+  // Fetch GitHub tree when project is selected and has git URL
+  const fetchFromGitHub = useCallback(async () => {
+    if (!selectedCachedProject?.gitRemoteUrl) return;
+
+    const parsed = parseGitHubUrl(selectedCachedProject.gitRemoteUrl);
+    if (!parsed) {
+      setGithubError('Could not parse GitHub URL');
+      return;
+    }
+
+    setIsLoadingGithub(true);
+    setGithubError(null);
+
+    try {
+      const entries = await fetchGitHubTree(parsed.owner, parsed.repo);
+      if (entries) {
+        const nested = buildNestedTree(entries);
+        setGithubTree(nested);
+      } else {
+        setGithubError('Could not fetch from GitHub (may be private repo)');
+      }
+    } catch (err) {
+      setGithubError(err instanceof Error ? err.message : 'Failed to fetch');
+    } finally {
+      setIsLoadingGithub(false);
+    }
+  }, [selectedCachedProject?.gitRemoteUrl]);
+
+  // Auto-fetch from GitHub when project selected in cloud mode
+  useEffect(() => {
+    if (isCloudMode && selectedCachedProject?.gitRemoteUrl && !cachedTree) {
+      fetchFromGitHub();
+    }
+  }, [isCloudMode, selectedCachedProject, cachedTree, fetchFromGitHub]);
+
+  // Clear GitHub tree when project changes
+  useEffect(() => {
+    setGithubTree(null);
+    setGithubError(null);
+    setExpandedFolders(new Set());
+  }, [selectedCachedProject?.encodedPath]);
 
   // Send prompt to cloud for selected project
   const handleSendCloudPrompt = async () => {
@@ -565,10 +624,13 @@ function CloudEmptyState({
                 )}
               >
                 Files
-                {cachedTree && (
+                {(cachedTree || githubTree) && (
                   <span className="px-1.5 py-0.5 text-xs bg-emerald-500/20 text-emerald-400 rounded-full">
                     ✓
                   </span>
+                )}
+                {isLoadingGithub && (
+                  <span className="w-4 h-4 border-2 border-text-muted/30 border-t-accent rounded-full animate-spin" />
                 )}
               </button>
             </div>
@@ -647,7 +709,26 @@ function CloudEmptyState({
                   </div>
                 )
               ) : /* Files Tab */
-              cachedTree && cachedTree.entries.length > 0 ? (
+              isLoadingGithub ? (
+                <div className="text-center py-8">
+                  <div className="w-8 h-8 border-2 border-text-muted/30 border-t-accent rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-sm text-text-muted">Fetching from GitHub...</p>
+                </div>
+              ) : githubTree && githubTree.length > 0 ? (
+                <div className="space-y-0.5">
+                  <div className="text-xs text-text-muted mb-3 flex items-center gap-2">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                    </svg>
+                    <span className="text-emerald-400">Live from GitHub</span>
+                  </div>
+                  <CachedTreeView
+                    entries={githubTree}
+                    expandedFolders={expandedFolders}
+                    onToggleFolder={toggleFolder}
+                  />
+                </div>
+              ) : cachedTree && cachedTree.entries.length > 0 ? (
                 <div className="space-y-0.5">
                   {cachedTree.branch && (
                     <div className="text-xs text-text-muted mb-3 flex items-center gap-2">
@@ -666,6 +747,7 @@ function CloudEmptyState({
                       </svg>
                       Branch:{' '}
                       <span className="text-text-secondary font-mono">{cachedTree.branch}</span>
+                      <span className="text-text-muted/50">(cached)</span>
                     </div>
                   )}
                   <CachedTreeView
@@ -673,6 +755,41 @@ function CloudEmptyState({
                     expandedFolders={expandedFolders}
                     onToggleFolder={toggleFolder}
                   />
+                </div>
+              ) : githubError ? (
+                <div className="text-center py-8">
+                  <svg
+                    className="w-12 h-12 mx-auto mb-3 text-amber-500/50"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                  <p className="text-sm text-amber-400 mb-2">{githubError}</p>
+                  <button onClick={fetchFromGitHub} className="text-xs text-accent hover:underline">
+                    Try again
+                  </button>
+                </div>
+              ) : selectedCachedProject?.gitRemoteUrl ? (
+                <div className="text-center py-8">
+                  <button
+                    onClick={fetchFromGitHub}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                    </svg>
+                    Fetch from GitHub
+                  </button>
+                  <p className="text-xs text-text-muted/70 mt-2">
+                    Pull file tree directly from repo
+                  </p>
                 </div>
               ) : (
                 <div className="text-center py-8">
