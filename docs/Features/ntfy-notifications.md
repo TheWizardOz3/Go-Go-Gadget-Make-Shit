@@ -1,8 +1,8 @@
 # Feature: ntfy Notifications
 
-> **Status**: In Progress  
+> **Status**: Complete  
 > **Started**: 2026-01-17  
-> **Completed**: —  
+> **Completed**: 2026-01-17  
 > **Milestone**: V1 (Order 3)  
 > **Feature Doc Version**: 1.0
 
@@ -330,7 +330,7 @@ The ntfy section in SettingsModal will look like:
 |---|----------------------------------------------------|-----------|--------------|---------|-----------------------------------------------|
 | 1 | Create `NtfyChannel` class                         | 45 min    | —            | ✅ Done | Implement NotificationChannel interface       |
 | 2 | Register NtfyChannel in NotificationManager        | 15 min    | Task 1       | ✅ Done | Import and add to channel registry            |
-| 3 | Update SettingsModal with ntfy configuration UI    | 45 min    | Task 2       | Pending | Server URL, topic, auth token, test button    |
+| 3 | Update SettingsModal with ntfy configuration UI    | 45 min    | Task 2       | ✅ Done | Server URL, topic, auth token, test button    |
 
 **Total Estimated Time**: ~1.75 hours
 
@@ -340,19 +340,18 @@ The ntfy section in SettingsModal will look like:
 
 ### Unit Tests
 
-**NtfyChannel.test.ts** (~12 tests):
-- `isAvailable()` returns true on all platforms
-- `isConfigured()` returns true when enabled + serverUrl + topic
-- `isConfigured()` returns false when disabled
-- `isConfigured()` returns false when serverUrl missing
-- `isConfigured()` returns false when topic missing
-- `send()` returns skipped when disabled
-- `send()` returns error when serverUrl missing
-- `send()` returns error when topic missing
-- `send()` returns skipped when rate limited
-- `send()` includes auth header when authToken provided
-- `sendTest()` bypasses rate limiting
-- `buildPublishUrl()` correctly combines serverUrl and topic
+**NtfyChannel.test.ts** (44 tests - all passing):
+
+| Category | Tests |
+|----------|-------|
+| Channel Identity | id, displayName, description |
+| Availability | Returns true on all platforms |
+| Configuration | enabled+serverUrl+topic validation, null/missing field handling |
+| Send Notifications | Disabled channel, missing fields, rate limiting, success path |
+| HTTP Requests | Auth headers, Content-Type, URL building, error responses |
+| Message Formatting | task-complete, test, emoji, branding |
+| Test Notifications | Bypasses rate limiting, proper formatting |
+| URL Building | Trailing slashes, leading slashes, self-hosted servers |
 
 ### Integration Tests
 

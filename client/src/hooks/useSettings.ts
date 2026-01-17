@@ -8,7 +8,7 @@
 import useSWR from 'swr';
 import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
-import type { AppSettings, IMessageChannelSettings } from '@shared/types';
+import type { AppSettings, IMessageChannelSettings, NtfyChannelSettings } from '@shared/types';
 
 /**
  * SWR fetcher that uses our typed API client
@@ -126,7 +126,7 @@ export function useSettings(): UseSettingsReturn {
 /**
  * Test notification settings for a specific channel
  */
-export type TestNotificationSettings = IMessageChannelSettings;
+export type TestNotificationSettings = IMessageChannelSettings | NtfyChannelSettings;
 
 /**
  * Send a test notification to a specific channel

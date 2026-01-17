@@ -9,7 +9,11 @@
 import { useEffect, useRef, useState, forwardRef } from 'react';
 import { cn } from '@/lib/cn';
 import { useSettings, sendTestNotification } from '@/hooks/useSettings';
-import type { IMessageChannelSettings, NotificationChannelSettings } from '@shared/types';
+import type {
+  IMessageChannelSettings,
+  NtfyChannelSettings,
+  NotificationChannelSettings,
+} from '@shared/types';
 
 interface SettingsModalProps {
   /** Whether the modal is open */
@@ -99,6 +103,28 @@ function MessageIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Paper airplane / send icon for ntfy
+ */
+function NtfyIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
       />
     </svg>
   );
@@ -202,6 +228,17 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  // ntfy channel state
+  const [ntfyServerUrl, setNtfyServerUrl] = useState('https://ntfy.sh');
+  const [ntfyTopic, setNtfyTopic] = useState('');
+  const [ntfyAuthToken, setNtfyAuthToken] = useState('');
+  const [ntfyError, setNtfyError] = useState<string | null>(null);
+  const [isSendingNtfyTest, setIsSendingNtfyTest] = useState(false);
+  const [ntfyTestResult, setNtfyTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
   // Get iMessage settings from new channels structure (with fallback for legacy)
   const getIMessageSettings = (): IMessageChannelSettings => {
     if (settings?.channels?.imessage) {
@@ -216,6 +253,13 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
 
   const imessageSettings = getIMessageSettings();
 
+  // Get ntfy settings from channels structure
+  const getNtfySettings = (): NtfyChannelSettings => {
+    return settings?.channels?.ntfy ?? { enabled: false };
+  };
+
+  const ntfySettings = getNtfySettings();
+
   // Sync values from settings when modal opens or settings change
   useEffect(() => {
     // Get iMessage settings, handling legacy and new formats
@@ -228,7 +272,24 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
     if (settings?.serverHostname) {
       setServerHostname(settings.serverHostname);
     }
-  }, [settings?.channels?.imessage, settings?.notificationPhoneNumber, settings?.serverHostname]);
+
+    // Sync ntfy settings
+    const ntfy = settings?.channels?.ntfy;
+    if (ntfy?.serverUrl) {
+      setNtfyServerUrl(ntfy.serverUrl);
+    }
+    if (ntfy?.topic) {
+      setNtfyTopic(ntfy.topic);
+    }
+    if (ntfy?.authToken) {
+      setNtfyAuthToken(ntfy.authToken);
+    }
+  }, [
+    settings?.channels?.imessage,
+    settings?.notificationPhoneNumber,
+    settings?.serverHostname,
+    settings?.channels?.ntfy,
+  ]);
 
   // Clear test result after 5 seconds
   useEffect(() => {
@@ -237,6 +298,14 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
       return () => clearTimeout(timer);
     }
   }, [testResult]);
+
+  // Clear ntfy test result after 5 seconds
+  useEffect(() => {
+    if (ntfyTestResult) {
+      const timer = setTimeout(() => setNtfyTestResult(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [ntfyTestResult]);
 
   // Handle escape key to close modal
   useEffect(() => {
@@ -270,6 +339,8 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
     if (!isOpen) {
       setPhoneError(null);
       setTestResult(null);
+      setNtfyError(null);
+      setNtfyTestResult(null);
     }
   }, [isOpen]);
 
@@ -283,7 +354,7 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
   // Helper to update channel settings
   const updateChannelSettings = async (
     channelId: keyof NotificationChannelSettings,
-    channelSettings: Partial<IMessageChannelSettings>
+    channelSettings: Partial<IMessageChannelSettings> | Partial<NtfyChannelSettings>
   ) => {
     const currentChannels = settings?.channels ?? {};
     const currentChannelSettings = currentChannels[channelId] ?? { enabled: false };
@@ -388,10 +459,114 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
     }
   };
 
+  // ============================================================
+  // ntfy Handlers
+  // ============================================================
+
+  // Handle ntfy toggle
+  const handleToggleNtfy = async (enabled: boolean) => {
+    // If enabling, check if required fields are filled
+    if (enabled && (!ntfyServerUrl.trim() || !ntfyTopic.trim())) {
+      setNtfyError('Please enter server URL and topic first');
+      return;
+    }
+
+    try {
+      await updateChannelSettings('ntfy', {
+        enabled,
+        serverUrl: ntfyServerUrl.trim(),
+        topic: ntfyTopic.trim(),
+        authToken: ntfyAuthToken.trim() || undefined,
+      });
+      setNtfyError(null);
+    } catch {
+      // Error handled by hook
+    }
+  };
+
+  // Handle ntfy server URL change
+  const handleNtfyServerUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNtfyServerUrl(e.target.value);
+    setNtfyError(null);
+  };
+
+  // Handle ntfy topic change
+  const handleNtfyTopicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNtfyTopic(e.target.value);
+    setNtfyError(null);
+  };
+
+  // Handle ntfy auth token change
+  const handleNtfyAuthTokenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNtfyAuthToken(e.target.value);
+  };
+
+  // Handle ntfy field blur (save)
+  const handleNtfyFieldBlur = async () => {
+    // Only save if we have the required fields
+    if (!ntfyServerUrl.trim() || !ntfyTopic.trim()) {
+      return;
+    }
+
+    try {
+      await updateChannelSettings('ntfy', {
+        enabled: ntfySettings.enabled,
+        serverUrl: ntfyServerUrl.trim(),
+        topic: ntfyTopic.trim(),
+        authToken: ntfyAuthToken.trim() || undefined,
+      });
+    } catch {
+      setNtfyError('Failed to save settings');
+    }
+  };
+
+  // Handle ntfy test notification
+  const handleNtfyTestNotification = async () => {
+    if (!ntfyServerUrl.trim() || !ntfyTopic.trim()) {
+      setNtfyError('Please enter server URL and topic first');
+      return;
+    }
+
+    setIsSendingNtfyTest(true);
+    setNtfyTestResult(null);
+
+    try {
+      // Save settings first
+      await updateChannelSettings('ntfy', {
+        enabled: ntfySettings.enabled,
+        serverUrl: ntfyServerUrl.trim(),
+        topic: ntfyTopic.trim(),
+        authToken: ntfyAuthToken.trim() || undefined,
+      });
+
+      if (serverHostname !== settings?.serverHostname) {
+        await updateSettings({ serverHostname: serverHostname.trim() || undefined });
+      }
+
+      const result = await sendTestNotification('ntfy', {
+        enabled: true,
+        serverUrl: ntfyServerUrl.trim(),
+        topic: ntfyTopic.trim(),
+        authToken: ntfyAuthToken.trim() || undefined,
+      });
+      setNtfyTestResult({ success: result.sent, message: result.message });
+    } catch (err) {
+      setNtfyTestResult({
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to send test notification',
+      });
+    } finally {
+      setIsSendingNtfyTest(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const isIMessageEnabled = imessageSettings.enabled;
   const hasValidPhone = isValidPhoneNumber(phoneNumber);
+
+  const isNtfyEnabled = ntfySettings.enabled;
+  const hasValidNtfyConfig = ntfyServerUrl.trim().length > 0 && ntfyTopic.trim().length > 0;
 
   return (
     <div
@@ -589,10 +764,148 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                     )}
                   </div>
 
+                  {/* ntfy Channel */}
+                  <div className="rounded-lg border border-text-primary/10 p-4 space-y-4">
+                    {/* Channel header with toggle */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-success/10">
+                          <NtfyIcon className="text-success" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-text-primary">ntfy</p>
+                          <p className="text-xs text-text-muted">Push via ntfy.sh</p>
+                        </div>
+                      </div>
+                      <Toggle
+                        enabled={isNtfyEnabled}
+                        onChange={handleToggleNtfy}
+                        disabled={isUpdating}
+                        label="Enable ntfy notifications"
+                      />
+                    </div>
+
+                    {/* Server URL input */}
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="ntfy-server-url"
+                        className="block text-sm font-medium text-text-primary"
+                      >
+                        Server URL
+                      </label>
+                      <Input
+                        id="ntfy-server-url"
+                        type="url"
+                        value={ntfyServerUrl}
+                        onChange={handleNtfyServerUrlChange}
+                        onBlur={handleNtfyFieldBlur}
+                        placeholder="https://ntfy.sh"
+                      />
+                    </div>
+
+                    {/* Topic input */}
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="ntfy-topic"
+                        className="block text-sm font-medium text-text-primary"
+                      >
+                        Topic
+                      </label>
+                      <Input
+                        id="ntfy-topic"
+                        type="text"
+                        value={ntfyTopic}
+                        onChange={handleNtfyTopicChange}
+                        onBlur={handleNtfyFieldBlur}
+                        placeholder="my-claude-alerts"
+                        error={ntfyError ?? undefined}
+                        aria-describedby={ntfyError ? 'ntfy-error' : undefined}
+                      />
+                      {ntfyError && (
+                        <p id="ntfy-error" className="text-xs text-error">
+                          {ntfyError}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Auth Token input (optional) */}
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="ntfy-auth-token"
+                        className="block text-sm font-medium text-text-primary"
+                      >
+                        Auth Token <span className="font-normal text-text-muted">(optional)</span>
+                      </label>
+                      <Input
+                        id="ntfy-auth-token"
+                        type="password"
+                        value={ntfyAuthToken}
+                        onChange={handleNtfyAuthTokenChange}
+                        onBlur={handleNtfyFieldBlur}
+                        placeholder="tk_..."
+                        autoComplete="off"
+                      />
+                      <p className="text-xs text-text-muted">
+                        For private topics or self-hosted servers with auth
+                      </p>
+                    </div>
+
+                    {/* Test button */}
+                    <button
+                      type="button"
+                      onClick={handleNtfyTestNotification}
+                      disabled={!hasValidNtfyConfig || isSendingNtfyTest}
+                      className={cn(
+                        'w-full px-4 py-2.5 rounded-lg',
+                        'text-sm font-medium',
+                        'transition-colors duration-150',
+                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                        hasValidNtfyConfig && !isSendingNtfyTest
+                          ? 'bg-accent text-white hover:bg-accent-hover active:bg-accent-hover'
+                          : 'bg-text-primary/10 text-text-muted cursor-not-allowed'
+                      )}
+                    >
+                      {isSendingNtfyTest ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Sending...
+                        </span>
+                      ) : (
+                        'Test ntfy'
+                      )}
+                    </button>
+
+                    {/* Test result message */}
+                    {ntfyTestResult && (
+                      <p
+                        className={cn(
+                          'text-xs text-center',
+                          ntfyTestResult.success ? 'text-success' : 'text-error'
+                        )}
+                      >
+                        {ntfyTestResult.message}
+                      </p>
+                    )}
+
+                    {/* Help text */}
+                    <p className="text-xs text-text-muted">
+                      Subscribe to your topic in the{' '}
+                      <a
+                        href="https://ntfy.sh/docs/subscribe/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline"
+                      >
+                        ntfy app
+                      </a>{' '}
+                      to receive notifications.
+                    </p>
+                  </div>
+
                   {/* Placeholder for future channels */}
                   <div className="rounded-lg border border-text-primary/5 border-dashed p-4">
                     <p className="text-xs text-text-muted text-center">
-                      More channels coming soon: ntfy, Slack, Telegram
+                      More channels coming soon: Slack, Telegram
                     </p>
                   </div>
                 </div>
@@ -645,7 +958,7 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
               {/* Info Section */}
               <section className="pt-4 border-t border-text-primary/10">
                 <p className="text-xs text-text-muted text-center">
-                  iMessage requires Messages.app to be set up on your Mac.
+                  iMessage requires Messages.app on your Mac. ntfy works on any platform.
                 </p>
               </section>
             </div>

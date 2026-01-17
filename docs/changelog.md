@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.20.0 | 2026-01-17 | minor | ntfy Notifications |
 | 0.19.0 | 2026-01-17 | minor | Notification Abstraction Layer |
 | 0.18.0 | 2026-01-17 | minor | Floating Voice Button |
 | 0.17.0 | 2026-01-17 | minor | Scheduled Prompts |
@@ -49,6 +50,45 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.20.0] - 2026-01-17
+
+### Summary
+**ntfy Notifications** - Push notifications via ntfy.sh or self-hosted servers, working cross-platform on any device.
+
+### Added
+- **NtfyChannel class** - Full notification channel implementation
+  - HTTP POST to ntfy.sh or self-hosted servers
+  - Optional Bearer token authentication for private topics
+  - 10-second request timeout
+  - Rate limiting (inherits from BaseChannel)
+- **ntfy Settings UI** in SettingsModal
+  - Server URL input (defaults to ntfy.sh)
+  - Topic name input
+  - Optional auth token (password field)
+  - "Test ntfy" button with success/error feedback
+  - Link to ntfy subscribe documentation
+- **NtfyChannel unit tests** - 44 comprehensive tests
+  - Channel identity, availability, configuration validation
+  - Send logic with rate limiting and error handling
+  - Message formatting and URL building
+  - Test notifications bypassing rate limits
+
+### Changed
+- `TestNotificationSettings` type now supports both iMessage and ntfy channel settings
+- `updateChannelSettings` helper accepts channel-specific settings union type
+
+### Technical Details
+- **Files Added:**
+  - `server/src/services/notifications/channels/NtfyChannel.ts`
+  - `server/src/services/notifications/channels/NtfyChannel.test.ts`
+  - `docs/Features/ntfy-notifications.md`
+- **Files Modified:**
+  - `server/src/services/notifications/NotificationManager.ts` - Register NtfyChannel
+  - `client/src/components/settings/SettingsModal.tsx` - ntfy configuration UI
+  - `client/src/hooks/useSettings.ts` - Updated type for channel settings
 
 ---
 

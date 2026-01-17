@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-17 (V1 Feature 2: Notification Abstraction Layer - Complete)
+**Last Updated**: 2026-01-17 (V1 Feature 3: ntfy Notifications - Complete, v0.20.0)
 
 ---
 
@@ -80,7 +80,7 @@
 |-------|--------------------------------|-------------|-----------------------------------------------------------------------------------|
 | 1     | Floating Voice Button          | ✅ Complete  | Persistent mic across views; record while browsing file tree                      |
 | 2     | Notification Abstraction Layer | ✅ Complete  | Extract iMessage into pluggable abstraction for all channels                      |
-| 3     | ntfy Notifications             | In Progress | Push notifications via ntfy.sh - [doc](Features/ntfy-notifications.md)            |
+| 3     | ntfy Notifications             | ✅ Complete  | Push notifications via ntfy.sh - [doc](Features/ntfy-notifications.md)            |
 | 4     | Serverless/Async Execution     | In Progress | Run agents without laptop awake (Modal) - [doc](Features/serverless-execution.md) |
 
 ### Dependency Notes
@@ -99,14 +99,14 @@
 
 ## V1 Progress
 
-**Test Count: 682 tests** (423 client + 259 server)
+**Test Count: 726 tests** (423 client + 303 server)
 
-| Feature/Task                   | Completion Date | Notes                                                                                           |
-|--------------------------------|-----------------|-------------------------------------------------------------------------------------------------|
-| Floating Voice Button          | 2026-01-17      | Persistent mic on Files tab with long-press-to-send - [doc](Features/floating-voice-button.md) |
+| Feature/Task                   | Completion Date | Notes                                                                                                      |
+|--------------------------------|-----------------|------------------------------------------------------------------------------------------------------------|
+| Floating Voice Button          | 2026-01-17      | Persistent mic on Files tab with long-press-to-send - [doc](Features/floating-voice-button.md)             |
 | Notification Abstraction Layer | 2026-01-17      | Pluggable channel system (iMessage, ntfy, Slack, etc.) - [doc](Features/notification-abstraction-layer.md) |
-| ntfy Notifications             | Pending         | Push notifications via ntfy.sh                                                                  |
-| Serverless/Async Execution     | Pending         | Run agents without laptop awake (Modal/Fly.io/Railway)                                          |
+| ntfy Notifications             | 2026-01-17      | Push notifications via ntfy.sh (44 tests) - [doc](Features/ntfy-notifications.md)                          |
+| Serverless/Async Execution     | Pending         | Run agents without laptop awake (Modal/Fly.io/Railway)                                                     |
 
 ---
 
