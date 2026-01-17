@@ -14,7 +14,20 @@ import type { ProjectSerialized, SessionSummarySerialized } from '@shared/types'
 
 const CACHE_KEY_PROJECTS = 'ggg_cache_projects';
 const CACHE_KEY_SESSIONS_PREFIX = 'ggg_cache_sessions_';
+const CACHE_KEY_FILES_PREFIX = 'ggg_cache_files_';
 const CACHE_KEY_LAST_SYNC = 'ggg_cache_last_sync';
+
+// ============================================================
+// Types
+// ============================================================
+
+/** Cached file info (matches FileChange from shared types) */
+export interface CachedFileChange {
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  additions?: number;
+  deletions?: number;
+}
 
 // ============================================================
 // Types
@@ -100,6 +113,40 @@ export function getCachedSessions(encodedPath: string): SessionSummarySerialized
     if (!stored) return null;
 
     const cached: CachedData<SessionSummarySerialized[]> = JSON.parse(stored);
+    return cached.data;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================
+// Files Cache
+// ============================================================
+
+/**
+ * Cache files changed for a specific project
+ */
+export function cacheFilesChanged(encodedPath: string, files: CachedFileChange[]): void {
+  try {
+    const cached: CachedData<CachedFileChange[]> = {
+      data: files,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(CACHE_KEY_FILES_PREFIX + encodedPath, JSON.stringify(cached));
+  } catch (e) {
+    console.warn('Failed to cache files:', e);
+  }
+}
+
+/**
+ * Get cached files changed for offline viewing
+ */
+export function getCachedFilesChanged(encodedPath: string): CachedFileChange[] | null {
+  try {
+    const stored = localStorage.getItem(CACHE_KEY_FILES_PREFIX + encodedPath);
+    if (!stored) return null;
+
+    const cached: CachedData<CachedFileChange[]> = JSON.parse(stored);
     return cached.data;
   } catch {
     return null;

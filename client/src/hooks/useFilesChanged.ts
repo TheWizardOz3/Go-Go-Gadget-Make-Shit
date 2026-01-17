@@ -3,10 +3,13 @@
  *
  * Uses SWR for caching and automatic revalidation.
  * Polls at a slower interval since files change less frequently than messages.
+ * Caches files to localStorage for offline viewing.
  */
 
+import { useEffect } from 'react';
 import useSWR from 'swr';
 import { api } from '@/lib/api';
+import { cacheFilesChanged, type CachedFileChange } from '@/lib/localCache';
 import type { FileChange } from '@shared/types';
 
 /**
@@ -64,6 +67,20 @@ export function useFilesChanged(encodedPath: string | null): UseFilesChangedRetu
       errorRetryCount: 2,
     }
   );
+
+  // Cache files to localStorage for offline access
+  useEffect(() => {
+    if (data && data.length > 0 && encodedPath) {
+      // Convert to cacheable format
+      const cacheable: CachedFileChange[] = data.map((f) => ({
+        path: f.path,
+        status: f.status,
+        additions: f.additions,
+        deletions: f.deletions,
+      }));
+      cacheFilesChanged(encodedPath, cacheable);
+    }
+  }, [data, encodedPath]);
 
   return {
     files: data,

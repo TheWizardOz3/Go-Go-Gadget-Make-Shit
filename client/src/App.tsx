@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
-import { getCachedProjects, getLastSyncRelative } from '@/lib/localCache';
+import { getCachedProjects, getLastSyncRelative, getCachedFilesChanged } from '@/lib/localCache';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { useConversation } from '@/hooks/useConversation';
@@ -146,8 +146,14 @@ function CloudEmptyState({
   const [isSendingCloud, setIsSendingCloud] = useState(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [cloudSuccess, setCloudSuccess] = useState<string | null>(null);
+  const [panelTab, setPanelTab] = useState<'prompt' | 'files'>('prompt');
 
   const isCloudMode = mode === 'cloud';
+
+  // Get cached files for selected project
+  const cachedFiles = selectedCachedProject
+    ? getCachedFilesChanged(selectedCachedProject.encodedPath)
+    : null;
 
   // Send prompt to cloud for selected project
   const handleSendCloudPrompt = async () => {
@@ -376,15 +382,18 @@ function CloudEmptyState({
 
       {/* Fixed bottom slide-up panel for selected project */}
       {selectedCachedProject && (
-        <div className="fixed inset-x-0 bottom-0 z-50 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 -top-[100vh] bg-black/50"
+            className="absolute inset-0 bg-black/60 animate-in fade-in duration-200"
             onClick={() => setSelectedCachedProject(null)}
           />
 
-          {/* Panel */}
-          <div className="relative bg-surface border-t border-border rounded-t-2xl shadow-2xl max-h-[70vh] overflow-y-auto">
+          {/* Panel - fixed height, doesn't resize viewport */}
+          <div
+            className="relative bg-surface border-t border-border rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300"
+            style={{ maxHeight: '60%' }}
+          >
             {/* Drag handle */}
             <div className="sticky top-0 bg-surface pt-3 pb-2 px-4 border-b border-border/50">
               <div className="w-10 h-1 bg-text-muted/30 rounded-full mx-auto mb-3" />
@@ -411,43 +420,64 @@ function CloudEmptyState({
               </div>
             </div>
 
+            {/* Tabs */}
+            <div className="flex border-b border-border">
+              <button
+                onClick={() => setPanelTab('prompt')}
+                className={cn(
+                  'flex-1 py-3 text-sm font-medium transition-colors',
+                  panelTab === 'prompt'
+                    ? 'text-accent border-b-2 border-accent'
+                    : 'text-text-muted hover:text-text-secondary'
+                )}
+              >
+                Send Prompt
+              </button>
+              <button
+                onClick={() => setPanelTab('files')}
+                className={cn(
+                  'flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2',
+                  panelTab === 'files'
+                    ? 'text-accent border-b-2 border-accent'
+                    : 'text-text-muted hover:text-text-secondary'
+                )}
+              >
+                Files
+                {cachedFiles && cachedFiles.length > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs bg-text-primary/10 rounded-full">
+                    {cachedFiles.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
             {/* Content */}
-            <div className="p-4">
-              <p className="text-sm text-text-muted mb-4">{selectedCachedProject.path}</p>
+            <div className="p-4 overflow-y-auto flex-1">
+              {panelTab === 'prompt' ? (
+                /* Prompt Tab */
+                selectedCachedProject.gitRemoteUrl ? (
+                  <>
+                    {/* Success message */}
+                    {cloudSuccess && (
+                      <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">
+                        ✅ {cloudSuccess}
+                      </div>
+                    )}
 
-              {selectedCachedProject.gitRemoteUrl ? (
-                <>
-                  {/* Has git URL - can do cloud execution */}
-                  <div className="flex items-center gap-2 text-xs text-emerald-400 mb-4 p-2 rounded-lg bg-emerald-500/10">
-                    <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                    </svg>
-                    <span className="truncate">Cloud-ready via GitHub</span>
-                  </div>
+                    {/* Error message */}
+                    {cloudError && (
+                      <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+                        ❌ {cloudError}
+                      </div>
+                    )}
 
-                  {/* Success message */}
-                  {cloudSuccess && (
-                    <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">
-                      ✅ {cloudSuccess}
-                    </div>
-                  )}
-
-                  {/* Error message */}
-                  {cloudError && (
-                    <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
-                      ❌ {cloudError}
-                    </div>
-                  )}
-
-                  {/* Cloud prompt input */}
-                  {isCloudMode && (
+                    {/* Cloud prompt input */}
                     <div className="space-y-3">
                       <textarea
                         value={cloudPrompt}
                         onChange={(e) => setCloudPrompt(e.target.value)}
                         placeholder="What would you like Claude to work on?"
-                        className="w-full h-28 px-4 py-3 rounded-xl bg-background border border-border text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent"
-                        autoFocus
+                        className="w-full h-24 px-4 py-3 rounded-xl bg-background border border-border text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent"
                       />
                       <button
                         onClick={handleSendCloudPrompt}
@@ -463,7 +493,7 @@ function CloudEmptyState({
                         {isSendingCloud ? (
                           <>
                             <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Sending to Cloud...
+                            Sending...
                           </>
                         ) : (
                           <>
@@ -485,15 +515,65 @@ function CloudEmptyState({
                         )}
                       </button>
                     </div>
-                  )}
-                </>
+                  </>
+                ) : (
+                  /* No git URL */
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-sm text-amber-400">
+                      ⚠️ No GitHub remote. Cloud execution requires a git repo URL.
+                    </p>
+                  </div>
+                )
+              ) : /* Files Tab */
+              cachedFiles && cachedFiles.length > 0 ? (
+                <div className="space-y-1">
+                  {cachedFiles.map((file) => (
+                    <div
+                      key={file.path}
+                      className="flex items-center gap-3 py-2 px-3 rounded-lg bg-background/50"
+                    >
+                      <span
+                        className={cn(
+                          'w-2 h-2 rounded-full shrink-0',
+                          file.status === 'added' && 'bg-emerald-500',
+                          file.status === 'modified' && 'bg-amber-500',
+                          file.status === 'deleted' && 'bg-red-500'
+                        )}
+                      />
+                      <span className="text-sm text-text-primary truncate flex-1 font-mono">
+                        {file.path}
+                      </span>
+                      {(file.additions || file.deletions) && (
+                        <span className="text-xs text-text-muted shrink-0">
+                          {file.additions ? (
+                            <span className="text-emerald-400">+{file.additions}</span>
+                          ) : null}
+                          {file.additions && file.deletions ? ' ' : ''}
+                          {file.deletions ? (
+                            <span className="text-red-400">-{file.deletions}</span>
+                          ) : null}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               ) : (
-                /* No git URL - can't do cloud execution */
-                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <p className="text-sm text-amber-400">
-                    ⚠️ This project doesn&apos;t have a GitHub remote configured. Cloud execution
-                    requires a git repository URL.
-                  </p>
+                <div className="text-center py-8">
+                  <svg
+                    className="w-12 h-12 mx-auto mb-3 text-text-muted/50"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <p className="text-sm text-text-muted">No cached files</p>
+                  <p className="text-xs text-text-muted/70 mt-1">View files on laptop to cache</p>
                 </div>
               )}
             </div>
