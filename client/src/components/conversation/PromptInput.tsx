@@ -152,10 +152,11 @@ export function PromptInput({
   );
 
   // Voice input hook
-  const { audioStream, isRecording, isProcessing, startRecording, stopRecording } = useVoiceInput({
-    onTranscription: handleTranscription,
-    onError: onVoiceError,
-  });
+  const { audioStream, isStarting, isRecording, isProcessing, startRecording, stopRecording } =
+    useVoiceInput({
+      onTranscription: handleTranscription,
+      onError: onVoiceError,
+    });
 
   // Disable voice input when Claude is working or when sending
   const isVoiceDisabled = disabled || isSending || status === 'working';
@@ -171,7 +172,7 @@ export function PromptInput({
 
   // Trim value to check if it's empty (whitespace-only counts as empty)
   const hasContent = value.trim().length > 0;
-  const isDisabled = disabled || isSending || isRecording || isProcessing;
+  const isDisabled = disabled || isSending || isStarting || isRecording || isProcessing;
   const canSend = hasContent && !isDisabled;
 
   /**
@@ -361,6 +362,7 @@ export function PromptInput({
 
         {/* Voice input button - larger size */}
         <VoiceButton
+          isStarting={isStarting}
           isRecording={isRecording}
           isProcessing={isProcessing}
           disabled={isVoiceDisabled}

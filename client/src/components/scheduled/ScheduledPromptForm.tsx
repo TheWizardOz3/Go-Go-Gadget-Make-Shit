@@ -194,15 +194,15 @@ function TimePicker({ value, onChange }: { value: string; onChange: (time: strin
         className={cn(
           'w-full px-3 py-2.5',
           'bg-text-primary/5 rounded-lg',
-          'text-text-primary',
           'border border-transparent',
           'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
           'transition-colors duration-150',
-          // Style the native time picker
+          // Style the native time picker icon for better visibility
           '[&::-webkit-calendar-picker-indicator]:filter',
-          '[&::-webkit-calendar-picker-indicator]:invert',
-          '[&::-webkit-calendar-picker-indicator]:opacity-50'
+          '[&::-webkit-calendar-picker-indicator]:brightness-150'
         )}
+        // Force high contrast for native time input - uses white text on dark backgrounds
+        style={{ color: '#ffffff', colorScheme: 'dark' }}
       />
     </div>
   );
@@ -298,7 +298,6 @@ function ProjectSelector({
         className={cn(
           'w-full px-3 py-2.5',
           'bg-text-primary/5 rounded-lg',
-          'text-text-primary',
           'border border-transparent',
           'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
           'transition-colors duration-150',
@@ -307,8 +306,11 @@ function ProjectSelector({
           'bg-no-repeat bg-right',
           'pr-10'
         )}
+        // Force high contrast for native select - white text, lighter arrow
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+          color: '#ffffff',
+          colorScheme: 'dark',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ffffff' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
           backgroundSize: '1.25rem',
           backgroundPosition: 'right 0.75rem center',
         }}
@@ -523,13 +525,15 @@ export function ScheduledPromptForm({
                 className={cn(
                   'w-full px-3 py-2.5',
                   'bg-text-primary/5 rounded-lg',
-                  'text-text-primary placeholder:text-text-muted',
+                  'placeholder:text-text-muted/70',
                   'border',
                   error ? 'border-error' : 'border-transparent',
                   'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
                   'transition-colors duration-150',
                   'resize-none'
                 )}
+                // Force high contrast text
+                style={{ color: '#ffffff' }}
               />
               {error && <p className="text-xs text-error">{error}</p>}
             </div>

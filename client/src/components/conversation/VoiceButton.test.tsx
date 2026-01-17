@@ -58,6 +58,16 @@ describe('VoiceButton', () => {
       const svg = button.querySelector('svg');
       expect(svg).toHaveClass('animate-spin');
     });
+
+    it('should render spinner icon when starting', () => {
+      render(<VoiceButton {...defaultProps} isStarting={true} />);
+
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('aria-label', 'Starting microphone');
+      // Check for spinning animation class
+      const svg = button.querySelector('svg');
+      expect(svg).toHaveClass('animate-spin');
+    });
   });
 
   describe('Interactions', () => {
@@ -103,6 +113,17 @@ describe('VoiceButton', () => {
       expect(onStop).not.toHaveBeenCalled();
     });
 
+    it('should not call any handler when starting (prevents double-tap)', () => {
+      const onStart = vi.fn();
+      const onStop = vi.fn();
+      render(<VoiceButton {...defaultProps} isStarting={true} onStart={onStart} onStop={onStop} />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(onStart).not.toHaveBeenCalled();
+      expect(onStop).not.toHaveBeenCalled();
+    });
+
     it('should trigger haptic feedback on click', () => {
       render(<VoiceButton {...defaultProps} />);
 
@@ -128,6 +149,14 @@ describe('VoiceButton', () => {
       expect(button).toHaveClass('bg-accent');
     });
 
+    it('should have amber background and pulse animation when starting', () => {
+      render(<VoiceButton {...defaultProps} isStarting={true} />);
+
+      const button = screen.getByRole('button');
+      expect(button).toHaveClass('bg-amber-500');
+      expect(button).toHaveClass('animate-pulse');
+    });
+
     it('should have reduced opacity when disabled', () => {
       render(<VoiceButton {...defaultProps} disabled={true} />);
 
@@ -138,6 +167,13 @@ describe('VoiceButton', () => {
 
     it('should be disabled when processing', () => {
       render(<VoiceButton {...defaultProps} isProcessing={true} />);
+
+      const button = screen.getByRole('button');
+      expect(button).toBeDisabled();
+    });
+
+    it('should be disabled when starting', () => {
+      render(<VoiceButton {...defaultProps} isStarting={true} />);
 
       const button = screen.getByRole('button');
       expect(button).toBeDisabled();
@@ -168,6 +204,12 @@ describe('VoiceButton', () => {
       render(<VoiceButton {...defaultProps} isProcessing={true} />);
 
       expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Processing audio');
+    });
+
+    it('should have correct aria-label for starting state', () => {
+      render(<VoiceButton {...defaultProps} isStarting={true} />);
+
+      expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Starting microphone');
     });
 
     it('should be keyboard accessible', () => {

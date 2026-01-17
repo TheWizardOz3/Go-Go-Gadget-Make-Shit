@@ -68,7 +68,7 @@ declare global {
 // ============================================================
 
 /** Voice input states */
-export type VoiceState = 'idle' | 'recording' | 'processing' | 'error';
+export type VoiceState = 'idle' | 'starting' | 'recording' | 'processing' | 'error';
 
 /** Response from transcription API */
 interface TranscriptionResponse {
@@ -93,6 +93,8 @@ export interface UseVoiceInputReturn {
   error: Error | null;
   /** MediaStream for waveform visualization (null when not recording) */
   audioStream: MediaStream | null;
+  /** Whether microphone access is being requested (starting up) */
+  isStarting: boolean;
   /** Whether currently recording */
   isRecording: boolean;
   /** Whether currently processing/transcribing */
@@ -487,10 +489,15 @@ export function useVoiceInput({
    * Start recording audio from the microphone
    */
   const startRecording = useCallback(async () => {
-    // Don't start if already recording or processing
-    if (state === 'recording' || state === 'processing') {
+    // Don't start if already starting, recording, or processing
+    if (state === 'starting' || state === 'recording' || state === 'processing') {
       return;
     }
+
+    // IMMEDIATELY set 'starting' state for instant visual feedback
+    // This prevents the perceived lag from async getUserMedia
+    setState('starting');
+    setError(null);
 
     // Check if MediaRecorder is supported AND we're in a secure context
     // iOS Safari requires HTTPS for MediaRecorder
@@ -649,6 +656,7 @@ export function useVoiceInput({
     state,
     error,
     audioStream,
+    isStarting: state === 'starting',
     isRecording: state === 'recording',
     isProcessing: state === 'processing',
     startRecording,

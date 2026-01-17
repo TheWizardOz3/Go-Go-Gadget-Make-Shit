@@ -91,6 +91,7 @@ describe('useVoiceInput', () => {
       );
 
       expect(result.current.state).toBe('idle');
+      expect(result.current.isStarting).toBe(false);
       expect(result.current.isRecording).toBe(false);
       expect(result.current.isProcessing).toBe(false);
       expect(result.current.error).toBeNull();

@@ -442,12 +442,14 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                       className={cn(
                         'w-full px-3 py-2.5',
                         'bg-text-primary/5 rounded-lg',
-                        'text-text-primary placeholder:text-text-muted',
+                        'placeholder:text-text-muted/70',
                         'border',
                         phoneError ? 'border-error' : 'border-transparent',
                         'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
                         'transition-colors duration-150'
                       )}
+                      // Force high contrast text for native input
+                      style={{ color: '#ffffff' }}
                       aria-describedby={phoneError ? 'phone-error' : undefined}
                     />
                     {phoneError && (
@@ -478,11 +480,13 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                       className={cn(
                         'w-full px-3 py-2.5',
                         'bg-text-primary/5 rounded-lg',
-                        'text-text-primary placeholder:text-text-muted',
+                        'placeholder:text-text-muted/70',
                         'border border-transparent',
                         'focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent',
                         'transition-colors duration-150'
                       )}
+                      // Force high contrast text for native input
+                      style={{ color: '#ffffff' }}
                     />
                     <p className="text-xs text-text-muted">
                       Your Tailscale hostname for notification links (run `tailscale status` to find

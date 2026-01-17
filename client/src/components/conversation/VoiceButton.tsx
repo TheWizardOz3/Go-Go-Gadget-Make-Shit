@@ -15,6 +15,8 @@ import { cn } from '@/lib/cn';
 // ============================================================
 
 interface VoiceButtonProps {
+  /** Whether microphone access is being requested */
+  isStarting?: boolean;
   /** Whether currently recording audio */
   isRecording: boolean;
   /** Whether currently processing/transcribing audio */
@@ -118,6 +120,7 @@ function SpinnerIcon() {
  * ```
  */
 export function VoiceButton({
+  isStarting = false,
   isRecording,
   isProcessing,
   disabled = false,
@@ -126,7 +129,8 @@ export function VoiceButton({
   size = 56,
   className,
 }: VoiceButtonProps) {
-  const isDisabled = disabled || isProcessing;
+  // Disable when processing OR when starting (to prevent double-taps)
+  const isDisabled = disabled || isProcessing || isStarting;
   const lastClickTimeRef = useRef<number>(0);
 
   /**
@@ -154,11 +158,13 @@ export function VoiceButton({
   }, [isDisabled, isRecording, onStart, onStop]);
 
   // Dynamic aria-label based on state
-  const ariaLabel = isRecording
-    ? 'Stop recording'
-    : isProcessing
-      ? 'Processing audio'
-      : 'Start voice input';
+  const ariaLabel = isStarting
+    ? 'Starting microphone'
+    : isRecording
+      ? 'Stop recording'
+      : isProcessing
+        ? 'Processing audio'
+        : 'Start voice input';
 
   // Size-dependent classes
   const sizeClass = size === 56 ? 'w-14 h-14' : 'w-11 h-11';
@@ -179,29 +185,45 @@ export function VoiceButton({
         borderRadius,
         'transition-colors duration-150',
 
+        // Starting state - immediate visual feedback (orange/amber with pulse)
+        isStarting && 'bg-amber-500 text-white animate-pulse',
+
         // Recording state - red with pulse animation
-        isRecording && 'bg-error text-white animate-pulse',
+        !isStarting && isRecording && 'bg-error text-white animate-pulse',
 
         // Processing state - accent color
-        isProcessing && 'bg-accent text-white',
+        !isStarting && isProcessing && 'bg-accent text-white',
 
         // Idle state - subtle background
-        !isRecording && !isProcessing && !isDisabled && 'bg-text-primary/5 text-text-secondary',
+        !isStarting &&
+          !isRecording &&
+          !isProcessing &&
+          !disabled &&
+          'bg-text-primary/5 text-text-secondary',
 
         // Hover/active states for idle
-        !isRecording &&
+        !isStarting &&
+          !isRecording &&
           !isProcessing &&
-          !isDisabled &&
+          !disabled &&
           'hover:bg-text-primary/10 active:bg-text-primary/20',
 
-        // Disabled state
-        isDisabled && !isProcessing && 'opacity-50 cursor-not-allowed',
+        // Disabled state (but not when starting/processing - those have their own styles)
+        disabled && !isStarting && !isProcessing && 'opacity-50 cursor-not-allowed',
 
         className
       )}
     >
       <div className={iconSize}>
-        {isProcessing ? <SpinnerIcon /> : isRecording ? <StopIcon /> : <MicrophoneIcon />}
+        {isStarting ? (
+          <SpinnerIcon />
+        ) : isProcessing ? (
+          <SpinnerIcon />
+        ) : isRecording ? (
+          <StopIcon />
+        ) : (
+          <MicrophoneIcon />
+        )}
       </div>
     </button>
   );
