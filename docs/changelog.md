@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.21.5 | 2026-01-17 | patch | Cloud prompt input - send prompts from cached projects |
 | 0.21.4 | 2026-01-17 | patch | Offline view - show cached projects when laptop is asleep |
 | 0.21.3 | 2026-01-17 | patch | Cloud mode initialization fix - wait for endpoint check |
 | 0.21.2 | 2026-01-17 | patch | Cloud mode fix - single FastAPI app |
@@ -55,6 +56,24 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.21.5] - 2026-01-17
+
+### Summary
+**Cloud Execution from Cached Projects** - You can now send prompts to run in the cloud directly from the cached projects view when your laptop is offline.
+
+### Added
+- "Run in Cloud" button for cached projects with git repositories
+- Cloud prompt textarea in project details
+- "Cloud" badge on projects that support cloud execution
+- Success/error feedback after sending cloud prompts
+
+### Changed
+- Updated cloud mode messaging to clarify you CAN send prompts
+- Projects with GitHub repos now show as "Cloud-ready"
+- Projects without repos show warning about needing git remote for cloud
 
 ---
 
