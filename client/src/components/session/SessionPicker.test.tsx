@@ -6,11 +6,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SessionPicker } from './SessionPicker';
-import type { SessionSummarySerialized } from '@shared/types';
+import type { MergedSessionSummary } from '@/hooks/useSessions';
 
-// Mock session data
+// Mock session data (local sessions with source indicator)
 // Note: Sessions with empty/null previews are now filtered out by SessionPicker
-const mockSessions: SessionSummarySerialized[] = [
+const mockSessions: MergedSessionSummary[] = [
   {
     id: 'session-alpha',
     filePath: '/Users/test/.claude/projects/-test/session-alpha.jsonl',
@@ -18,6 +18,7 @@ const mockSessions: SessionSummarySerialized[] = [
     lastActivityAt: new Date().toISOString(),
     messageCount: 5,
     preview: 'Hello Claude, help me with React',
+    source: 'local',
   },
   {
     id: 'session-beta',
@@ -26,6 +27,7 @@ const mockSessions: SessionSummarySerialized[] = [
     lastActivityAt: new Date(Date.now() - 3600000).toISOString(),
     messageCount: 3,
     preview: 'Write a Python script',
+    source: 'local',
   },
   {
     id: 'session-gamma',
@@ -34,11 +36,12 @@ const mockSessions: SessionSummarySerialized[] = [
     lastActivityAt: new Date(Date.now() - 7200000).toISOString(),
     messageCount: 1,
     preview: 'Third session with content',
+    source: 'local',
   },
 ];
 
 // Generate many sessions for search testing
-const generateManySessions = (count: number): SessionSummarySerialized[] => {
+const generateManySessions = (count: number): MergedSessionSummary[] => {
   return Array.from({ length: count }, (_, i) => ({
     id: `session-${i}`,
     filePath: `/Users/test/.claude/projects/-test/session-${i}.jsonl`,
@@ -46,6 +49,7 @@ const generateManySessions = (count: number): SessionSummarySerialized[] => {
     lastActivityAt: new Date(Date.now() - i * 3600000).toISOString(),
     messageCount: i + 1,
     preview: `Session preview text number ${i}`,
+    source: 'local' as const,
   }));
 };
 

@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { cn } from '@/lib/cn';
 import { SessionListItem } from './SessionListItem';
-import type { SessionSummarySerialized } from '@shared/types';
+import type { MergedSessionSummary } from '@/hooks/useSessions';
 
 /** Threshold for showing search input */
 const SEARCH_THRESHOLD = 10;
@@ -19,8 +19,8 @@ interface SessionPickerProps {
   isOpen: boolean;
   /** Callback to close the modal */
   onClose: () => void;
-  /** List of sessions to display */
-  sessions: SessionSummarySerialized[];
+  /** List of sessions to display (supports merged local + cloud sessions) */
+  sessions: MergedSessionSummary[];
   /** Currently selected session ID */
   selectedSession: string | null;
   /** Callback when a session is selected */

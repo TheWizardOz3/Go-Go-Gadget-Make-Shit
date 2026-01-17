@@ -13,6 +13,8 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.21.1 | 2026-01-17 | patch | Auto Git Remote URLs for cloud execution |
+| 0.21.0 | 2026-01-17 | minor | Serverless/Async Execution |
 | 0.20.0 | 2026-01-17 | minor | ntfy Notifications |
 | 0.19.0 | 2026-01-17 | minor | Notification Abstraction Layer |
 | 0.18.0 | 2026-01-17 | minor | Floating Voice Button |
@@ -50,6 +52,77 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.21.1] - 2026-01-17
+
+### Summary
+**Auto Git Remote URLs** - Projects now automatically include their git remote URL, enabling seamless cloud execution without manual configuration.
+
+### Added
+- `gitRemoteUrl` field in Project type for automatic repo URL detection
+- Projects API now fetches git remote URLs when listing projects
+- Cloud execution automatically uses project's repo URL (no manual config needed)
+
+### Changed
+- Settings API schema updated to properly validate `channels` and `serverless` fields
+- `ConversationView` now passes cloud options automatically from project data
+
+### Fixed
+- ntfy settings failing to save (missing schema validation for channels)
+- Settings save returning 400 error when updating notification channels
+
+---
+
+## [0.21.0] - 2026-01-17
+
+### Summary
+**Serverless/Async Execution** - Run Claude Code agents in the cloud via Modal, even when your laptop is asleep. React app hosted on Vercel for laptop-optional access.
+
+### Added
+- Modal cloud execution infrastructure (`modal/modal_app.py`) with:
+  - `execute_prompt` function for running Claude on cloud compute
+  - Git repository cloning for project context
+  - Session data persistence via Modal Volumes
+  - Webhook callbacks for task completion notifications
+  - Web API endpoints (`api_dispatch_job`, `api_list_projects`, `api_get_sessions`, `api_get_messages`, `api_health`)
+- Server-side Modal client (`server/src/services/modalClient.ts`) for cloud API communication
+- Cloud session manager (`server/src/services/cloudSessionManager.ts`) for merging local and cloud sessions
+- New API routes:
+  - `POST /api/cloud/jobs` - Dispatch cloud jobs
+  - `GET /api/cloud/jobs/:id` - Get job status
+  - `GET /api/cloud/sessions` - List cloud sessions
+  - `GET /api/cloud/projects` - List cloud projects
+  - `POST /api/webhooks/cloud-job-complete` - Receive completion notifications from Modal
+- Settings encryption for sensitive tokens (`server/src/lib/encryption.ts`)
+- Serverless settings section in Settings UI:
+  - Enable/disable serverless execution
+  - Modal API token configuration
+  - Claude API key for cloud execution
+  - Default repository URL
+  - Laptop API URL for Tailscale
+- API endpoint switching (`client/src/hooks/useApiEndpoint.tsx`):
+  - Auto-detect laptop availability
+  - Seamless fallback to cloud API
+  - Connection mode badge in header
+- Session source badges showing Local/Cloud origin
+- Vercel deployment configuration (`vercel.json`)
+
+### Changed
+- `useSessions` hook now merges local and cloud sessions
+- `useSendPrompt` hook supports cloud job dispatch
+- Session picker and list items show cloud indicators
+- App wrapped with `ApiEndpointProvider` for global endpoint state
+
+### Technical
+- Shared types extended with cloud job, session, and settings types
+- Dynamic API base URL based on laptop availability
+- Webhook-based notification integration for cloud task completion
+
+### Dependencies
+- Modal Python client (for `modal_app.py`)
+- `lru-cache` for cloud session caching
 
 ---
 

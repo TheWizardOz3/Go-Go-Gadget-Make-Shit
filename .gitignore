@@ -53,3 +53,4 @@ certs/
 # Claude Code local data (never commit user data)
 # Note: We read from ~/.claude/ but never commit it
 
+.vercel

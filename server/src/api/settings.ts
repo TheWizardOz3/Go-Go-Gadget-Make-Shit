@@ -17,6 +17,43 @@ const router: RouterType = Router();
 // ============================================================
 
 /**
+ * Schema for ntfy channel settings
+ */
+const ntfyChannelSchema = z.object({
+  enabled: z.boolean(),
+  serverUrl: z.string().optional(),
+  topic: z.string().optional(),
+  authToken: z.string().optional(),
+});
+
+/**
+ * Schema for iMessage channel settings
+ */
+const imessageChannelSchema = z.object({
+  enabled: z.boolean(),
+  phoneNumber: z.string().optional(),
+});
+
+/**
+ * Schema for notification channels
+ */
+const channelsSchema = z.object({
+  imessage: imessageChannelSchema.optional(),
+  ntfy: ntfyChannelSchema.optional(),
+});
+
+/**
+ * Schema for serverless settings
+ */
+const serverlessSchema = z.object({
+  enabled: z.boolean().optional(),
+  modalApiToken: z.string().optional(),
+  claudeApiKey: z.string().optional(),
+  defaultRepoUrl: z.string().optional(),
+  laptopApiUrl: z.string().optional(),
+});
+
+/**
  * Schema for updating settings (all fields optional)
  */
 const updateSettingsSchema = z.object({
@@ -25,6 +62,8 @@ const updateSettingsSchema = z.object({
   serverHostname: z.string().optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
   allowEdits: z.boolean().optional(),
+  channels: channelsSchema.optional(),
+  serverless: serverlessSchema.optional(),
   // defaultTemplates intentionally omitted - managed separately
 });
 

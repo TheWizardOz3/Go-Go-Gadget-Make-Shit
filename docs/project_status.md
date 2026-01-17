@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-17 (V1 Feature 3: ntfy Notifications - Complete, v0.20.0)
+**Last Updated**: 2026-01-17 (V1 Complete + Auto Git Remote URLs patch, v0.21.1)
 
 ---
 
@@ -76,12 +76,12 @@
 
 ### V1 Build Order
 
-| Order | Feature                        | Status      | Description                                                                       |
-|-------|--------------------------------|-------------|-----------------------------------------------------------------------------------|
-| 1     | Floating Voice Button          | ✅ Complete  | Persistent mic across views; record while browsing file tree                      |
-| 2     | Notification Abstraction Layer | ✅ Complete  | Extract iMessage into pluggable abstraction for all channels                      |
-| 3     | ntfy Notifications             | ✅ Complete  | Push notifications via ntfy.sh - [doc](Features/ntfy-notifications.md)            |
-| 4     | Serverless/Async Execution     | In Progress | Run agents without laptop awake (Modal) - [doc](Features/serverless-execution.md) |
+| Order | Feature                        | Status     | Description                                                                       |
+|-------|--------------------------------|------------|-----------------------------------------------------------------------------------|
+| 1     | Floating Voice Button          | ✅ Complete | Persistent mic across views; record while browsing file tree                      |
+| 2     | Notification Abstraction Layer | ✅ Complete | Extract iMessage into pluggable abstraction for all channels                      |
+| 3     | ntfy Notifications             | ✅ Complete | Push notifications via ntfy.sh - [doc](Features/ntfy-notifications.md)            |
+| 4     | Serverless/Async Execution     | ✅ Complete | Run agents without laptop awake (Modal) - [doc](Features/serverless-execution.md) |
 
 ### Dependency Notes
 - **Floating Voice Button** is independent (no backend dependencies beyond existing voice infrastructure)
@@ -93,11 +93,11 @@
 - FloatingVoiceButton component with long-press-to-send gesture
 - Notification channel abstraction layer - [doc](Features/notification-abstraction-layer.md)
 - NtfyChannel class with HTTP POST to ntfy.sh - [doc](Features/ntfy-notifications.md)
-- Modal cloud compute integration - [doc](Features/serverless-execution.md)
+- Modal cloud compute + Vercel app hosting - [doc](Features/serverless-execution.md)
 
 ---
 
-## V1 Progress
+## V1 Progress - COMPLETE ✅
 
 **Test Count: 726 tests** (423 client + 303 server)
 
@@ -106,7 +106,8 @@
 | Floating Voice Button          | 2026-01-17      | Persistent mic on Files tab with long-press-to-send - [doc](Features/floating-voice-button.md)             |
 | Notification Abstraction Layer | 2026-01-17      | Pluggable channel system (iMessage, ntfy, Slack, etc.) - [doc](Features/notification-abstraction-layer.md) |
 | ntfy Notifications             | 2026-01-17      | Push notifications via ntfy.sh (44 tests) - [doc](Features/ntfy-notifications.md)                          |
-| Serverless/Async Execution     | Pending         | Run agents without laptop awake (Modal/Fly.io/Railway)                                                     |
+| Serverless/Async Execution     | 2026-01-17      | Run agents without laptop awake (Modal + Vercel) - [doc](Features/serverless-execution.md)                 |
+| Auto Git Remote URLs (patch)   | 2026-01-17      | Projects auto-include git remote URL for seamless cloud execution                                          |
 
 ---
 

@@ -1,9 +1,15 @@
 /**
  * API Client for GoGoGadgetClaude
  *
- * Typed fetch wrapper with automatic base URL detection
- * and standardized error handling.
+ * Typed fetch wrapper with dynamic base URL support for
+ * switching between local (laptop) and cloud (Modal) APIs.
+ *
+ * The base URL can be set dynamically via setApiBaseUrl(),
+ * which is called by the ApiEndpointProvider when the
+ * connection mode changes.
  */
+
+import type { ApiEndpointMode } from '@shared/types';
 
 // ============================================================
 // Types
@@ -39,29 +45,101 @@ export class ApiError extends Error {
   }
 }
 
+/** Options for API requests */
+export interface ApiRequestOptions {
+  /** Override the base URL for this request only */
+  baseUrl?: string;
+  /** Additional headers */
+  headers?: Record<string, string>;
+  /** Request timeout in ms */
+  timeout?: number;
+}
+
 // ============================================================
 // Configuration
 // ============================================================
 
 /**
- * Determine API base URL based on environment
+ * Determine default API base URL based on environment
  *
- * - Development: Vite dev server proxies to localhost:3456
- * - Production: Same origin (served by Express)
+ * - Development: localhost:3457 (HTTP port)
+ * - Production: Same origin (served by Express) OR configured URLs
  */
-function getBaseUrl(): string {
-  // In development, Vite runs on a different port
-  // We need to call the Express server directly
-  // Server runs HTTPS on 3456 (primary) and HTTP on 3457 (secondary)
-  // Use HTTP for dev browser testing (voice input won't work but API calls will)
+function getDefaultBaseUrl(): string {
+  // In development, use HTTP port directly
   if (import.meta.env.DEV) {
     return 'http://localhost:3457';
   }
-  // In production, API is served from same origin
+
+  // In production on Vercel, try laptop URL first
+  const laptopUrl = import.meta.env.VITE_LAPTOP_API_URL;
+  if (laptopUrl) {
+    return laptopUrl;
+  }
+
+  // Fall back to same origin (for local production builds)
   return '';
 }
 
-const BASE_URL = getBaseUrl();
+/** Current base URL - can be updated dynamically */
+let currentBaseUrl = getDefaultBaseUrl();
+
+/** Current API mode for logging/debugging */
+let currentMode: ApiEndpointMode = 'local';
+
+/** Subscribers to base URL changes */
+type BaseUrlSubscriber = (baseUrl: string, mode: ApiEndpointMode) => void;
+const subscribers: Set<BaseUrlSubscriber> = new Set();
+
+// ============================================================
+// Base URL Management
+// ============================================================
+
+/**
+ * Set the API base URL dynamically
+ *
+ * Called by ApiEndpointProvider when connection mode changes.
+ *
+ * @param baseUrl - The new base URL (e.g., "https://macbook.tailnet.ts.net:3456")
+ * @param mode - The current API mode ('local' or 'cloud')
+ */
+export function setApiBaseUrl(baseUrl: string, mode: ApiEndpointMode = 'local'): void {
+  const changed = currentBaseUrl !== baseUrl || currentMode !== mode;
+  currentBaseUrl = baseUrl;
+  currentMode = mode;
+
+  if (changed) {
+    // Notify subscribers
+    subscribers.forEach((callback) => callback(baseUrl, mode));
+  }
+}
+
+/**
+ * Get the current API base URL
+ */
+export function getApiBaseUrl(): string {
+  return currentBaseUrl;
+}
+
+/**
+ * Get the current API mode
+ */
+export function getApiMode(): ApiEndpointMode {
+  return currentMode;
+}
+
+/**
+ * Subscribe to base URL changes
+ *
+ * @param callback - Function to call when base URL changes
+ * @returns Unsubscribe function
+ */
+export function subscribeToBaseUrl(callback: BaseUrlSubscriber): () => void {
+  subscribers.add(callback);
+  return () => {
+    subscribers.delete(callback);
+  };
+}
 
 // ============================================================
 // Fetch Wrapper
@@ -73,40 +151,59 @@ const BASE_URL = getBaseUrl();
 async function request<T>(
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
-  body?: unknown
+  body?: unknown,
+  options?: ApiRequestOptions
 ): Promise<T> {
-  const url = `${BASE_URL}/api${path}`;
+  const baseUrl = options?.baseUrl ?? currentBaseUrl;
+  const url = `${baseUrl}/api${path}`;
 
-  const options: RequestInit = {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options?.headers,
+  };
+
+  const fetchOptions: RequestInit = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
   };
 
   if (body !== undefined) {
-    options.body = JSON.stringify(body);
+    fetchOptions.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, options);
-
-  // Parse JSON response
-  const json = await response.json();
-
-  // Handle error responses
-  if (!response.ok) {
-    const errorResponse = json as ApiErrorResponse;
-    throw new ApiError(
-      errorResponse.error?.message || 'An error occurred',
-      errorResponse.error?.code || 'UNKNOWN_ERROR',
-      response.status,
-      errorResponse.error?.details
-    );
+  // Add timeout support
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  if (options?.timeout) {
+    const controller = new AbortController();
+    fetchOptions.signal = controller.signal;
+    timeoutId = setTimeout(() => controller.abort(), options.timeout);
   }
 
-  // Return the data from success response
-  const successResponse = json as ApiSuccessResponse<T>;
-  return successResponse.data;
+  try {
+    const response = await fetch(url, fetchOptions);
+
+    // Parse JSON response
+    const json = await response.json();
+
+    // Handle error responses
+    if (!response.ok) {
+      const errorResponse = json as ApiErrorResponse;
+      throw new ApiError(
+        errorResponse.error?.message || 'An error occurred',
+        errorResponse.error?.code || 'UNKNOWN_ERROR',
+        response.status,
+        errorResponse.error?.details
+      );
+    }
+
+    // Return the data from success response
+    const successResponse = json as ApiSuccessResponse<T>;
+    return successResponse.data;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 // ============================================================
@@ -118,40 +215,40 @@ export const api = {
    * GET request
    * @example const status = await api.get<StatusResponse>('/status');
    */
-  get<T>(path: string): Promise<T> {
-    return request<T>('GET', path);
+  get<T>(path: string, options?: ApiRequestOptions): Promise<T> {
+    return request<T>('GET', path, undefined, options);
   },
 
   /**
    * POST request
    * @example await api.post('/sessions/abc/send', { prompt: 'Hello' });
    */
-  post<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>('POST', path, body);
+  post<T>(path: string, body?: unknown, options?: ApiRequestOptions): Promise<T> {
+    return request<T>('POST', path, body, options);
   },
 
   /**
    * PUT request
    * @example await api.put('/settings', { theme: 'dark' });
    */
-  put<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>('PUT', path, body);
+  put<T>(path: string, body?: unknown, options?: ApiRequestOptions): Promise<T> {
+    return request<T>('PUT', path, body, options);
   },
 
   /**
    * DELETE request
    * @example await api.delete('/sessions/abc');
    */
-  delete<T>(path: string): Promise<T> {
-    return request<T>('DELETE', path);
+  delete<T>(path: string, options?: ApiRequestOptions): Promise<T> {
+    return request<T>('DELETE', path, undefined, options);
   },
 
   /**
    * PATCH request
    * @example await api.patch('/scheduled-prompts/abc/toggle');
    */
-  patch<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>('PATCH', path, body);
+  patch<T>(path: string, body?: unknown, options?: ApiRequestOptions): Promise<T> {
+    return request<T>('PATCH', path, body, options);
   },
 
   /**
@@ -161,32 +258,63 @@ export const api = {
    * formData.append('audio', audioBlob);
    * const result = await api.upload<TranscriptionResult>('/transcribe', formData);
    */
-  async upload<T>(path: string, formData: FormData): Promise<T> {
-    const url = `${BASE_URL}/api${path}`;
+  async upload<T>(path: string, formData: FormData, options?: ApiRequestOptions): Promise<T> {
+    const baseUrl = options?.baseUrl ?? currentBaseUrl;
+    const url = `${baseUrl}/api${path}`;
 
-    // Don't set Content-Type header - browser will set it with boundary
-    const response = await fetch(url, {
+    const fetchOptions: RequestInit = {
       method: 'POST',
       body: formData,
-    });
+      // Don't set Content-Type header - browser will set it with boundary
+    };
 
-    // Parse JSON response
-    const json = await response.json();
-
-    // Handle error responses
-    if (!response.ok) {
-      const errorResponse = json as ApiErrorResponse;
-      throw new ApiError(
-        errorResponse.error?.message || 'Upload failed',
-        errorResponse.error?.code || 'UPLOAD_ERROR',
-        response.status,
-        errorResponse.error?.details
-      );
+    // Add timeout support
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (options?.timeout) {
+      const controller = new AbortController();
+      fetchOptions.signal = controller.signal;
+      timeoutId = setTimeout(() => controller.abort(), options.timeout);
     }
 
-    // Return the data from success response
-    const successResponse = json as ApiSuccessResponse<T>;
-    return successResponse.data;
+    try {
+      const response = await fetch(url, fetchOptions);
+
+      // Parse JSON response
+      const json = await response.json();
+
+      // Handle error responses
+      if (!response.ok) {
+        const errorResponse = json as ApiErrorResponse;
+        throw new ApiError(
+          errorResponse.error?.message || 'Upload failed',
+          errorResponse.error?.code || 'UPLOAD_ERROR',
+          response.status,
+          errorResponse.error?.details
+        );
+      }
+
+      // Return the data from success response
+      const successResponse = json as ApiSuccessResponse<T>;
+      return successResponse.data;
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+  },
+
+  /**
+   * Get the current base URL being used
+   */
+  getBaseUrl(): string {
+    return currentBaseUrl;
+  },
+
+  /**
+   * Get the current API mode
+   */
+  getMode(): ApiEndpointMode {
+    return currentMode;
   },
 };
 
@@ -209,7 +337,24 @@ export function getErrorMessage(error: unknown): string {
     return error.message;
   }
   if (error instanceof Error) {
+    // Handle timeout errors
+    if (error.name === 'AbortError') {
+      return 'Request timed out';
+    }
     return error.message;
   }
   return 'An unexpected error occurred';
+}
+
+/**
+ * Check if an error is a network/connectivity error
+ */
+export function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return true;
+  }
+  if (error instanceof Error && error.name === 'AbortError') {
+    return true;
+  }
+  return false;
 }

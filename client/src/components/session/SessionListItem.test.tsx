@@ -6,34 +6,37 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SessionListItem } from './SessionListItem';
-import type { SessionSummarySerialized } from '@shared/types';
+import type { MergedSessionSummary } from '@/hooks/useSessions';
 
-// Mock session data
-const mockSession: SessionSummarySerialized = {
+// Mock session data (local sessions)
+const mockSession: MergedSessionSummary = {
   id: 'session-123',
   filePath: '/Users/test/.claude/projects/-Users-test-my-project/session-123.jsonl',
   startedAt: new Date().toISOString(),
   lastActivityAt: new Date().toISOString(),
   messageCount: 5,
   preview: 'Hello Claude, please help me with a React component',
+  source: 'local',
 };
 
-const mockSessionNoPreview: SessionSummarySerialized = {
+const mockSessionNoPreview: MergedSessionSummary = {
   id: 'session-456',
   filePath: '/Users/test/.claude/projects/-Users-test-my-project/session-456.jsonl',
   startedAt: new Date().toISOString(),
   lastActivityAt: new Date().toISOString(),
   messageCount: 0,
   preview: null,
+  source: 'local',
 };
 
-const mockSessionNoActivity: SessionSummarySerialized = {
+const mockSessionNoActivity: MergedSessionSummary = {
   id: 'session-789',
   filePath: '/Users/test/.claude/projects/-Users-test-my-project/session-789.jsonl',
   startedAt: null,
   lastActivityAt: null,
   messageCount: 0,
   preview: 'Old session preview',
+  source: 'local',
 };
 
 describe('SessionListItem', () => {

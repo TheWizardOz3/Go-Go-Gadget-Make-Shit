@@ -19,6 +19,11 @@ export const config = {
   // Can include protocol (https://) or just hostname
   tailscaleHostname: process.env.TAILSCALE_HOSTNAME || 'dereks-macbook-pro.taild775c5.ts.net',
 
+  // Server URL for webhook callbacks
+  // Used by Modal to send completion notifications back to this server
+  // e.g., "https://your-macbook.tailnet.ts.net:3456" or "http://localhost:3457"
+  serverUrl: process.env.SERVER_URL || '',
+
   // HTTPS/SSL configuration
   // Set these to enable HTTPS (required for voice input on iOS Safari)
   sslCertPath: process.env.SSL_CERT_PATH || '',
@@ -27,5 +32,15 @@ export const config = {
   // Helper to check if HTTPS is configured
   get httpsEnabled(): boolean {
     return Boolean(this.sslCertPath && this.sslKeyPath);
+  },
+
+  // Modal cloud configuration
+  // Set this to your Modal web endpoint URL after deployment
+  // Format: https://<username>--gogogadget-claude-web.modal.run
+  modalWebEndpointUrl: process.env.MODAL_WEB_ENDPOINT_URL || '',
+
+  // Helper to check if Modal is configured
+  get modalEnabled(): boolean {
+    return Boolean(this.modalWebEndpointUrl);
   },
 } as const;

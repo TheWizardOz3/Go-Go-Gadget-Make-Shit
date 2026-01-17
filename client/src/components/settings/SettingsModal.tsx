@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, forwardRef } from 'react';
 import { cn } from '@/lib/cn';
 import { useSettings, sendTestNotification } from '@/hooks/useSettings';
+import { ServerlessSettingsSection } from './ServerlessSettingsSection';
 import type {
   IMessageChannelSettings,
   NtfyChannelSettings,
@@ -954,6 +955,14 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                   </p>
                 </div>
               </section>
+
+              {/* Serverless Execution Section */}
+              <ServerlessSettingsSection
+                settings={settings}
+                isLoading={isLoading}
+                isUpdating={isUpdating}
+                onUpdateSettings={updateSettings}
+              />
 
               {/* Info Section */}
               <section className="pt-4 border-t border-text-primary/10">

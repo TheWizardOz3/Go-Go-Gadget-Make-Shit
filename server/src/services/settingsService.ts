@@ -12,6 +12,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
+import { encrypt, decrypt, maskSensitive } from '../lib/encryption.js';
 
 // ============================================================
 // Types (matches shared/types/index.ts)
@@ -81,6 +82,24 @@ export interface NotificationChannelSettings {
 }
 
 // -----------------------------------------------------------------------------
+// Serverless Settings Type
+// -----------------------------------------------------------------------------
+
+/** Serverless execution settings */
+export interface ServerlessSettings {
+  /** Whether serverless mode is enabled */
+  enabled: boolean;
+  /** Modal API token (stored encrypted) */
+  modalToken?: string;
+  /** Claude API key for cloud execution (stored encrypted) */
+  claudeApiKey?: string;
+  /** Default git repository URL for cloud execution */
+  defaultRepoUrl?: string;
+  /** User's Tailscale/local laptop URL for connectivity checks */
+  laptopUrl?: string;
+}
+
+// -----------------------------------------------------------------------------
 // App Settings Type
 // -----------------------------------------------------------------------------
 
@@ -95,6 +114,10 @@ export interface AppSettings {
   // === NEW: Channel-based notifications ===
   /** Notification channel configurations */
   channels?: NotificationChannelSettings;
+
+  // === SERVERLESS EXECUTION (V1) ===
+  /** Serverless execution settings for cloud compute */
+  serverless?: ServerlessSettings;
 
   // === UNCHANGED ===
   /** Server hostname for notification links */
@@ -176,6 +199,15 @@ const NotificationChannelSettingsSchema = z.object({
   email: EmailChannelSettingsSchema.optional(),
 });
 
+/** Serverless settings schema */
+const ServerlessSettingsSchema = z.object({
+  enabled: z.boolean(),
+  modalToken: z.string().optional(),
+  claudeApiKey: z.string().optional(),
+  defaultRepoUrl: z.string().optional(),
+  laptopUrl: z.string().optional(),
+});
+
 /** App settings schema (supports both legacy and new format) */
 const AppSettingsSchema = z.object({
   // Legacy fields (optional for backward compatibility)
@@ -183,6 +215,8 @@ const AppSettingsSchema = z.object({
   notificationPhoneNumber: z.string().optional(),
   // New channel-based settings
   channels: NotificationChannelSettingsSchema.optional(),
+  // Serverless execution settings
+  serverless: ServerlessSettingsSchema.optional(),
   // Unchanged fields
   serverHostname: z.string().optional(),
   defaultTemplates: z.array(TemplateSchema),
@@ -312,10 +346,12 @@ async function readSettingsFile(): Promise<unknown | null> {
 
 /**
  * Write settings to file
+ * Encrypts sensitive fields before writing.
  */
 async function writeSettingsFile(settings: AppSettings): Promise<void> {
   await ensureSettingsDir();
-  const content = JSON.stringify(settings, null, 2);
+  const processed = processSettingsBeforeWrite(settings);
+  const content = JSON.stringify(processed, null, 2);
   await writeFile(SETTINGS_FILE, content, 'utf-8');
 }
 
@@ -340,12 +376,81 @@ function mergeWithDefaults(settings: Partial<AppSettings>): AppSettings {
       ...(settings.channels?.telegram && { telegram: settings.channels.telegram }),
       ...(settings.channels?.email && { email: settings.channels.email }),
     },
+    // Preserve serverless settings if present
+    ...(settings.serverless && { serverless: settings.serverless }),
     serverHostname: settings.serverHostname,
     defaultTemplates: settings.defaultTemplates ?? DEFAULT_SETTINGS.defaultTemplates,
     theme: settings.theme ?? DEFAULT_SETTINGS.theme,
     allowEdits: settings.allowEdits,
     lastActiveProjectPath: settings.lastActiveProjectPath,
   };
+}
+
+// ============================================================
+// Encryption Helpers
+// ============================================================
+
+/** Fields that should be encrypted in serverless settings */
+const ENCRYPTED_SERVERLESS_FIELDS: (keyof ServerlessSettings)[] = ['modalToken', 'claudeApiKey'];
+
+/**
+ * Encrypt sensitive fields in serverless settings before saving.
+ */
+function encryptServerlessSettings(settings: ServerlessSettings): ServerlessSettings {
+  const encrypted = { ...settings };
+
+  for (const field of ENCRYPTED_SERVERLESS_FIELDS) {
+    const value = encrypted[field];
+    if (typeof value === 'string' && value) {
+      (encrypted as Record<string, unknown>)[field] = encrypt(value);
+    }
+  }
+
+  return encrypted;
+}
+
+/**
+ * Decrypt sensitive fields in serverless settings after reading.
+ */
+function decryptServerlessSettings(settings: ServerlessSettings): ServerlessSettings {
+  const decrypted = { ...settings };
+
+  for (const field of ENCRYPTED_SERVERLESS_FIELDS) {
+    const value = decrypted[field];
+    if (typeof value === 'string' && value) {
+      (decrypted as Record<string, unknown>)[field] = decrypt(value);
+    }
+  }
+
+  return decrypted;
+}
+
+/**
+ * Process settings after reading from disk.
+ * Decrypts sensitive fields.
+ */
+function processSettingsAfterRead(settings: AppSettings): AppSettings {
+  if (settings.serverless) {
+    return {
+      ...settings,
+      serverless: decryptServerlessSettings(settings.serverless),
+    };
+  }
+  return settings;
+}
+
+/**
+ * Process settings before writing to disk.
+ * Encrypts sensitive fields.
+ */
+function processSettingsBeforeWrite(settings: AppSettings): AppSettings {
+  if (settings.serverless) {
+    return {
+      ...settings,
+      serverless: encryptServerlessSettings(settings.serverless),
+    };
+  }
+  return settings;
 }
 
 // ============================================================
@@ -405,7 +510,9 @@ export async function getSettings(): Promise<AppSettings> {
     }
 
     // Already in new format, just merge with defaults
-    return mergeWithDefaults(parsedSettings);
+    const merged = mergeWithDefaults(parsedSettings);
+    // Decrypt sensitive fields
+    return processSettingsAfterRead(merged);
   } catch (err) {
     logger.error('Failed to read settings', {
       path: SETTINGS_FILE,
@@ -500,4 +607,111 @@ export function isIMessageEnabled(settings: AppSettings): boolean {
  */
 export function getIMessagePhoneNumber(settings: AppSettings): string | undefined {
   return settings.channels?.imessage?.phoneNumber;
+}
+
+// ============================================================
+// Serverless Settings Helpers
+// ============================================================
+
+/**
+ * Check if serverless execution is enabled.
+ *
+ * @param settings - App settings
+ * @returns true if serverless mode is enabled
+ */
+export function isServerlessEnabled(settings: AppSettings): boolean {
+  return settings.serverless?.enabled ?? false;
+}
+
+/**
+ * Get the serverless settings.
+ *
+ * @param settings - App settings
+ * @returns Serverless settings or undefined
+ */
+export function getServerlessSettings(settings: AppSettings): ServerlessSettings | undefined {
+  return settings.serverless;
+}
+
+/**
+ * Get the Modal API token (decrypted).
+ *
+ * @param settings - App settings
+ * @returns Modal token or undefined
+ */
+export function getModalToken(settings: AppSettings): string | undefined {
+  return settings.serverless?.modalToken;
+}
+
+/**
+ * Get the Claude API key for cloud execution (decrypted).
+ *
+ * @param settings - App settings
+ * @returns Claude API key or undefined
+ */
+export function getClaudeApiKey(settings: AppSettings): string | undefined {
+  return settings.serverless?.claudeApiKey;
+}
+
+/**
+ * Get the default repository URL for cloud execution.
+ *
+ * @param settings - App settings
+ * @returns Default repo URL or undefined
+ */
+export function getDefaultRepoUrl(settings: AppSettings): string | undefined {
+  return settings.serverless?.defaultRepoUrl;
+}
+
+/**
+ * Get the laptop URL for connectivity checks.
+ *
+ * @param settings - App settings
+ * @returns Laptop URL or undefined
+ */
+export function getLaptopUrl(settings: AppSettings): string | undefined {
+  return settings.serverless?.laptopUrl;
+}
+
+/**
+ * Update serverless settings.
+ * Handles encryption of sensitive fields automatically.
+ *
+ * @param serverlessUpdate - Partial serverless settings to update
+ * @returns Updated app settings
+ */
+export async function updateServerlessSettings(
+  serverlessUpdate: Partial<ServerlessSettings>
+): Promise<AppSettings> {
+  const current = await getSettings();
+  const currentServerless = current.serverless ?? { enabled: false };
+
+  const updatedServerless: ServerlessSettings = {
+    ...currentServerless,
+    ...serverlessUpdate,
+  };
+
+  return updateSettings({ serverless: updatedServerless });
+}
+
+/**
+ * Get serverless settings with masked sensitive values (for logging/display).
+ *
+ * @param settings - App settings
+ * @returns Serverless settings with masked tokens
+ */
+export function getServerlessSettingsMasked(
+  settings: AppSettings
+): Record<string, unknown> | undefined {
+  if (!settings.serverless) {
+    return undefined;
+  }
+
+  return {
+    enabled: settings.serverless.enabled,
+    modalToken: maskSensitive(settings.serverless.modalToken),
+    claudeApiKey: maskSensitive(settings.serverless.claudeApiKey),
+    defaultRepoUrl: settings.serverless.defaultRepoUrl,
+    laptopUrl: settings.serverless.laptopUrl,
+  };
 }

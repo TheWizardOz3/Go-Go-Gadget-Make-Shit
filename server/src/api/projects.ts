@@ -20,18 +20,25 @@ const router: RouterType = Router();
  * GET /api/projects
  *
  * Returns all projects sorted by most recent activity.
+ * Includes git remote URL for each project (for cloud execution).
  */
 router.get('/', async (_req, res) => {
   try {
     const projects = await scanProjects();
 
-    // Convert Date objects to ISO strings for JSON serialization
-    const serializedProjects = projects.map((p) => ({
-      ...p,
-      lastActivityAt: p.lastActivityAt?.toISOString(),
-    }));
+    // Fetch git remote URLs for all projects in parallel
+    const projectsWithUrls = await Promise.all(
+      projects.map(async (p) => {
+        const gitRemoteUrl = await getGitHubRepoUrl(p.path);
+        return {
+          ...p,
+          lastActivityAt: p.lastActivityAt?.toISOString(),
+          gitRemoteUrl: gitRemoteUrl ?? undefined,
+        };
+      })
+    );
 
-    res.json(success(serializedProjects));
+    res.json(success(projectsWithUrls));
   } catch (err) {
     logger.error('Failed to list projects', {
       error: err instanceof Error ? err.message : 'Unknown error',

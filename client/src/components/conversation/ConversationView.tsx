@@ -28,6 +28,10 @@ interface ConversationViewProps {
   encodedPath: string | null;
   /** Project path (decoded) for creating new sessions */
   projectPath?: string;
+  /** Project name for cloud execution */
+  projectName?: string;
+  /** Git remote URL for cloud execution */
+  gitRemoteUrl?: string;
   /** Callback when a new session is started with the user's first message */
   onNewSessionStarted?: () => void;
   /** Additional CSS classes */
@@ -44,6 +48,8 @@ export function ConversationView({
   sessionId,
   encodedPath,
   projectPath,
+  projectName,
+  gitRemoteUrl,
   onNewSessionStarted,
   className,
 }: ConversationViewProps) {
@@ -62,7 +68,10 @@ export function ConversationView({
   const [textToInsert, setTextToInsert] = useState<string | undefined>(undefined);
 
   const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId);
-  const { sendPrompt, isSending } = useSendPrompt(sessionId);
+  // Pass cloud options from project's git remote URL for automatic cloud execution
+  const cloudOptions =
+    gitRemoteUrl && projectName ? { repoUrl: gitRemoteUrl, projectName } : undefined;
+  const { sendPrompt, isSending } = useSendPrompt(sessionId, cloudOptions);
   const { stopAgent, isStopping } = useStopAgent(sessionId);
   const { templates, isLoading: templatesLoading } = useTemplates(encodedPath);
 

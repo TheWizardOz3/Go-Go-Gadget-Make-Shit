@@ -133,6 +133,8 @@ export interface Project {
   lastSessionId?: string;
   /** Last activity timestamp */
   lastActivityAt?: Date;
+  /** Git remote URL (for cloud execution) */
+  gitRemoteUrl?: string;
 }
 
 /** Project with ISO string date (for API responses) */
@@ -143,6 +145,8 @@ export interface ProjectSerialized {
   sessionCount: number;
   lastSessionId?: string;
   lastActivityAt?: string;
+  /** Git remote URL (for cloud execution) */
+  gitRemoteUrl?: string;
 }
 
 // =============================================================================
@@ -348,6 +352,135 @@ export interface ScheduledPromptsFile {
 }
 
 // =============================================================================
+// Serverless Execution Types (V1 Feature)
+// =============================================================================
+
+/** API endpoint mode - where the app is connecting to */
+export type ApiEndpointMode = 'local' | 'cloud';
+
+/** Cloud job execution status */
+export type CloudJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+/** Serverless execution settings */
+export interface ServerlessSettings {
+  /** Whether serverless mode is enabled */
+  enabled: boolean;
+  /** Modal API token (stored encrypted) */
+  modalToken?: string;
+  /** Claude API key for cloud execution (stored encrypted) */
+  claudeApiKey?: string;
+  /** Default git repository URL for cloud execution */
+  defaultRepoUrl?: string;
+  /** User's Tailscale/local laptop URL for connectivity checks */
+  laptopUrl?: string;
+}
+
+/** Cloud job dispatch request */
+export interface CloudJobDispatchRequest {
+  /** The prompt to execute */
+  prompt: string;
+  /** Git repository URL to clone */
+  repoUrl: string;
+  /** Project name (used for JSONL organization) */
+  projectName: string;
+  /** Allowed tools for Claude (e.g., ["Task", "Bash", "Read", "Write"]) */
+  allowedTools?: string[];
+  /** Webhook URL for completion notification */
+  notificationWebhook?: string;
+}
+
+/** Cloud job information */
+export interface CloudJob {
+  /** Unique job identifier */
+  id: string;
+  /** Current job status */
+  status: CloudJobStatus;
+  /** When the job was created */
+  createdAt: string;
+  /** When the job started executing (null if still queued) */
+  startedAt?: string;
+  /** When the job completed (null if not complete) */
+  completedAt?: string;
+  /** Project name for this job */
+  projectName: string;
+  /** Error message if job failed */
+  error?: string;
+  /** Session ID created by this job (available after completion) */
+  sessionId?: string;
+}
+
+/** Cloud job dispatch response */
+export interface CloudJobDispatchResponse {
+  /** The created job ID */
+  jobId: string;
+  /** Initial status (typically 'queued') */
+  status: CloudJobStatus;
+  /** Estimated wait time in seconds */
+  estimatedWaitSeconds?: number;
+}
+
+/** Cloud job status response */
+export interface CloudJobStatusResponse {
+  /** Job information */
+  job: CloudJob;
+}
+
+/** Cloud session - extends Session with source indicator */
+export interface CloudSession {
+  /** Session UUID */
+  id: string;
+  /** Project path (encoded for cloud storage) */
+  projectPath: string;
+  /** Project name */
+  projectName: string;
+  /** First message timestamp (ISO string) */
+  startedAt: string;
+  /** Last activity timestamp (ISO string) */
+  lastActivityAt: string;
+  /** Total messages in session */
+  messageCount: number;
+  /** Current session status */
+  status: SessionStatus;
+  /** Source indicator - 'cloud' for cloud-executed sessions */
+  source: 'cloud';
+}
+
+/** Local session with source indicator (for merged lists) */
+export interface LocalSession extends SessionSerialized {
+  /** Source indicator - 'local' for laptop-executed sessions */
+  source: 'local';
+}
+
+/** Combined session type for UI (can be local or cloud) */
+export type MergedSession = LocalSession | CloudSession;
+
+/** API endpoint state for the client */
+export interface ApiEndpointState {
+  /** Current API base URL */
+  baseUrl: string;
+  /** Current mode (local or cloud) */
+  mode: ApiEndpointMode;
+  /** Whether connectivity check is in progress */
+  isChecking: boolean;
+  /** Last successful check timestamp */
+  lastCheckedAt?: string;
+}
+
+/** Cloud execution cost estimate */
+export interface CloudCostEstimate {
+  /** Estimated compute cost in USD */
+  computeCost: number;
+  /** Estimated API cost in USD (if using BYOK) */
+  apiCost?: number;
+  /** Total estimated cost */
+  totalCost: number;
+  /** Cost per minute of execution */
+  costPerMinute: number;
+  /** Warning message if applicable */
+  warning?: string;
+}
+
+// =============================================================================
 // Settings Types
 // =============================================================================
 
@@ -436,6 +569,10 @@ export interface AppSettings {
   // === NEW: Channel-based notifications ===
   /** Notification channel configurations */
   channels?: NotificationChannelSettings;
+
+  // === SERVERLESS EXECUTION (V1) ===
+  /** Serverless execution settings for cloud compute */
+  serverless?: ServerlessSettings;
 
   // === UNCHANGED ===
   /** Server hostname for notification links (e.g., "dereks-macbook-pro" or "my-mac.tailnet.ts.net") */
