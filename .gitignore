@@ -54,3 +54,4 @@ certs/
 # Note: We read from ~/.claude/ but never commit it
 
 .vercel
+__pycache__/

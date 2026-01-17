@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.21.2 | 2026-01-17 | patch | Cloud mode fix - single FastAPI app |
 | 0.21.1 | 2026-01-17 | patch | Auto Git Remote URLs for cloud execution |
 | 0.21.0 | 2026-01-17 | minor | Serverless/Async Execution |
 | 0.20.0 | 2026-01-17 | minor | ntfy Notifications |
@@ -52,6 +53,23 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.21.2] - 2026-01-17
+
+### Summary
+**Cloud Mode Fix** - Modal now uses a single FastAPI app with proper routing, enabling the Vercel frontend to work when laptop is asleep.
+
+### Changed
+- Modal restructured from separate function endpoints to single FastAPI app
+- All cloud API routes now served from one URL: `https://...-fastapi-app.modal.run`
+- Added CORS middleware for browser access
+- Added `/api/status`, `/api/settings`, `/api/scheduled-prompts` stubs for cloud mode
+
+### Fixed
+- Cloud mode not loading data when laptop is asleep (route mismatch)
+- Modal endpoints not matching client API paths
 
 ---
 

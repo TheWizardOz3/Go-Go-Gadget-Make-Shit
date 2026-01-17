@@ -22,6 +22,9 @@ from pathlib import Path
 from typing import Any
 
 import modal
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # =============================================================================
 # Modal App Configuration
@@ -43,7 +46,7 @@ image = (
         # Install Claude CLI globally
         "npm install -g @anthropic-ai/claude-code",
     )
-    .pip_install("fastapi[standard]")
+    .pip_install("fastapi[standard]", "pydantic")
 )
 
 
@@ -152,81 +155,57 @@ def transform_to_messages(entries: list[dict[str, Any]], session_id: str) -> lis
                 msg["toolUse"] = tool_use
             messages.append(msg)
 
-    # Sort by timestamp
-    messages.sort(key=lambda m: m.get("timestamp", ""))
     return messages
 
 
-def get_session_metadata(entries: list[dict[str, Any]]) -> dict[str, Any]:
-    """Get session metadata from parsed entries."""
-    messages = [e for e in entries if should_include_entry(e)]
+def get_session_summary(session_file: Path) -> dict[str, Any] | None:
+    """Get a summary of a session from its JSONL file."""
+    entries = parse_jsonl_file(session_file)
+    if not entries:
+        return None
 
-    if not messages:
-        return {
-            "startedAt": None,
-            "lastActivityAt": None,
-            "messageCount": 0,
-        }
+    session_id = session_file.stem  # UUID from filename
 
-    timestamps = sorted([e.get("timestamp", "") for e in messages])
+    # Find timestamps
+    first_timestamp = None
+    last_timestamp = None
+    first_user_message = None
+    message_count = 0
 
-    return {
-        "startedAt": timestamps[0] if timestamps else None,
-        "lastActivityAt": timestamps[-1] if timestamps else None,
-        "messageCount": len(messages),
-    }
-
-
-def get_first_user_message_preview(entries: list[dict[str, Any]], max_length: int = 60) -> str | None:
-    """Extract the first user message as a preview string."""
-    sorted_entries = sorted(entries, key=lambda e: e.get("timestamp", ""))
-
-    for entry in sorted_entries:
+    for entry in entries:
         if not should_include_entry(entry):
             continue
 
-        if entry.get("type") == "user":
+        timestamp = entry.get("timestamp")
+        if timestamp:
+            if first_timestamp is None:
+                first_timestamp = timestamp
+            last_timestamp = timestamp
+
+        message_count += 1
+
+        # Get first user message for preview
+        if first_user_message is None and entry.get("type") == "user":
             message_data = entry.get("message", {})
             content = extract_text_from_content(message_data.get("content", ""))
+            if content:
+                first_user_message = content[:100]
 
-            # Clean up whitespace
-            cleaned = " ".join(content.split()).strip()
+    if message_count == 0:
+        return None
 
-            if not cleaned:
-                continue
-
-            if len(cleaned) <= max_length:
-                return cleaned
-
-            return cleaned[: max_length - 1].strip() + "…"
-
-    return None
-
-
-def extract_project_path(entries: list[dict[str, Any]]) -> str | None:
-    """Extract the project path (cwd) from JSONL entries."""
-    for entry in entries:
-        if "cwd" in entry and entry["cwd"]:
-            return entry["cwd"]
-    return None
+    return {
+        "id": session_id,
+        "filePath": str(session_file),
+        "startedAt": first_timestamp,
+        "lastActivityAt": last_timestamp,
+        "messageCount": message_count,
+        "preview": first_user_message,
+    }
 
 
 # =============================================================================
-# Path Encoding (Matches Claude Code's encoding scheme)
-# =============================================================================
-
-
-def encode_path(project_path: str) -> str:
-    """Encode a project path to Claude's folder naming convention."""
-    # Claude replaces '/' with '-' and removes leading slash
-    encoded = project_path.replace("/", "-")
-    if encoded.startswith("-"):
-        encoded = encoded[1:]
-    return encoded
-
-
-# =============================================================================
-# Modal Functions
+# Core Functions (Modal Functions)
 # =============================================================================
 
 
@@ -234,8 +213,7 @@ def encode_path(project_path: str) -> str:
     image=image,
     volumes={"/root/.claude": volume},
     secrets=[modal.Secret.from_name("ANTHROPIC_API_KEY")],
-    timeout=1800,  # 30 minute max
-    retries=0,  # Don't retry failed jobs
+    timeout=600,  # 10 minute timeout for long-running prompts
 )
 def execute_prompt(
     prompt: str,
@@ -245,128 +223,113 @@ def execute_prompt(
     notification_webhook: str | None = None,
 ) -> dict[str, Any]:
     """
-    Execute a Claude prompt in the cloud.
+    Execute a Claude prompt on a git repository.
 
     Args:
-        prompt: The prompt text to send to Claude
+        prompt: The prompt to send to Claude
         project_repo: Git repository URL to clone
-        project_name: Human-readable project name
-        allowed_tools: List of allowed tools (default: Task,Bash,Read,Write,Edit)
-        notification_webhook: Optional webhook URL for completion notification
+        project_name: Name for the project (used for session organization)
+        allowed_tools: List of allowed tools (e.g., ["Task", "Bash", "Read", "Write"])
+        notification_webhook: Optional webhook URL to call on completion
 
     Returns:
-        dict with success status, stdout, stderr, and session info
+        dict with sessionId, success status, and any output
     """
-    import urllib.request
-    import urllib.error
+    import requests
 
-    work_dir = f"/tmp/{project_name}"
-    session_id = None
-    
+    work_dir = Path(f"/tmp/repos/{project_name}")
+    session_id = str(uuid.uuid4())
+
     try:
-        # Clean up any existing work directory
-        if os.path.exists(work_dir):
-            subprocess.run(["rm", "-rf", work_dir], check=True)
+        # Clone the repository
+        print(f"Cloning {project_repo} to {work_dir}...")
+        work_dir.parent.mkdir(parents=True, exist_ok=True)
 
-        # Clone the repository (shallow clone for speed)
-        print(f"Cloning repository: {project_repo}")
-        clone_result = subprocess.run(
-            ["git", "clone", "--depth=1", project_repo, work_dir],
+        if work_dir.exists():
+            # Clean up existing directory
+            subprocess.run(["rm", "-rf", str(work_dir)], check=True)
+
+        subprocess.run(
+            ["git", "clone", "--depth=1", project_repo, str(work_dir)],
+            check=True,
             capture_output=True,
-            text=True,
         )
-        
-        if clone_result.returncode != 0:
-            return {
-                "success": False,
-                "error": f"Git clone failed: {clone_result.stderr}",
-                "stdout": clone_result.stdout,
-                "stderr": clone_result.stderr,
-            }
 
-        # Change to the work directory
-        os.chdir(work_dir)
+        # Build the Claude command
+        cmd = ["claude", "-p", prompt]
 
-        # Build Claude command
-        tools_arg = ",".join(allowed_tools) if allowed_tools else "Task,Bash,Read,Write,Edit"
-        cmd = [
-            "claude",
-            "-p", prompt,
-            "--allowedTools", tools_arg,
-            "--yes",  # Non-interactive mode (auto-accept tool usage)
-        ]
+        if allowed_tools:
+            cmd.extend(["--allowedTools", ",".join(allowed_tools)])
 
-        print(f"Executing Claude: {' '.join(cmd)}")
-
-        # Execute Claude
+        # Run Claude in the repo directory
+        print(f"Running Claude with prompt: {prompt[:100]}...")
         result = subprocess.run(
             cmd,
+            cwd=str(work_dir),
             capture_output=True,
             text=True,
-            env={
-                **os.environ,
-                "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
-            },
+            timeout=540,  # 9 minute timeout (leave buffer for cleanup)
         )
 
         success = result.returncode == 0
-        
-        # Try to find the session ID from Claude's output or the .claude folder
-        claude_projects_dir = Path("/root/.claude/projects")
-        encoded_project = encode_path(work_dir)
-        project_session_dir = claude_projects_dir / encoded_project
-        
-        if project_session_dir.exists():
-            # Get the most recent session file
-            session_files = sorted(
-                project_session_dir.glob("*.jsonl"),
-                key=lambda f: f.stat().st_mtime,
-                reverse=True
-            )
-            if session_files:
-                session_id = session_files[0].stem
+        output = result.stdout if success else result.stderr
 
-        # Commit volume changes to persist the session data
+        print(f"Claude finished with return code: {result.returncode}")
+
+        # Commit the volume to persist any session data
         volume.commit()
 
-        print(f"Claude execution completed. Success: {success}, Session: {session_id}")
-
-        # Send completion notification if webhook provided
+        # Call notification webhook if provided
         if notification_webhook:
             try:
-                data = json.dumps({
-                    "type": "task-complete",
-                    "projectName": project_name,
-                    "success": success,
-                    "sessionId": session_id,
-                }).encode("utf-8")
-                
-                req = urllib.request.Request(
+                requests.post(
                     notification_webhook,
-                    data=data,
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
+                    json={
+                        "jobId": session_id,
+                        "status": "completed" if success else "failed",
+                        "projectName": project_name,
+                        "output": output[:1000] if output else None,
+                    },
+                    timeout=10,
                 )
-                urllib.request.urlopen(req, timeout=10)
-                print(f"Notification sent to {notification_webhook}")
-            except urllib.error.URLError as e:
-                print(f"Failed to send notification: {e}")
+            except Exception as e:
+                print(f"Failed to call notification webhook: {e}")
 
         return {
-            "success": success,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
             "sessionId": session_id,
-            "projectPath": work_dir,
+            "success": success,
+            "output": output,
+            "projectName": project_name,
+        }
+
+    except subprocess.TimeoutExpired:
+        error_msg = "Claude execution timed out after 9 minutes"
+        print(error_msg)
+        return {
+            "sessionId": session_id,
+            "success": False,
+            "error": error_msg,
+            "projectName": project_name,
+        }
+
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Command failed: {e.stderr if e.stderr else str(e)}"
+        print(error_msg)
+        return {
+            "sessionId": session_id,
+            "success": False,
+            "error": error_msg,
+            "projectName": project_name,
         }
 
     except Exception as e:
-        print(f"Error executing prompt: {e}")
+        error_msg = f"Unexpected error: {str(e)}"
+        print(error_msg)
         return {
+            "sessionId": session_id,
             "success": False,
-            "error": str(e),
-            "stdout": "",
-            "stderr": str(e),
+            "error": error_msg,
+            "projectName": project_name,
         }
 
 
@@ -375,52 +338,55 @@ def execute_prompt(
     volumes={"/root/.claude": volume},
 )
 def list_projects() -> list[dict[str, Any]]:
-    """List all projects with sessions on the cloud volume."""
-    volume.reload()  # Ensure we have latest data
-    
-    projects_dir = Path("/root/.claude/projects")
+    """
+    List all projects that have Claude sessions.
+
+    Returns:
+        List of project objects with path, name, encodedPath, sessionCount, etc.
+    """
+    volume.reload()  # Ensure we see latest data
+
+    claude_dir = Path("/root/.claude/projects")
     projects = []
 
-    if not projects_dir.exists():
+    if not claude_dir.exists():
         return projects
 
-    for project_folder in projects_dir.iterdir():
-        if not project_folder.is_dir():
+    for project_dir in claude_dir.iterdir():
+        if not project_dir.is_dir():
             continue
 
-        session_files = list(project_folder.glob("*.jsonl"))
-        if not session_files:
+        # Decode the project path
+        encoded_path = project_dir.name
+
+        # Count sessions
+        sessions = list(project_dir.glob("*.jsonl"))
+        if not sessions:
             continue
 
-        # Get metadata from the most recent session
-        latest_session = max(session_files, key=lambda f: f.stat().st_mtime)
-        entries = parse_jsonl_file(latest_session)
-        project_path = extract_project_path(entries)
+        # Find the most recent session
+        most_recent = None
+        most_recent_time = None
 
-        # Calculate aggregate stats
-        total_messages = 0
-        latest_activity = None
-
-        for session_file in session_files:
-            entries = parse_jsonl_file(session_file)
-            metadata = get_session_metadata(entries)
-            total_messages += metadata["messageCount"]
-            
-            if metadata["lastActivityAt"]:
-                if not latest_activity or metadata["lastActivityAt"] > latest_activity:
-                    latest_activity = metadata["lastActivityAt"]
+        for session_file in sessions:
+            summary = get_session_summary(session_file)
+            if summary and summary.get("lastActivityAt"):
+                if most_recent_time is None or summary["lastActivityAt"] > most_recent_time:
+                    most_recent = summary
+                    most_recent_time = summary["lastActivityAt"]
 
         projects.append({
-            "encodedPath": project_folder.name,
-            "path": project_path or project_folder.name,
-            "name": Path(project_path).name if project_path else project_folder.name,
-            "sessionCount": len(session_files),
-            "lastSessionId": latest_session.stem,
-            "lastActivityAt": latest_activity,
+            "path": f"/cloud/{encoded_path}",  # Virtual path for cloud sessions
+            "name": encoded_path.replace("-", "/").split("/")[-1] or encoded_path,
+            "encodedPath": f"cloud-{encoded_path}",  # Prefix with cloud- to distinguish
+            "sessionCount": len(sessions),
+            "lastSessionId": most_recent["id"] if most_recent else None,
+            "lastActivityAt": most_recent_time,
         })
 
-    # Sort by last activity (most recent first)
+    # Sort by most recent activity
     projects.sort(key=lambda p: p.get("lastActivityAt") or "", reverse=True)
+
     return projects
 
 
@@ -428,47 +394,36 @@ def list_projects() -> list[dict[str, Any]]:
     image=image,
     volumes={"/root/.claude": volume},
 )
-def get_sessions(encoded_project_path: str) -> list[dict[str, Any]]:
+def get_sessions(encoded_path: str) -> list[dict[str, Any]]:
     """
-    List sessions for a project from the volume.
+    List all sessions for a project.
 
     Args:
-        encoded_project_path: Claude's encoded folder name for the project
+        encoded_path: The encoded project path (with cloud- prefix)
 
     Returns:
-        List of session metadata dictionaries
+        List of session summary objects
     """
-    volume.reload()  # Ensure we have latest data
-    
-    sessions_dir = Path(f"/root/.claude/projects/{encoded_project_path}")
+    volume.reload()  # Ensure we see latest data
+
+    # Remove cloud- prefix if present
+    if encoded_path.startswith("cloud-"):
+        encoded_path = encoded_path[6:]
+
+    project_dir = Path(f"/root/.claude/projects/{encoded_path}")
     sessions = []
 
-    if not sessions_dir.exists():
+    if not project_dir.exists():
         return sessions
 
-    for jsonl_file in sessions_dir.glob("*.jsonl"):
-        # Skip sidechain files (agent sub-conversations)
-        if ".sidechain." in jsonl_file.name:
-            continue
+    for session_file in project_dir.glob("*.jsonl"):
+        summary = get_session_summary(session_file)
+        if summary:
+            sessions.append(summary)
 
-        entries = parse_jsonl_file(jsonl_file)
-        metadata = get_session_metadata(entries)
-        preview = get_first_user_message_preview(entries)
-        project_path = extract_project_path(entries)
-
-        sessions.append({
-            "id": jsonl_file.stem,
-            "filePath": str(jsonl_file),
-            "projectPath": project_path or encoded_project_path,
-            "startedAt": metadata["startedAt"],
-            "lastActivityAt": metadata["lastActivityAt"],
-            "messageCount": metadata["messageCount"],
-            "preview": preview,
-            "source": "cloud",
-        })
-
-    # Sort by last activity (most recent first)
+    # Sort by most recent activity
     sessions.sort(key=lambda s: s.get("lastActivityAt") or "", reverse=True)
+
     return sessions
 
 
@@ -476,93 +431,129 @@ def get_sessions(encoded_project_path: str) -> list[dict[str, Any]]:
     image=image,
     volumes={"/root/.claude": volume},
 )
-def get_messages(session_id: str, encoded_project_path: str) -> dict[str, Any]:
+def get_messages(session_id: str, encoded_path: str) -> dict[str, Any]:
     """
-    Get messages for a session from the volume.
+    Get all messages for a session.
 
     Args:
-        session_id: Session UUID (filename without .jsonl)
-        encoded_project_path: Claude's encoded folder name for the project
+        session_id: The session UUID
+        encoded_path: The encoded project path
 
     Returns:
-        dict with messages array and session status
+        Object with messages array and status
     """
-    volume.reload()  # Ensure we have latest data
-    
-    jsonl_path = Path(f"/root/.claude/projects/{encoded_project_path}/{session_id}.jsonl")
+    volume.reload()  # Ensure we see latest data
 
-    if not jsonl_path.exists():
-        return {
-            "messages": [],
-            "status": "idle",
-            "sessionId": session_id,
-            "error": "Session not found",
-        }
+    # Remove cloud- prefix if present
+    if encoded_path.startswith("cloud-"):
+        encoded_path = encoded_path[6:]
 
-    entries = parse_jsonl_file(jsonl_path)
+    session_file = Path(f"/root/.claude/projects/{encoded_path}/{session_id}.jsonl")
+
+    if not session_file.exists():
+        return {"messages": [], "status": "idle"}
+
+    entries = parse_jsonl_file(session_file)
     messages = transform_to_messages(entries, session_id)
 
-    # Determine status based on last message
-    # If the last message is from assistant and has no pending tool calls, status is "waiting"
-    # Otherwise, we assume "idle" for cloud sessions (no live process)
+    # Determine status based on last entry
     status = "idle"
-    if messages:
-        last_msg = messages[-1]
-        if last_msg.get("type") == "assistant":
-            status = "waiting"
+    if entries:
+        last_entry = entries[-1]
+        if last_entry.get("type") == "assistant":
+            # Check if it looks like Claude is still working
+            content = last_entry.get("message", {}).get("content", "")
+            if isinstance(content, list):
+                for block in content:
+                    if block.get("type") == "tool_use":
+                        status = "working"
+                        break
 
-    return {
-        "messages": messages,
-        "status": status,
-        "sessionId": session_id,
-    }
+    return {"messages": messages, "status": status}
 
 
 # =============================================================================
-# Web Endpoints (FastAPI via Modal)
+# FastAPI Web App (Single App for All Routes)
 # =============================================================================
 
+web_app = FastAPI(title="GoGoGadgetClaude Cloud API")
 
-@app.function(
-    image=image,
-    volumes={"/root/.claude": volume},
-    secrets=[modal.Secret.from_name("ANTHROPIC_API_KEY")],
+# Add CORS middleware for browser access
+web_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for now
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-@modal.fastapi_endpoint(method="POST")
-def api_dispatch_job(request: dict) -> dict:
-    """
-    Web endpoint to dispatch a new cloud job.
 
-    POST /api/dispatch
-    Body: {
-        "prompt": "...",
-        "repoUrl": "https://github.com/...",
-        "projectName": "my-project",
-        "allowedTools": ["Task", "Bash", "Read", "Write"],
-        "notificationWebhook": "https://..."
-    }
-    """
-    prompt = request.get("prompt")
-    repo_url = request.get("repoUrl")
-    project_name = request.get("projectName")
-    allowed_tools = request.get("allowedTools")
-    notification_webhook = request.get("notificationWebhook")
 
-    if not prompt or not repo_url or not project_name:
-        return {
-            "error": {
-                "code": "VALIDATION_ERROR",
-                "message": "Missing required fields: prompt, repoUrl, projectName",
-            }
+class DispatchJobRequest(BaseModel):
+    prompt: str
+    repoUrl: str
+    projectName: str
+    allowedTools: list[str] | None = None
+    notificationWebhook: str | None = None
+
+
+@web_app.get("/api/status")
+async def api_status():
+    """Health check / status endpoint."""
+    return {
+        "data": {
+            "healthy": True,
+            "service": "gogogadget-claude-cloud",
+            "mode": "cloud",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
+    }
+
+
+@web_app.get("/api/projects")
+async def api_list_projects():
+    """List all cloud projects."""
+    projects = list_projects.remote()
+    return {"data": projects}
+
+
+@web_app.get("/api/projects/{encoded_path}/sessions")
+async def api_get_sessions(encoded_path: str):
+    """List sessions for a project."""
+    sessions = get_sessions.remote(encoded_path)
+    return {"data": sessions}
+
+
+@web_app.get("/api/sessions/{session_id}/messages")
+async def api_get_messages(
+    session_id: str,
+    encoded_path: str = Query(..., alias="projectPath"),
+):
+    """Get messages for a session."""
+    result = get_messages.remote(session_id, encoded_path)
+    return {"data": result}
+
+
+@web_app.post("/api/cloud/jobs")
+async def api_dispatch_job(request: DispatchJobRequest):
+    """Dispatch a new cloud job."""
+    if not request.prompt or not request.repoUrl or not request.projectName:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": "Missing required fields: prompt, repoUrl, projectName",
+                }
+            },
+        )
 
     # Spawn the execution as an async job
     job = execute_prompt.spawn(
-        prompt=prompt,
-        project_repo=repo_url,
-        project_name=project_name,
-        allowed_tools=allowed_tools,
-        notification_webhook=notification_webhook,
+        prompt=request.prompt,
+        project_repo=request.repoUrl,
+        project_name=request.projectName,
+        allowed_tools=request.allowedTools,
+        notification_webhook=request.notificationWebhook,
     )
 
     return {
@@ -573,66 +564,34 @@ def api_dispatch_job(request: dict) -> dict:
     }
 
 
-@app.function(
-    image=image,
-    volumes={"/root/.claude": volume},
-)
-@modal.fastapi_endpoint(method="GET")
-def api_list_projects() -> dict:
-    """
-    Web endpoint to list all projects.
-
-    GET /api/projects
-    """
-    projects = list_projects.remote()
-    return {"data": projects}
-
-
-@app.function(
-    image=image,
-    volumes={"/root/.claude": volume},
-)
-@modal.fastapi_endpoint(method="GET")
-def api_get_sessions(encoded_path: str) -> dict:
-    """
-    Web endpoint to list sessions for a project.
-
-    GET /api/projects/{encoded_path}/sessions
-    """
-    sessions = get_sessions.remote(encoded_path)
-    return {"data": sessions}
-
-
-@app.function(
-    image=image,
-    volumes={"/root/.claude": volume},
-)
-@modal.fastapi_endpoint(method="GET")
-def api_get_messages(encoded_path: str, session_id: str) -> dict:
-    """
-    Web endpoint to get messages for a session.
-
-    GET /api/projects/{encoded_path}/sessions/{session_id}/messages
-    """
-    result = get_messages.remote(session_id, encoded_path)
-    return {"data": result}
-
-
-@app.function(image=image)
-@modal.fastapi_endpoint(method="GET")
-def api_health() -> dict:
-    """
-    Health check endpoint.
-
-    GET /api/health
-    """
+@web_app.get("/api/settings")
+async def api_get_settings():
+    """Return empty settings (cloud doesn't store settings)."""
     return {
         "data": {
-            "healthy": True,
-            "service": "gogogadget-claude",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "notificationsEnabled": False,
+            "defaultTemplates": [],
+            "theme": "system",
         }
     }
+
+
+@web_app.get("/api/scheduled-prompts")
+async def api_get_scheduled_prompts():
+    """Return empty scheduled prompts (cloud doesn't support scheduling)."""
+    return {"data": []}
+
+
+# Mount the FastAPI app as a Modal web endpoint
+@app.function(
+    image=image,
+    volumes={"/root/.claude": volume},
+    secrets=[modal.Secret.from_name("ANTHROPIC_API_KEY")],
+)
+@modal.asgi_app()
+def fastapi_app():
+    """Serve the FastAPI app."""
+    return web_app
 
 
 # =============================================================================
@@ -640,7 +599,6 @@ def api_health() -> dict:
 # =============================================================================
 
 if __name__ == "__main__":
-    # For local testing via `modal run modal/modal_app.py`
     print("GoGoGadgetClaude Modal App")
     print("==========================")
     print()
@@ -650,13 +608,14 @@ if __name__ == "__main__":
     print("  - get_sessions: List sessions for a project")
     print("  - get_messages: Get messages for a session")
     print()
-    print("Web endpoints (after deploy):")
-    print("  - POST /api_dispatch_job - Dispatch a new job")
-    print("  - GET  /api_list_projects - List projects")
-    print("  - GET  /api_get_sessions - List sessions")
-    print("  - GET  /api_get_messages - Get messages")
-    print("  - GET  /api_health - Health check")
+    print("Web API (single endpoint):")
+    print("  https://[workspace]--gogogadget-claude-fastapi-app.modal.run")
+    print()
+    print("  GET  /api/status - Health check")
+    print("  GET  /api/projects - List projects")
+    print("  GET  /api/projects/{path}/sessions - List sessions")
+    print("  GET  /api/sessions/{id}/messages - Get messages")
+    print("  POST /api/cloud/jobs - Dispatch a job")
     print()
     print("To deploy: modal deploy modal/modal_app.py")
     print("To serve locally: modal serve modal/modal_app.py")
-
