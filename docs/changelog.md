@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.21.4 | 2026-01-17 | patch | Offline view - show cached projects when laptop is asleep |
 | 0.21.3 | 2026-01-17 | patch | Cloud mode initialization fix - wait for endpoint check |
 | 0.21.2 | 2026-01-17 | patch | Cloud mode fix - single FastAPI app |
 | 0.21.1 | 2026-01-17 | patch | Auto Git Remote URLs for cloud execution |
@@ -54,6 +55,24 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.21.4] - 2026-01-17
+
+### Summary
+**Offline Context View** - When laptop is asleep (cloud mode), the app now shows cached projects from your last local session so you have context about what you were working on.
+
+### Added
+- `localCache.ts` - New utility for caching projects/sessions to localStorage
+- `CloudEmptyState` component - Shows cached projects when in cloud mode
+- Projects are automatically cached when fetched in local mode
+- "Retry connection" button to check if laptop is back online
+- Connection mode badge and settings access on empty state screen
+
+### Changed
+- Empty state now shows cached projects (read-only) when in cloud mode
+- `useProjects` hook now caches projects to localStorage for offline viewing
 
 ---
 

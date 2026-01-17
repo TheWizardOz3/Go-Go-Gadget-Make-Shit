@@ -3,10 +3,12 @@
  *
  * Uses SWR for caching and automatic revalidation.
  * Waits for API endpoint initialization before fetching to ensure correct URL.
+ * Caches projects to localStorage for offline viewing.
  */
 
 import useSWR from 'swr';
 import { api, subscribeToBaseUrl, getApiBaseUrl } from '@/lib/api';
+import { cacheProjects } from '@/lib/localCache';
 import type { ProjectSerialized } from '@shared/types';
 import { useEffect, useState } from 'react';
 
@@ -73,6 +75,13 @@ export function useProjects(): UseProjectsReturn {
       errorRetryCount: 2,
     }
   );
+
+  // Cache projects to localStorage for offline access (only when we have data)
+  useEffect(() => {
+    if (data && data.length > 0) {
+      cacheProjects(data);
+    }
+  }, [data]);
 
   return {
     projects: data,

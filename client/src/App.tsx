@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
+import { getCachedProjects, getLastSyncRelative } from '@/lib/localCache';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { useConversation } from '@/hooks/useConversation';
@@ -31,7 +32,12 @@ import { SharedPromptProvider } from '@/contexts/SharedPromptContext';
 import { ApiEndpointProvider, useApiEndpointContext } from '@/hooks/useApiEndpoint';
 import { useScheduledPrompts } from '@/hooks/useScheduledPrompts';
 import { useScheduledPromptNotifications } from '@/hooks/useScheduledPromptNotifications';
-import type { SessionStatus, SessionSummarySerialized, ScheduledPromptInput } from '@shared/types';
+import type {
+  SessionStatus,
+  SessionSummarySerialized,
+  ScheduledPromptInput,
+  ProjectSerialized,
+} from '@shared/types';
 
 /** Active tab type */
 type ActiveTab = 'conversation' | 'files';
@@ -112,6 +118,240 @@ function InitializationLoader() {
         {/* Text */}
         <p className="text-text-muted text-sm">Connecting...</p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Empty state shown when no projects are found
+ * Shows cached projects if available (for context when laptop is asleep)
+ */
+function CloudEmptyState({
+  onOpenSettings,
+  isSettingsOpen,
+  setIsSettingsOpen,
+}: {
+  onOpenSettings: () => void;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: (open: boolean) => void;
+}) {
+  const { mode, isLaptopAvailable, checkNow, isChecking } = useApiEndpointContext();
+  const cachedProjects = getCachedProjects();
+  const lastSync = getLastSyncRelative();
+  const [selectedCachedProject, setSelectedCachedProject] = useState<ProjectSerialized | null>(
+    null
+  );
+
+  const isCloudMode = mode === 'cloud';
+
+  return (
+    <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
+      {/* Header with settings access */}
+      <header className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold text-text-primary">GoGoGadgetClaude</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Connection mode badge */}
+          <ConnectionModeBadge
+            mode={mode}
+            isLaptopAvailable={isLaptopAvailable}
+            isCloudConfigured={true}
+            isChecking={isChecking}
+            onTap={checkNow}
+          />
+          {/* Settings button */}
+          <button
+            onClick={onOpenSettings}
+            className="p-2 rounded-lg hover:bg-text-primary/5 transition-colors"
+            aria-label="Settings"
+          >
+            <svg
+              className="h-5 w-5 text-text-secondary"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        {/* Status message */}
+        {isCloudMode && (
+          <div className="mb-6 p-4 rounded-xl bg-violet-500/10 border border-violet-500/20">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-violet-500/20">
+                <svg
+                  className="w-5 h-5 text-violet-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium text-violet-300">Cloud Mode Active</h3>
+                <p className="text-sm text-text-secondary mt-1">
+                  Your laptop appears to be offline. You can view cached projects below or wait for
+                  it to come back online.
+                </p>
+                <button
+                  onClick={checkNow}
+                  disabled={isChecking}
+                  className="mt-3 text-sm text-violet-400 hover:text-violet-300 font-medium flex items-center gap-1"
+                >
+                  {isChecking ? (
+                    <>
+                      <span className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      Retry connection
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cached projects section */}
+        {cachedProjects && cachedProjects.length > 0 ? (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-medium text-text-secondary uppercase tracking-wide">
+                Recent Projects {lastSync && <span className="text-text-muted">({lastSync})</span>}
+              </h2>
+            </div>
+            <p className="text-xs text-text-muted mb-4">
+              Cached from your last local session. Read-only until laptop reconnects.
+            </p>
+
+            <div className="space-y-2">
+              {cachedProjects.slice(0, 10).map((project) => (
+                <button
+                  key={project.encodedPath}
+                  onClick={() => setSelectedCachedProject(project)}
+                  className={cn(
+                    'w-full text-left p-4 rounded-xl border transition-all',
+                    selectedCachedProject?.encodedPath === project.encodedPath
+                      ? 'bg-accent/10 border-accent/30'
+                      : 'bg-surface border-border hover:border-text-muted/30'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 rounded-lg bg-text-primary/5 shrink-0">
+                        <svg
+                          className="w-4 h-4 text-text-muted"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
+                          />
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-medium text-text-primary truncate">{project.name}</h3>
+                        <p className="text-xs text-text-muted truncate">{project.path}</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-text-muted shrink-0 ml-2">
+                      {project.sessionCount} session{project.sessionCount !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Selected project details */}
+            {selectedCachedProject && (
+              <div className="mt-6 p-4 rounded-xl bg-surface border border-border">
+                <h3 className="font-medium text-text-primary mb-2">{selectedCachedProject.name}</h3>
+                <p className="text-sm text-text-muted mb-3">{selectedCachedProject.path}</p>
+                {selectedCachedProject.gitRemoteUrl && (
+                  <div className="flex items-center gap-2 text-xs text-text-secondary">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    <span className="truncate">{selectedCachedProject.gitRemoteUrl}</span>
+                  </div>
+                )}
+                <p className="mt-4 text-xs text-amber-400/80">
+                  ⚠️ View-only: Connect to your laptop to interact with this project.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* No cached projects - show standard empty state */
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-text-primary/5">
+              <svg
+                className="h-8 w-8 text-text-muted"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-text-primary mb-1">No projects found</h3>
+            <p className="text-sm text-text-secondary max-w-xs">
+              {isCloudMode
+                ? 'No cached projects available. Connect to your laptop to see your projects.'
+                : 'Start a Claude Code session in any project to see it here.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Settings modal */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 }
@@ -309,35 +549,14 @@ function AppMain() {
     );
   }
 
-  // No projects found
+  // No projects found - show cached data if in cloud mode, or empty state
   if (!projects || projects.length === 0) {
     return (
-      <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
-        <Header projectName={null} />
-        <div className="flex-1 flex items-center justify-center px-6">
-          <div className="text-center">
-            <div className="mb-4 flex h-16 w-16 mx-auto items-center justify-center rounded-full bg-text-primary/5">
-              <svg
-                className="h-8 w-8 text-text-muted"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-1">No projects found</h3>
-            <p className="text-sm text-text-secondary max-w-xs">
-              Start a Claude Code session in any project to see it here.
-            </p>
-          </div>
-        </div>
-      </div>
+      <CloudEmptyState
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        isSettingsOpen={isSettingsOpen}
+        setIsSettingsOpen={setIsSettingsOpen}
+      />
     );
   }
 
