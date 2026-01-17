@@ -66,9 +66,9 @@
 *No features currently in progress.*
 
 ### Up Next
-| Feature/Task      | Notes                                                                  |
-|-------------------|------------------------------------------------------------------------|
-| Scheduled Prompts | Schedule/cancel repeating prompts - #4 in V0.75 build order            |
+| Feature/Task      | Notes                                                       |
+|-------------------|-------------------------------------------------------------|
+| Scheduled Prompts | Schedule/cancel repeating prompts - #4 in V0.75 build order |
 
 ---
 

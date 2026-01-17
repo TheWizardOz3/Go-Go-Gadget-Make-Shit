@@ -52,8 +52,10 @@ export class ApiError extends Error {
 function getBaseUrl(): string {
   // In development, Vite runs on a different port
   // We need to call the Express server directly
+  // Server runs HTTPS on 3456 (primary) and HTTP on 3457 (secondary)
+  // Use HTTP for dev browser testing (voice input won't work but API calls will)
   if (import.meta.env.DEV) {
-    return 'http://localhost:3456';
+    return 'http://localhost:3457';
   }
   // In production, API is served from same origin
   return '';

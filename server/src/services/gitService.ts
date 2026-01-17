@@ -680,6 +680,8 @@ export interface GetCommittedTreeResult {
 function buildTreeFromPaths(filePaths: string[], subPath: string = ''): FileTreeEntry[] {
   // Map to collect entries at the current level
   const entriesMap = new Map<string, FileTreeEntry>();
+  // Map to collect child paths for each directory
+  const childPathsMap = new Map<string, string[]>();
 
   for (const filePath of filePaths) {
     // Skip files not under the subPath
@@ -712,14 +714,32 @@ function buildTreeFromPaths(filePaths: string[], subPath: string = ''): FileTree
           extension: ext || null,
         });
       } else {
-        // It's a directory
+        // It's a directory - will add children later
         entriesMap.set(firstPart, {
           name: firstPart,
           path: entryPath,
           type: 'directory',
           extension: null,
+          children: [], // Initialize empty, will be populated below
         });
+        childPathsMap.set(firstPart, []);
       }
+    }
+
+    // Collect paths for directory children
+    if (!isFile) {
+      const childPaths = childPathsMap.get(firstPart);
+      if (childPaths) {
+        childPaths.push(filePath);
+      }
+    }
+  }
+
+  // Recursively build children for each directory
+  for (const [dirName, entry] of entriesMap) {
+    if (entry.type === 'directory') {
+      const childPaths = childPathsMap.get(dirName) || [];
+      entry.children = buildTreeFromPaths(childPaths, entry.path);
     }
   }
 
