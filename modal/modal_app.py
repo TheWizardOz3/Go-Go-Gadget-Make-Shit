@@ -212,7 +212,10 @@ def get_session_summary(session_file: Path) -> dict[str, Any] | None:
 @app.function(
     image=image,
     volumes={"/root/.claude": volume},
-    secrets=[modal.Secret.from_name("ANTHROPIC_API_KEY")],
+    secrets=[
+        modal.Secret.from_name("ANTHROPIC_API_KEY"),
+        modal.Secret.from_name("GITHUB_TOKEN"),
+    ],
     timeout=600,  # 10 minute timeout for long-running prompts
 )
 def execute_prompt(
@@ -249,8 +252,16 @@ def execute_prompt(
             # Clean up existing directory
             subprocess.run(["rm", "-rf", str(work_dir)], check=True)
 
+        # Prepare clone URL with GitHub token for private repos
+        clone_url = project_repo
+        github_token = os.environ.get("GITHUB_TOKEN")
+        if github_token and "github.com" in project_repo and project_repo.startswith("https://"):
+            # Insert token into URL: https://TOKEN@github.com/user/repo.git
+            clone_url = project_repo.replace("https://github.com", f"https://{github_token}@github.com")
+            print("Using GitHub token for authentication")
+
         subprocess.run(
-            ["git", "clone", "--depth=1", project_repo, str(work_dir)],
+            ["git", "clone", "--depth=1", clone_url, str(work_dir)],
             check=True,
             capture_output=True,
         )
