@@ -303,8 +303,19 @@ export function ConversationView({
    */
   const handleSend = useCallback(
     async (prompt: string) => {
-      const result = await sendPromptAdvanced(prompt);
+      const trimmedPrompt = prompt.trim();
+      const result = await sendPromptAdvanced(trimmedPrompt);
+
       if (result.success) {
+        // If this is a cloud job, show pending state with job ID
+        if (result.mode === 'cloud' && result.jobId) {
+          setPendingCloudJob({
+            jobId: result.jobId,
+            prompt: trimmedPrompt,
+          });
+          return;
+        }
+
         // Scroll to bottom after a short delay to allow for UI update
         setTimeout(() => scrollToBottom('smooth'), 100);
       } else if (result.errorMessage) {

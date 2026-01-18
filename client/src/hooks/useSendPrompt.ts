@@ -11,6 +11,7 @@
 
 import { useState, useCallback } from 'react';
 import { api, ApiError, getApiMode } from '@/lib/api';
+import { debugLog } from '@/lib/debugLog';
 import type { ApiEndpointMode, CloudJobStatus } from '@shared/types';
 
 // ============================================================
@@ -174,12 +175,22 @@ export function useSendPrompt(
       setError(null);
 
       try {
+        debugLog.info('Dispatching cloud job', {
+          repoUrl: options.repoUrl,
+          projectName: options.projectName,
+        });
+
         const response = await api.post<CloudDispatchResponse>('/cloud/jobs', {
           prompt: trimmedPrompt,
           repoUrl: options.repoUrl,
           projectName: options.projectName,
           allowedTools: options.allowedTools,
           notificationWebhook: options.notificationWebhook,
+        });
+
+        debugLog.info('Cloud job dispatched successfully', {
+          jobId: response.jobId,
+          status: response.status,
         });
 
         const result: SendPromptResult = {
