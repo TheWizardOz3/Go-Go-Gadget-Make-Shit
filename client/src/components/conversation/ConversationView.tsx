@@ -7,7 +7,6 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
-import { api } from '@/lib/api';
 import { useConversation } from '@/hooks/useConversation';
 import { useSendPrompt } from '@/hooks/useSendPrompt';
 import { useStopAgent } from '@/hooks/useStopAgent';
@@ -83,6 +82,7 @@ export function ConversationView({
 
   /**
    * Handle starting a new session with the user's first message
+   * In cloud mode, uses sendPromptAdvanced which dispatches to /cloud/jobs
    */
   const handleStartNewSession = useCallback(
     async (prompt: string) => {
@@ -94,10 +94,13 @@ export function ConversationView({
       setIsStartingNewSession(true);
 
       try {
-        await api.post('/sessions/new', {
-          projectPath,
-          prompt: trimmedPrompt,
-        });
+        // Use sendPromptAdvanced which handles cloud mode automatically
+        const result = await sendPromptAdvanced(trimmedPrompt);
+
+        if (!result.success) {
+          setToast({ message: result.errorMessage || 'Failed to start session', type: 'error' });
+          return false;
+        }
 
         // Notify parent to refresh sessions and select the new one
         onNewSessionStarted?.();
@@ -110,7 +113,7 @@ export function ConversationView({
         setIsStartingNewSession(false);
       }
     },
-    [projectPath, isStartingNewSession, onNewSessionStarted]
+    [projectPath, isStartingNewSession, onNewSessionStarted, sendPromptAdvanced]
   );
 
   /**

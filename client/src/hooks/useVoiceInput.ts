@@ -334,8 +334,16 @@ export function useVoiceInput({
 
       try {
         // Create form data with the audio file
+        // Must include filename with extension for Groq to detect file type
         const formData = new FormData();
-        formData.append('audio', audioBlob);
+        const extension = audioBlob.type.includes('webm')
+          ? 'webm'
+          : audioBlob.type.includes('mp4')
+            ? 'mp4'
+            : audioBlob.type.includes('ogg')
+              ? 'ogg'
+              : 'webm';
+        formData.append('audio', audioBlob, `recording.${extension}`);
 
         // Send to transcription API (Groq Whisper)
         const response = await api.upload<TranscriptionResponse>('/transcribe', formData);
