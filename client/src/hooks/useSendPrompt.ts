@@ -201,6 +201,8 @@ export function useSendPrompt(
         debugLog.info('Dispatching cloud job', {
           repoUrl: options.repoUrl,
           projectName: options.projectName,
+          sessionId: options.sessionId || '(new session)',
+          ntfyTopic: options.ntfyTopic || '(not configured)',
         });
 
         const response = await api.post<CloudDispatchResponse>('/cloud/jobs', {

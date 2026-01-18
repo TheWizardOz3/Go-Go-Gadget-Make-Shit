@@ -222,6 +222,10 @@ function AppMain() {
   const [selectedProject, setSelectedProject] = useState<string | null>(() => getStoredProject());
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
+  // Track whether user explicitly selected this session (vs auto-selected)
+  // Used to determine if cloud mode should continue an existing session
+  const [sessionWasUserSelected, setSessionWasUserSelected] = useState(false);
+
   // "New session" mode - prevents auto-select from re-selecting a session
   const [isNewSessionMode, setIsNewSessionMode] = useState(false);
 
@@ -302,6 +306,7 @@ function AppMain() {
 
   // When sessions load, try to restore from localStorage or auto-select most recent
   // Skip auto-selection when in "new session" mode (user explicitly wants blank conversation)
+  // Auto-selected sessions are marked as NOT user-selected (for cloud mode behavior)
   useEffect(() => {
     if (!sessions || sessions.length === 0) return;
 
@@ -321,6 +326,7 @@ function AppMain() {
       const sessionExists = sessions.some((s) => s.id === storedSessionId);
       if (sessionExists) {
         setSelectedSession(storedSessionId);
+        setSessionWasUserSelected(false); // Auto-restored, not user-selected
         return;
       }
     }
@@ -332,6 +338,7 @@ function AppMain() {
       return bTime - aTime;
     });
     setSelectedSession(sorted[0].id);
+    setSessionWasUserSelected(false); // Auto-selected, not user-selected
   }, [sessions, selectedSession, selectedProject, isNewSessionMode]);
 
   // Persist selected session to localStorage when it changes
@@ -342,6 +349,7 @@ function AppMain() {
   // Reset session when project changes (will be restored from localStorage in above effect)
   useEffect(() => {
     setSelectedSession(null);
+    setSessionWasUserSelected(false);
   }, [selectedProject]);
 
   // Clear selected file when project changes
@@ -406,10 +414,11 @@ function AppMain() {
     setSelectedProject(encodedPath);
   };
 
-  // Handle session selection from picker
+  // Handle session selection from picker (user explicitly chose this session)
   const handleSelectSession = (sessionId: string) => {
     setIsNewSessionMode(false); // Exit new session mode when manually selecting
     setSelectedSession(sessionId);
+    setSessionWasUserSelected(true); // Mark as user-selected
   };
 
   // Main app with tab navigation
@@ -435,6 +444,7 @@ function AppMain() {
         {activeTab === 'conversation' ? (
           <ConversationView
             sessionId={selectedSession}
+            sessionWasUserSelected={sessionWasUserSelected}
             encodedPath={selectedProject}
             projectPath={currentProject?.path}
             projectName={currentProject?.name}

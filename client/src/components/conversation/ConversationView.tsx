@@ -26,6 +26,8 @@ import { CloudJobPending } from './CloudJobPending';
 interface ConversationViewProps {
   /** Session ID to load conversation for */
   sessionId: string | null;
+  /** Whether the user explicitly selected this session (vs auto-selected) */
+  sessionWasUserSelected?: boolean;
   /** Encoded project path for loading templates */
   encodedPath: string | null;
   /** Project path (decoded) for creating new sessions */
@@ -48,6 +50,7 @@ const PULL_THRESHOLD = 80;
 
 export function ConversationView({
   sessionId,
+  sessionWasUserSelected = false,
   encodedPath,
   projectPath,
   projectName,
@@ -79,16 +82,18 @@ export function ConversationView({
   }, [settings]);
 
   // Pass cloud options from project's git remote URL for automatic cloud execution
-  // Include sessionId for continuing existing conversations and ntfyTopic for notifications
+  // Only include sessionId if the user explicitly selected a session to continue
+  // This prevents unexpected continuation of old conversations in cloud mode
   const cloudOptions = useMemo(() => {
     if (!gitRemoteUrl || !projectName) return undefined;
     return {
       repoUrl: gitRemoteUrl,
       projectName,
-      sessionId: sessionId || undefined, // Pass existing session ID if continuing
+      // Only pass sessionId to cloud if user explicitly chose to continue this session
+      sessionId: sessionWasUserSelected ? sessionId || undefined : undefined,
       ntfyTopic,
     };
-  }, [gitRemoteUrl, projectName, sessionId, ntfyTopic]);
+  }, [gitRemoteUrl, projectName, sessionId, sessionWasUserSelected, ntfyTopic]);
 
   // Local session options for creating new sessions in local mode
   const localSessionOptions = useMemo(() => {

@@ -246,10 +246,22 @@ def execute_prompt(
 
     work_dir = Path(f"/tmp/repos/{project_name}")
     
+    # Log all parameters for debugging
+    print(f"=== execute_prompt called ===")
+    print(f"  project_repo: {project_repo}")
+    print(f"  project_name: {project_name}")
+    print(f"  session_id: {session_id}")
+    print(f"  ntfy_topic: {ntfy_topic}")
+    print(f"  notification_webhook: {notification_webhook}")
+    print(f"  allowed_tools: {allowed_tools}")
+    
     # Use existing session ID or generate new one
     is_continuation = session_id is not None
     if not session_id:
         session_id = str(uuid.uuid4())
+        print(f"  Generated new session_id: {session_id}")
+    else:
+        print(f"  Continuing existing session: {session_id}")
 
     try:
         # Clone the repository
@@ -302,6 +314,67 @@ def execute_prompt(
 
         # Commit the volume to persist any session data
         volume.commit()
+        
+        # Git commit and push changes if any were made
+        if success:
+            try:
+                # Check if there are any changes to commit
+                git_status = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=str(work_dir),
+                    capture_output=True,
+                    text=True,
+                )
+                
+                if git_status.stdout.strip():
+                    print(f"Git changes detected, committing and pushing...")
+                    
+                    # Configure git user for commit
+                    subprocess.run(
+                        ["git", "config", "user.email", "gogogadget@claude.ai"],
+                        cwd=str(work_dir),
+                        check=True,
+                    )
+                    subprocess.run(
+                        ["git", "config", "user.name", "GoGoGadget Claude"],
+                        cwd=str(work_dir),
+                        check=True,
+                    )
+                    
+                    # Add all changes
+                    subprocess.run(
+                        ["git", "add", "-A"],
+                        cwd=str(work_dir),
+                        check=True,
+                    )
+                    
+                    # Create commit with descriptive message
+                    commit_msg = f"Cloud session update via GoGoGadget Claude\n\nSession: {session_id}\nPrompt: {prompt[:100]}..."
+                    subprocess.run(
+                        ["git", "commit", "-m", commit_msg],
+                        cwd=str(work_dir),
+                        check=True,
+                    )
+                    
+                    # Push to main branch (using authenticated URL)
+                    # Note: We already have github_token in clone_url from earlier
+                    push_url = project_repo
+                    if github_token and "github.com" in project_repo:
+                        push_url = project_repo.replace("https://github.com", f"https://{github_token}@github.com")
+                    
+                    subprocess.run(
+                        ["git", "push", push_url, "HEAD:main"],
+                        cwd=str(work_dir),
+                        capture_output=True,
+                        check=True,
+                    )
+                    print(f"Successfully pushed changes to main branch")
+                else:
+                    print("No git changes to commit")
+            except subprocess.CalledProcessError as git_err:
+                print(f"Git push failed (non-fatal): {git_err.stderr if git_err.stderr else str(git_err)}")
+            except Exception as git_err:
+                print(f"Git push error (non-fatal): {str(git_err)}")
 
         # Call notification webhook if provided
         if notification_webhook:
@@ -320,6 +393,7 @@ def execute_prompt(
                 print(f"Failed to call notification webhook: {e}")
 
         # Send ntfy push notification if topic is provided
+        print(f"Checking ntfy notification - topic: '{ntfy_topic}'")
         if ntfy_topic:
             try:
                 status_emoji = "✅" if success else "❌"
@@ -329,8 +403,13 @@ def execute_prompt(
                 if len(output or "") > 200:
                     body += "..."
                 
-                requests.post(
-                    f"https://ntfy.sh/{ntfy_topic}",
+                ntfy_url = f"https://ntfy.sh/{ntfy_topic}"
+                print(f"Sending ntfy notification to: {ntfy_url}")
+                print(f"  Title: {title}")
+                print(f"  Body preview: {body[:50]}...")
+                
+                ntfy_response = requests.post(
+                    ntfy_url,
                     data=body.encode("utf-8"),
                     headers={
                         "Title": title,
@@ -339,9 +418,17 @@ def execute_prompt(
                     },
                     timeout=10,
                 )
-                print(f"Sent ntfy notification to topic: {ntfy_topic}")
+                print(f"ntfy response status: {ntfy_response.status_code}")
+                if ntfy_response.status_code != 200:
+                    print(f"ntfy response body: {ntfy_response.text}")
+                else:
+                    print(f"Successfully sent ntfy notification to topic: {ntfy_topic}")
             except Exception as e:
                 print(f"Failed to send ntfy notification: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("No ntfy topic provided, skipping notification")
 
         return {
             "sessionId": session_id,
