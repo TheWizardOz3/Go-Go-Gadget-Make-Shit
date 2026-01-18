@@ -836,18 +836,15 @@ function Header({
           )}
         </div>
 
-        {/* Right side: Connection Mode + Scheduled Prompts + Settings + Status */}
+        {/* Right side: Icons + Stacked indicators */}
         <div className="flex-shrink-0 flex items-center gap-1">
-          {/* Connection mode badge */}
-          {connectionBadge}
-
           {/* Scheduled Prompts button */}
           {onScheduledPromptsClick && (
             <button
               type="button"
               onClick={onScheduledPromptsClick}
               className={cn(
-                'p-2 rounded-lg',
+                'p-1.5 rounded-lg',
                 'text-text-muted hover:text-text-primary',
                 'hover:bg-text-primary/5 active:bg-text-primary/10',
                 'transition-colors duration-150',
@@ -865,7 +862,7 @@ function Header({
               type="button"
               onClick={onSettingsClick}
               className={cn(
-                'p-2 rounded-lg',
+                'p-1.5 rounded-lg',
                 'text-text-muted hover:text-text-primary',
                 'hover:bg-text-primary/5 active:bg-text-primary/10',
                 'transition-colors duration-150',
@@ -877,8 +874,11 @@ function Header({
             </button>
           )}
 
-          {/* Status indicator */}
-          {statusLoading ? <StatusIndicatorSkeleton /> : <StatusIndicator status={status} />}
+          {/* Stacked indicators: Connection mode + Status */}
+          <div className="flex flex-col items-end gap-0.5 ml-1">
+            {connectionBadge}
+            {statusLoading ? <StatusIndicatorSkeleton /> : <StatusIndicator status={status} />}
+          </div>
         </div>
       </div>
     </header>
@@ -983,10 +983,7 @@ interface TabBarProps {
 
 function TabBar({ activeTab, onTabChange, filesChangedCount }: TabBarProps) {
   return (
-    <nav
-      className="flex-shrink-0 border-t border-text-primary/10 bg-surface"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-    >
+    <nav className="flex-shrink-0 border-t border-text-primary/10 bg-surface safe-bottom">
       <div className="flex items-center justify-around">
         {/* Conversation Tab */}
         <button
