@@ -779,6 +779,42 @@ async def api_dispatch_job(request: DispatchJobRequest):
     }
 
 
+@web_app.get("/api/cloud/jobs/{job_id}")
+async def api_get_job_status(job_id: str):
+    """Check the status of a cloud job."""
+    try:
+        from modal.functions import FunctionCall
+        
+        fc = FunctionCall.from_id(job_id)
+        
+        try:
+            # Try to get result (non-blocking check)
+            result = fc.get(timeout=0.1)
+            return {
+                "data": {
+                    "jobId": job_id,
+                    "status": "completed",
+                    "result": result,
+                }
+            }
+        except TimeoutError:
+            # Job still running
+            return {
+                "data": {
+                    "jobId": job_id,
+                    "status": "running",
+                }
+            }
+    except Exception as e:
+        return {
+            "data": {
+                "jobId": job_id,
+                "status": "unknown",
+                "error": str(e),
+            }
+        }
+
+
 @web_app.get("/api/settings")
 async def api_get_settings():
     """Return empty settings (cloud doesn't store settings)."""
