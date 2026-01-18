@@ -429,6 +429,7 @@ def get_sessions(encoded_path: str) -> list[dict[str, Any]]:
 
 @app.function(
     image=image,
+    secrets=[modal.Secret.from_name("GITHUB_TOKEN")],
     timeout=120,
 )
 def fetch_repo_tree(repo_url: str, branch: str | None = None) -> dict[str, Any]:
