@@ -373,6 +373,24 @@ export function ConversationView({
     }
   }, [toast]);
 
+  // Cloud job pending - show loading state while job executes
+  // This check MUST come before the !sessionId check, because we set pendingCloudJob
+  // when starting a new session (no sessionId yet)
+  if (pendingCloudJob) {
+    debugLog.info('Rendering CloudJobPending', { jobId: pendingCloudJob.jobId });
+    return (
+      <div className={cn('flex flex-col', className)}>
+        <CloudJobPending
+          jobId={pendingCloudJob.jobId}
+          prompt={pendingCloudJob.prompt}
+          projectName={projectName || 'Project'}
+          onComplete={handleCloudJobComplete}
+          onError={handleCloudJobError}
+        />
+      </div>
+    );
+  }
+
   // No session selected - show "new conversation" UI if project is selected
   if (!sessionId) {
     // If no project is selected, show basic empty state
@@ -490,22 +508,6 @@ export function ConversationView({
           onStop={handleStop}
           isStopping={isStopping}
           onVoiceError={handleVoiceError}
-        />
-      </div>
-    );
-  }
-
-  // Cloud job pending - show loading state while job executes
-  if (pendingCloudJob) {
-    return (
-      <div className={cn('flex flex-col', className)}>
-        <CloudJobPending
-          jobId={pendingCloudJob.jobId}
-          prompt={pendingCloudJob.prompt}
-          projectName={projectName || 'Project'}
-          onComplete={handleCloudJobComplete}
-          onError={handleCloudJobError}
-          className="flex-1"
         />
       </div>
     );
