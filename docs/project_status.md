@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-17 (V1 Complete + Auto Git Remote URLs patch, v0.21.1)
+**Last Updated**: 2026-01-18 (V1.1 Cloud Mode Polish complete, v0.23.0)
 
 ---
 
@@ -108,6 +108,24 @@
 | ntfy Notifications             | 2026-01-17      | Push notifications via ntfy.sh (44 tests) - [doc](Features/ntfy-notifications.md)                          |
 | Serverless/Async Execution     | 2026-01-17      | Run agents without laptop awake (Modal + Vercel) - [doc](Features/serverless-execution.md)                 |
 | Auto Git Remote URLs (patch)   | 2026-01-17      | Projects auto-include git remote URL for seamless cloud execution                                          |
+
+---
+
+## V1.1 Progress - Cloud Mode Polish ✅
+
+**Completed**: 2026-01-18 (v0.23.0)
+
+| Feature/Task                    | Completion Date | Notes                                                                            |
+|---------------------------------|-----------------|----------------------------------------------------------------------------------|
+| Cloud session continuation      | 2026-01-18      | Messages to existing sessions continue the conversation, not create new ones     |
+| ntfy notifications from cloud   | 2026-01-18      | Push notifications when Modal jobs complete                                      |
+| Cloud job pending UI            | 2026-01-18      | Loading animation with stages while jobs execute                                 |
+| Persistent debug logging        | 2026-01-18      | `localStorage` logs for debugging cloud mode without DevTools                    |
+| File tree caching               | 2026-01-18      | Cached trees for offline viewing, faster navigation                              |
+| Unified UI for local/cloud      | 2026-01-18      | Same experience regardless of connection mode                                    |
+| Cloud sessions endpoint         | 2026-01-18      | `/api/cloud/sessions` scans Modal volume for actual sessions                     |
+| Modal transcription endpoint    | 2026-01-18      | `/api/transcribe` for voice input in cloud mode                                  |
+| Multiple cloud mode bug fixes   | 2026-01-18      | Path mismatches, URL parsing, endpoint routing, error handling                   |
 
 ---
 

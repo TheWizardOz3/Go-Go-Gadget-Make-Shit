@@ -13,6 +13,8 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-025 | 2026-01-18 | arch     | active | Cloud session continuation via Claude CLI --continue flag |
+| ADR-024 | 2026-01-18 | infra    | active | Persistent client-side debug logging for cloud mode       |
 | ADR-023 | 2026-01-17 | arch     | active | Notification channel abstraction layer                    |
 | ADR-022 | 2026-01-17 | arch     | active | SharedPromptContext for cross-view voice input sync       |
 | ADR-021 | 2026-01-17 | arch     | active | Fire-and-forget execution for scheduled prompts           |
@@ -46,6 +48,95 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-025: Cloud Session Continuation via Claude CLI --continue Flag
+**Date:** 2026-01-18 | **Category:** arch | **Status:** active
+
+**Trigger:**
+- Cloud mode was creating a new session for every message, even when sent from an existing session
+- Users expected conversations to continue, not start fresh each time
+
+**Decision:**
+Pass existing `sessionId` to Modal `execute_prompt` function. When present, use Claude CLI's `--continue` flag:
+
+```python
+# In execute_prompt()
+cmd = ["claude", "-p", prompt]
+if session_id:  # Continuing existing session
+    cmd.extend(["--continue", session_id])
+```
+
+**Rationale:**
+- Claude CLI natively supports session continuation via `--continue <session-id>`
+- Session ID is the JSONL filename stem (UUID), already known to the client
+- No custom session management needed—Claude handles conversation threading
+- Consistent behavior between local and cloud execution
+
+**Alternatives Considered:**
+- **Re-read previous JSONL and prepend context**: Complex, would duplicate data
+- **Custom session tracking in Modal volume**: Unnecessary when Claude handles it
+- **Force new sessions always**: Poor UX for iterative workflows
+
+**AI Instructions:**
+- Always check if `sessionId` is provided before building Claude CLI command
+- For new sessions, omit `--continue` (let Claude generate new session ID)
+- For existing sessions, include `--continue {session_id}`
+- The client should pass `sessionId` from `useSendPrompt` cloudOptions when an existing session is selected
+
+---
+
+### ADR-024: Persistent Client-Side Debug Logging for Cloud Mode
+**Date:** 2026-01-18 | **Category:** infra | **Status:** active
+
+**Trigger:**
+- Cloud mode issues were impossible to debug because:
+  1. Browser DevTools require laptop connection (which forces local mode)
+  2. Modal logs have latency and don't show client-side issues
+  3. Users couldn't provide useful error reports
+
+**Decision:**
+Implement client-side logging to `localStorage`:
+
+```typescript
+// debugLog.ts
+const LOG_KEY = 'ggg_debug_logs';
+const MAX_ENTRIES = 100;
+
+export const debugLog = {
+  info: (msg, data?) => addLog('info', msg, data),
+  warn: (msg, data?) => addLog('warn', msg, data),
+  error: (msg, data?) => addLog('error', msg, data),
+  get: () => getLogs(),
+  clear: () => localStorage.removeItem(LOG_KEY),
+};
+```
+
+Exposed in Settings UI with:
+- View logs panel (expandable section)
+- Copy all logs button
+- Clear logs button
+- Refresh button
+
+**Rationale:**
+- Solves the "debugging paradox" where connecting DevTools changes the behavior
+- Logs persist across page reloads (survives browser background/foreground cycles)
+- User can copy logs and share them for troubleshooting
+- Minimal overhead (100 entries max, auto-pruning)
+- No server dependency—works completely offline
+
+**Alternatives Considered:**
+- **Remote logging service**: Requires internet, adds complexity, privacy concerns
+- **In-memory only**: Lost on page reload, useless for real debugging
+- **Browser console only**: Not accessible when DevTools isn't connected
+
+**AI Instructions:**
+- Use `debugLog.info()` for API requests, mode changes, key events
+- Use `debugLog.error()` for failures with full error details
+- Include `mode` (local/cloud) in all log entries
+- Keep log entries concise but include relevant data (status codes, URLs, payloads)
+- Don't log sensitive data (API keys, tokens)
+
+---
 
 ### ADR-023: Notification Channel Abstraction Layer
 **Date:** 2026-01-17 | **Category:** arch | **Status:** active

@@ -19,6 +19,8 @@ vi.mock('@/lib/api', () => ({
     put: vi.fn(),
     post: vi.fn(),
   },
+  // Mock getApiMode to return 'local' (standard mode for tests)
+  getApiMode: vi.fn(() => 'local'),
 }));
 
 const mockApi = vi.mocked(api);

@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.23.0 | 2026-01-18 | minor | Cloud Mode Polish - session continuation, ntfy notifications, debug logging |
 | 0.21.5 | 2026-01-17 | patch | Cloud prompt input - send prompts from cached projects |
 | 0.21.4 | 2026-01-17 | patch | Offline view - show cached projects when laptop is asleep |
 | 0.21.3 | 2026-01-17 | patch | Cloud mode initialization fix - wait for endpoint check |
@@ -56,6 +57,61 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.23.0] - 2026-01-18
+
+### Summary
+**Cloud Mode Polish** - Major refinements to cloud execution: session continuation, ntfy notifications, file tree caching, debug logging, and improved UI/UX.
+
+### Added
+- **Cloud session continuation** - Send messages to existing cloud sessions instead of creating new ones every time
+  - Pass `sessionId` to Modal jobs for continuing conversations
+  - Modal uses `claude -p "prompt" --continue <session-id>` when resuming
+- **ntfy notifications from cloud** - Receive push notifications when cloud tasks complete
+  - `ntfyTopic` parameter passed from client settings to Modal
+  - Modal sends ntfy.sh notification with success/failure emoji
+- **Cloud job pending UI** - Loading animation while cloud jobs execute
+  - Shows stages: "Job queued" → "Cloning repository" → "Claude is thinking"
+  - Elapsed timer and progress bar
+  - Polls `/api/cloud/jobs/{id}` for status updates
+- **Persistent debug logging** - Client-side logs stored in `localStorage` for offline debugging
+  - `debugLog.ts` utility with info/warn/error levels
+  - Settings UI section to view, refresh, copy, and clear logs
+  - Logs API requests, responses, and mode changes
+- **File tree caching** - Cached file trees for offline viewing in cloud mode
+  - `useFileTree` uses cached data as `fallbackData` in SWR
+  - File content also cached for faster navigation
+- **Connection mode badge** - Shows "Local" or "Cloud" in header with tap-to-refresh
+
+### Changed
+- **Unified UI for local/cloud modes** - Same experience regardless of connection
+  - All prompts, voice input, and file viewing work identically
+  - Settings stored in `localStorage` when in cloud mode (Modal doesn't persist)
+- **Cloud sessions endpoint** - `/api/cloud/sessions` now scans Modal volume for actual session files
+- **Modal transcription endpoint** - Added `/api/transcribe` for voice input in cloud mode
+  - Uses Groq Whisper API via `httpx`
+  - Requires `GROQ_API_KEY` Modal secret
+- **Improved error feedback** - Clear toast messages for cloud execution failures
+- **Simplified serverless settings UI** - Removed direct token inputs (use Modal secrets instead)
+
+### Fixed
+- **Cloud mode prompts not working** - Multiple endpoint and path fixes
+- **Voice transcription in cloud** - Added filename to audio upload for Groq compatibility
+- **"Error" badge in header** - Corrected `getApiMode()` usage across hooks
+- **Modal URL newline character** - Added `.trim()` to environment variable parsing
+- **Project path mismatch** - Cloud sessions stored under `/tmp/repos/{name}`, client now queries correctly
+- **Test failures** - Added `getApiMode` mock to `useSettings.test.ts`
+
+### Technical Notes
+- Modal now uses `GITHUB_TOKEN` secret for private repo cloning in `execute_prompt`
+- Added `requests` dependency to Modal image for webhook notifications
+- Made `projectPath` optional in `/api/sessions/{id}/messages` endpoint
+
+### Version Tags
+- v0.22.0 through v0.22.18 (incremental cloud mode fixes)
+- v0.23.0 (consolidated release)
 
 ---
 
