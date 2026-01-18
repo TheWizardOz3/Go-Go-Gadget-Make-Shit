@@ -791,6 +791,54 @@ async def api_get_settings():
     }
 
 
+@web_app.get("/api/cloud/sessions")
+async def api_get_cloud_sessions(projectPath: str = Query(None)):
+    """Return empty cloud sessions (placeholder for cloud mode)."""
+    return {"data": []}
+
+
+@web_app.get("/api/projects/{encoded_path}/templates")
+async def api_get_templates(encoded_path: str):
+    """Return empty templates (cloud doesn't have local templates)."""
+    return {"data": []}
+
+
+@web_app.get("/api/projects/{encoded_path}/files")
+async def api_get_files(encoded_path: str):
+    """Return empty files list (cloud uses tree endpoint instead)."""
+    return {"data": []}
+
+
+@web_app.post("/api/sessions/new")
+async def api_create_session(request: Request):
+    """
+    Create a new session - in cloud mode, redirect to cloud/jobs.
+    """
+    try:
+        body = await request.json()
+        prompt = body.get("prompt", "")
+        project_path = body.get("projectPath", "")
+        
+        if not prompt or not project_path:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": {"code": "VALIDATION_ERROR", "message": "Missing prompt or projectPath"}}
+            )
+        
+        # For cloud mode, we need the repo URL - return an error asking to use cloud/jobs
+        return {
+            "data": {
+                "error": "Use /api/cloud/jobs for cloud execution with repoUrl",
+                "requiresCloudJob": True,
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "INVALID_REQUEST", "message": str(e)}}
+        )
+
+
 @web_app.post("/api/transcribe")
 async def api_transcribe(request: Request):
     """

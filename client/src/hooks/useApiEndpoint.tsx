@@ -36,10 +36,12 @@ import { setApiBaseUrl } from '@/lib/api';
  */
 function getConfiguredUrls(): { laptopUrl: string; modalUrl: string } {
   // Try Vite env vars first (for Vercel deployment)
-  const laptopUrl =
-    import.meta.env.VITE_LAPTOP_API_URL || (import.meta.env.DEV ? 'http://localhost:3457' : '');
+  // Trim to remove any accidental whitespace/newlines from env vars
+  const laptopUrl = (
+    import.meta.env.VITE_LAPTOP_API_URL || (import.meta.env.DEV ? 'http://localhost:3457' : '')
+  ).trim();
 
-  const modalUrl = import.meta.env.VITE_MODAL_API_URL || '';
+  const modalUrl = (import.meta.env.VITE_MODAL_API_URL || '').trim();
 
   return { laptopUrl, modalUrl };
 }
