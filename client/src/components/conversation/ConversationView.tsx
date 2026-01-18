@@ -94,7 +94,12 @@ export function ConversationView({
    */
   const handleStartNewSession = useCallback(
     async (prompt: string) => {
-      if (!projectPath || isStartingNewSession) return false;
+      debugLog.info('handleStartNewSession called', { projectPath, prompt: prompt.slice(0, 50) });
+
+      if (!projectPath || isStartingNewSession) {
+        debugLog.warn('handleStartNewSession aborted', { projectPath, isStartingNewSession });
+        return false;
+      }
 
       const trimmedPrompt = prompt.trim();
       if (!trimmedPrompt) return false;
@@ -105,6 +110,13 @@ export function ConversationView({
         // Use sendPromptAdvanced which handles cloud mode automatically
         const result = await sendPromptAdvanced(trimmedPrompt);
 
+        debugLog.info('handleStartNewSession result', {
+          success: result.success,
+          mode: result.mode,
+          jobId: result.jobId,
+          errorMessage: result.errorMessage,
+        });
+
         if (!result.success) {
           setToast({ message: result.errorMessage || 'Failed to start session', type: 'error' });
           return false;
@@ -112,6 +124,9 @@ export function ConversationView({
 
         // If this is a cloud job, show pending state with job ID
         if (result.mode === 'cloud' && result.jobId) {
+          debugLog.info('Setting pendingCloudJob from handleStartNewSession', {
+            jobId: result.jobId,
+          });
           setPendingCloudJob({
             jobId: result.jobId,
             prompt: trimmedPrompt,
