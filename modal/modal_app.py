@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import modal
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -46,7 +46,7 @@ image = (
         # Install Claude CLI globally
         "npm install -g @anthropic-ai/claude-code",
     )
-    .pip_install("fastapi[standard]", "pydantic")
+    .pip_install("fastapi[standard]", "pydantic", "httpx")
 )
 
 
@@ -791,6 +791,81 @@ async def api_get_settings():
     }
 
 
+@web_app.post("/api/transcribe")
+async def api_transcribe(request: Request):
+    """
+    Transcribe audio using Groq Whisper API.
+    Requires GROQ_API_KEY secret to be configured in Modal.
+    """
+    import httpx
+
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+    if not groq_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "MISSING_API_KEY", "message": "GROQ_API_KEY not configured"}},
+        )
+
+    # Parse multipart form data
+    form = await request.form()
+    audio_file = form.get("audio")
+
+    if not audio_file:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "MISSING_AUDIO", "message": "No audio file provided"}},
+        )
+
+    # Read the audio content
+    audio_content = await audio_file.read()
+
+    # Send to Groq Whisper API
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            files = {
+                "file": (audio_file.filename or "audio.webm", audio_content, audio_file.content_type or "audio/webm"),
+            }
+            data = {
+                "model": "whisper-large-v3",
+                "response_format": "json",
+            }
+
+            response = await client.post(
+                "https://api.groq.com/openai/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {groq_api_key}"},
+                files=files,
+                data=data,
+            )
+
+            if response.status_code != 200:
+                error_detail = response.text
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail={"error": {"code": "GROQ_API_ERROR", "message": f"Groq API error: {error_detail}"}},
+                )
+
+            result = response.json()
+            text = result.get("text", "").strip()
+
+            return {
+                "data": {
+                    "text": text,
+                    "empty": len(text) == 0,
+                }
+            }
+
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail={"error": {"code": "TIMEOUT", "message": "Transcription request timed out"}},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "TRANSCRIPTION_ERROR", "message": str(e)}},
+        )
+
+
 class FetchTreeRequest(BaseModel):
     repoUrl: str
     branch: str | None = None
@@ -842,7 +917,10 @@ async def api_get_scheduled_prompts():
 @app.function(
     image=image,
     volumes={"/root/.claude": volume},
-    secrets=[modal.Secret.from_name("ANTHROPIC_API_KEY")],
+    secrets=[
+        modal.Secret.from_name("ANTHROPIC_API_KEY"),
+        modal.Secret.from_name("GROQ_API_KEY"),
+    ],
 )
 @modal.asgi_app()
 def fastapi_app():
