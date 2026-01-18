@@ -369,7 +369,9 @@ def execute_prompt(
             )
 
         # Build the Claude command
-        cmd = ["claude", "-p", prompt]
+        # --dangerously-skip-permissions is required for headless execution
+        # Without it, Claude will hang waiting for user to approve tool calls
+        cmd = ["claude", "-p", prompt, "--dangerously-skip-permissions"]
 
         # If continuing an existing session, add --continue flag
         if is_continuation:

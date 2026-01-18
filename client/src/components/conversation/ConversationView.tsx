@@ -232,6 +232,13 @@ export function ConversationView({
           result?: { sessionId?: string; success?: boolean };
         }>(`/cloud/jobs/${pendingFollowUp.jobId}`);
 
+        debugLog.info('Follow-up job poll response', {
+          jobId: pendingFollowUp.jobId,
+          status: response.status,
+          hasResult: !!response.result,
+          sessionId: response.result?.sessionId,
+        });
+
         if (response.status === 'completed') {
           debugLog.info('Follow-up job completed', { result: response.result });
           setPendingFollowUp(null);
@@ -402,18 +409,22 @@ export function ConversationView({
   /**
    * Handle sending a prompt (for existing sessions)
    *
-   * In cloud mode, this dispatches a job but shows an INLINE indicator
-   * instead of full-screen CloudJobPending (that's only for NEW sessions).
+   * In cloud mode behavior depends on whether we're CONTINUING a session:
+   * - If cloudOptions.sessionId exists: Show INLINE indicator (follow-up message)
+   * - If cloudOptions.sessionId is undefined: Show FULL-SCREEN loader (new session)
    */
   const handleSend = useCallback(
     async (prompt: string) => {
       const trimmedPrompt = prompt.trim();
+      const isCloudContinuation = !!cloudOptions?.sessionId;
+
       debugLog.info('handleSend called', {
         prompt: trimmedPrompt.slice(0, 50),
         sessionId,
         sessionWasUserSelected,
         hasCloudOptions: !!cloudOptions,
         cloudSessionIdInOptions: cloudOptions?.sessionId || '(none)',
+        isCloudContinuation,
       });
 
       const result = await sendPromptAdvanced(trimmedPrompt);
@@ -426,12 +437,24 @@ export function ConversationView({
 
       if (result.success) {
         if (result.mode === 'cloud' && result.jobId) {
-          // For EXISTING sessions: show inline indicator, NOT full-screen loading
-          // The conversation remains visible while processing
-          debugLog.info('Setting pendingFollowUp state (inline indicator)', {
-            jobId: result.jobId,
-          });
-          setPendingFollowUp({ jobId: result.jobId });
+          if (isCloudContinuation) {
+            // CONTINUING existing cloud session: show inline indicator
+            // The conversation remains visible while processing
+            debugLog.info('Setting pendingFollowUp state (inline indicator)', {
+              jobId: result.jobId,
+            });
+            setPendingFollowUp({ jobId: result.jobId });
+          } else {
+            // STARTING NEW cloud session: show full-screen loader
+            // This navigates user to new session when complete
+            debugLog.info('Setting pendingCloudJob state (new session, full-screen)', {
+              jobId: result.jobId,
+            });
+            setPendingCloudJob({
+              jobId: result.jobId,
+              prompt: trimmedPrompt,
+            });
+          }
           return;
         }
 
