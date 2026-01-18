@@ -524,6 +524,126 @@ def fetch_repo_tree(repo_url: str, branch: str | None = None) -> dict[str, Any]:
 
 @app.function(
     image=image,
+    secrets=[modal.Secret.from_name("GITHUB_TOKEN")],
+    timeout=120,
+)
+def fetch_file_content(repo_url: str, file_path: str, branch: str | None = None) -> dict[str, Any]:
+    """
+    Clone a git repo and return content of a specific file.
+    Supports private repos if GITHUB_TOKEN secret is configured.
+
+    Args:
+        repo_url: Git repository URL (HTTPS or SSH)
+        file_path: Path to file within the repo
+        branch: Optional branch name (defaults to main/master)
+
+    Returns:
+        dict with 'content', 'language', etc. or 'error'
+    """
+    import tempfile
+    import mimetypes
+
+    # Get GitHub token from environment if available
+    github_token = os.environ.get("GITHUB_TOKEN")
+
+    # Prepare the URL with auth if token is available
+    clone_url = repo_url
+    if github_token and "github.com" in repo_url and repo_url.startswith("https://"):
+        clone_url = repo_url.replace("https://github.com", f"https://{github_token}@github.com")
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            work_dir = Path(tmpdir) / "repo"
+
+            # Clone with depth=1 for speed
+            clone_cmd = ["git", "clone", "--depth=1"]
+            if branch:
+                clone_cmd.extend(["-b", branch])
+            clone_cmd.extend([clone_url, str(work_dir)])
+
+            result = subprocess.run(
+                clone_cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or "Failed to clone repository"
+                error_msg = error_msg.replace(github_token, "***") if github_token else error_msg
+                return {"error": error_msg}
+
+            # Read the file
+            target_file = work_dir / file_path
+            if not target_file.exists():
+                return {"error": f"File not found: {file_path}"}
+
+            if not target_file.is_file():
+                return {"error": f"Not a file: {file_path}"}
+
+            # Check file size (limit to 1MB)
+            file_size = target_file.stat().st_size
+            if file_size > 1024 * 1024:
+                return {"error": f"File too large: {file_size} bytes (max 1MB)"}
+
+            # Try to read as text
+            try:
+                content = target_file.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                return {"error": "Binary file - cannot display"}
+
+            # Determine language from extension
+            ext = target_file.suffix.lower()
+            language_map = {
+                ".py": "python",
+                ".js": "javascript",
+                ".jsx": "javascript",
+                ".ts": "typescript",
+                ".tsx": "typescript",
+                ".json": "json",
+                ".md": "markdown",
+                ".html": "html",
+                ".css": "css",
+                ".scss": "scss",
+                ".yaml": "yaml",
+                ".yml": "yaml",
+                ".sh": "bash",
+                ".bash": "bash",
+                ".zsh": "bash",
+                ".go": "go",
+                ".rs": "rust",
+                ".java": "java",
+                ".c": "c",
+                ".cpp": "cpp",
+                ".h": "c",
+                ".hpp": "cpp",
+                ".rb": "ruby",
+                ".php": "php",
+                ".swift": "swift",
+                ".kt": "kotlin",
+                ".sql": "sql",
+                ".graphql": "graphql",
+                ".vue": "vue",
+                ".svelte": "svelte",
+            }
+            language = language_map.get(ext, "text")
+
+            return {
+                "path": file_path,
+                "content": content,
+                "language": language,
+                "size": file_size,
+                "githubUrl": f"{repo_url}/blob/main/{file_path}" if "github.com" in repo_url else None,
+            }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Clone timed out"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.function(
+    image=image,
     volumes={"/root/.claude": volume},
 )
 def get_messages(session_id: str, encoded_path: str) -> dict[str, Any]:
@@ -674,6 +794,27 @@ async def api_get_settings():
 class FetchTreeRequest(BaseModel):
     repoUrl: str
     branch: str | None = None
+
+
+class FetchContentRequest(BaseModel):
+    repoUrl: str
+    filePath: str
+    branch: str | None = None
+
+
+@web_app.post("/api/cloud/content")
+async def api_fetch_content(request: FetchContentRequest):
+    """
+    Fetch file content from a git repository.
+    Works with private repos if GITHUB_TOKEN secret is configured.
+    """
+    result = fetch_file_content.remote(request.repoUrl, request.filePath, request.branch)
+    if result.get("error"):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "FETCH_ERROR", "message": result["error"]}},
+        )
+    return {"data": result}
 
 
 @web_app.post("/api/cloud/tree")

@@ -7,8 +7,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
-import { getCachedProjects, getLastSyncRelative, getCachedFileTree } from '@/lib/localCache';
-import { fetchRepoTree, type NestedTreeEntry } from '@/lib/github';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { useConversation } from '@/hooks/useConversation';
@@ -33,12 +31,7 @@ import { SharedPromptProvider } from '@/contexts/SharedPromptContext';
 import { ApiEndpointProvider, useApiEndpointContext } from '@/hooks/useApiEndpoint';
 import { useScheduledPrompts } from '@/hooks/useScheduledPrompts';
 import { useScheduledPromptNotifications } from '@/hooks/useScheduledPromptNotifications';
-import type {
-  SessionStatus,
-  SessionSummarySerialized,
-  ScheduledPromptInput,
-  ProjectSerialized,
-} from '@shared/types';
+import type { SessionStatus, SessionSummarySerialized, ScheduledPromptInput } from '@shared/types';
 
 /** Active tab type */
 type ActiveTab = 'conversation' | 'files';
@@ -108,119 +101,6 @@ function setStoredSession(encodedPath: string | null, sessionId: string | null):
 }
 
 /**
- * Common tree entry shape (works for cached or GitHub trees)
- */
-interface TreeEntry {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  extension?: string | null;
-  children?: TreeEntry[];
-}
-
-/**
- * Recursive tree view for file trees (cached or from GitHub)
- */
-function CachedTreeView({
-  entries,
-  expandedFolders,
-  onToggleFolder,
-  depth = 0,
-}: {
-  entries: TreeEntry[];
-  expandedFolders: Set<string>;
-  onToggleFolder: (path: string) => void;
-  depth?: number;
-}) {
-  // Sort: folders first, then files, alphabetically
-  const sorted = [...entries].sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  return (
-    <div className={depth > 0 ? 'ml-4 border-l border-border/30 pl-2' : ''}>
-      {sorted.map((entry) => {
-        const isExpanded = expandedFolders.has(entry.path);
-        const isFolder = entry.type === 'directory';
-
-        return (
-          <div key={entry.path}>
-            <button
-              onClick={() => isFolder && onToggleFolder(entry.path)}
-              className={cn(
-                'w-full flex items-center gap-2 py-1.5 px-2 rounded text-left text-sm',
-                'hover:bg-text-primary/5 transition-colors',
-                isFolder ? 'cursor-pointer' : 'cursor-default'
-              )}
-            >
-              {isFolder ? (
-                <>
-                  <svg
-                    className={cn(
-                      'w-4 h-4 text-text-muted transition-transform',
-                      isExpanded && 'rotate-90'
-                    )}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                  <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                  </svg>
-                </>
-              ) : (
-                <>
-                  <span className="w-4" />
-                  <svg
-                    className="w-4 h-4 text-text-muted"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                </>
-              )}
-              <span
-                className={cn(
-                  'truncate',
-                  isFolder
-                    ? 'text-text-primary font-medium'
-                    : 'text-text-secondary font-mono text-xs'
-                )}
-              >
-                {entry.name}
-              </span>
-            </button>
-            {isFolder && isExpanded && entry.children && (
-              <CachedTreeView
-                entries={entry.children}
-                expandedFolders={expandedFolders}
-                onToggleFolder={onToggleFolder}
-                depth={depth + 1}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
  * Loading screen shown while determining API endpoint
  */
 function InitializationLoader() {
@@ -237,11 +117,9 @@ function InitializationLoader() {
 }
 
 /**
- * Empty state shown when no projects are found
- * Shows cached projects if available (for context when laptop is asleep)
- * Allows starting cloud sessions for projects with git URLs
+ * Simple empty state shown when truly no projects exist
  */
-function CloudEmptyState({
+function EmptyProjectsState({
   onOpenSettings,
   isSettingsOpen,
   setIsSettingsOpen,
@@ -250,595 +128,64 @@ function CloudEmptyState({
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
 }) {
-  const { mode, isLaptopAvailable, checkNow, isChecking } = useApiEndpointContext();
-  const cachedProjects = getCachedProjects();
-  const lastSync = getLastSyncRelative();
-  const [selectedCachedProject, setSelectedCachedProject] = useState<ProjectSerialized | null>(
-    null
-  );
-  const [cloudPrompt, setCloudPrompt] = useState('');
-  const [isSendingCloud, setIsSendingCloud] = useState(false);
-  const [cloudError, setCloudError] = useState<string | null>(null);
-  const [cloudSuccess, setCloudSuccess] = useState<string | null>(null);
-  const [panelTab, setPanelTab] = useState<'prompt' | 'files'>('prompt');
-
+  const { mode, checkNow, isChecking } = useApiEndpointContext();
   const isCloudMode = mode === 'cloud';
-
-  // Get cached file tree for selected project
-  const cachedTree = selectedCachedProject
-    ? getCachedFileTree(selectedCachedProject.encodedPath)
-    : null;
-
-  // GitHub tree fetching state
-  const [githubTree, setGithubTree] = useState<NestedTreeEntry[] | null>(null);
-  const [isLoadingGithub, setIsLoadingGithub] = useState(false);
-  const [githubError, setGithubError] = useState<string | null>(null);
-
-  // Track expanded folders in the tree
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-
-  const toggleFolder = (path: string) => {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  };
-
-  // Track the source of the tree (modal or github)
-  const [treeSource, setTreeSource] = useState<'modal' | 'github' | null>(null);
-
-  // Fetch file tree from GitHub or Modal (for private repos)
-  const fetchFromGitHub = useCallback(async () => {
-    if (!selectedCachedProject?.gitRemoteUrl) return;
-
-    setIsLoadingGithub(true);
-    setGithubError(null);
-
-    try {
-      const result = await fetchRepoTree(selectedCachedProject.gitRemoteUrl);
-
-      if (result.error) {
-        setGithubError(result.error);
-        setGithubTree(null);
-      } else if (result.entries.length > 0) {
-        setGithubTree(result.entries);
-        setTreeSource(result.source);
-      } else {
-        setGithubError('Repository appears to be empty');
-      }
-    } catch (err) {
-      setGithubError(err instanceof Error ? err.message : 'Failed to fetch');
-    } finally {
-      setIsLoadingGithub(false);
-    }
-  }, [selectedCachedProject?.gitRemoteUrl]);
-
-  // Auto-fetch from GitHub when project selected in cloud mode
-  useEffect(() => {
-    if (isCloudMode && selectedCachedProject?.gitRemoteUrl && !cachedTree) {
-      fetchFromGitHub();
-    }
-  }, [isCloudMode, selectedCachedProject, cachedTree, fetchFromGitHub]);
-
-  // Clear GitHub tree when project changes
-  useEffect(() => {
-    setGithubTree(null);
-    setGithubError(null);
-    setExpandedFolders(new Set());
-  }, [selectedCachedProject?.encodedPath]);
-
-  // Send prompt to cloud for selected project
-  const handleSendCloudPrompt = async () => {
-    if (!selectedCachedProject?.gitRemoteUrl || !cloudPrompt.trim()) return;
-
-    setIsSendingCloud(true);
-    setCloudError(null);
-    setCloudSuccess(null);
-
-    try {
-      await api.post('/cloud/jobs', {
-        repoUrl: selectedCachedProject.gitRemoteUrl,
-        prompt: cloudPrompt.trim(),
-        projectName: selectedCachedProject.name,
-      });
-
-      setCloudSuccess(
-        `Prompt sent! Claude is working on "${selectedCachedProject.name}" in the cloud.`
-      );
-      setCloudPrompt('');
-    } catch (err) {
-      setCloudError(err instanceof Error ? err.message : 'Failed to send prompt');
-    } finally {
-      setIsSendingCloud(false);
-    }
-  };
 
   return (
     <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
-      {/* Header with settings access */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-text-primary">GoGoGadgetClaude</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Connection mode badge */}
-          <ConnectionModeBadge
-            mode={mode}
-            isLaptopAvailable={isLaptopAvailable}
-            isCloudConfigured={true}
-            isChecking={isChecking}
-            onTap={checkNow}
-          />
-          {/* Settings button */}
-          <button
-            onClick={onOpenSettings}
-            className="p-2 rounded-lg hover:bg-text-primary/5 transition-colors"
-            aria-label="Settings"
-          >
-            <svg
-              className="h-5 w-5 text-text-secondary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-          </button>
-        </div>
-      </header>
+      <Header projectName={null} onSettingsClick={onOpenSettings} />
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        {/* Status message */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-text-primary/5">
+          <svg
+            className="h-8 w-8 text-text-muted"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
+            />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-text-primary mb-2">No projects found</h3>
+        <p className="text-sm text-text-secondary max-w-xs mb-6">
+          {isCloudMode
+            ? 'Your laptop is offline and no cached projects are available.'
+            : 'Start a Claude Code session in any project to see it here.'}
+        </p>
+
         {isCloudMode && (
-          <div className="mb-6 p-4 rounded-xl bg-violet-500/10 border border-violet-500/20">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-violet-500/20">
-                <svg
-                  className="w-5 h-5 text-violet-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
+          <button
+            onClick={checkNow}
+            disabled={isChecking}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white font-medium hover:bg-accent/90 transition-colors"
+          >
+            {isChecking ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Checking...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
-              </div>
-              <div>
-                <h3 className="font-medium text-violet-300">Cloud Mode Active</h3>
-                <p className="text-sm text-text-secondary mt-1">
-                  Your laptop is offline. Select a project below to send prompts via cloud
-                  execution, or retry to reconnect to your laptop.
-                </p>
-                <button
-                  onClick={checkNow}
-                  disabled={isChecking}
-                  className="mt-3 text-sm text-violet-400 hover:text-violet-300 font-medium flex items-center gap-1"
-                >
-                  {isChecking ? (
-                    <>
-                      <span className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" />
-                      Checking...
-                    </>
-                  ) : (
-                    <>
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                      </svg>
-                      Retry connection
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Cached projects section */}
-        {cachedProjects && cachedProjects.length > 0 ? (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-medium text-text-secondary uppercase tracking-wide">
-                Recent Projects {lastSync && <span className="text-text-muted">({lastSync})</span>}
-              </h2>
-            </div>
-            <p className="text-xs text-text-muted mb-4">
-              {isCloudMode
-                ? 'Select a project to send prompts via cloud. Projects with GitHub repos can run Claude remotely.'
-                : 'Cached from your last local session.'}
-            </p>
-
-            <div className="space-y-2">
-              {cachedProjects.slice(0, 10).map((project) => (
-                <button
-                  key={project.encodedPath}
-                  onClick={() => setSelectedCachedProject(project)}
-                  className={cn(
-                    'w-full text-left p-4 rounded-xl border transition-all',
-                    selectedCachedProject?.encodedPath === project.encodedPath
-                      ? 'bg-accent/10 border-accent/30'
-                      : 'bg-surface border-border hover:border-text-muted/30'
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 rounded-lg bg-text-primary/5 shrink-0">
-                        <svg
-                          className="w-4 h-4 text-text-muted"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
-                          />
-                        </svg>
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-medium text-text-primary truncate">{project.name}</h3>
-                        <p className="text-xs text-text-muted truncate">{project.path}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      {project.gitRemoteUrl && isCloudMode && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">
-                          Cloud
-                        </span>
-                      )}
-                      <span className="text-xs text-text-muted">
-                        {project.sessionCount} session{project.sessionCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Spacer for bottom panel */}
-            {selectedCachedProject && <div className="h-64" />}
-          </div>
-        ) : (
-          /* No cached projects - show standard empty state */
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-text-primary/5">
-              <svg
-                className="h-8 w-8 text-text-muted"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-1">No projects found</h3>
-            <p className="text-sm text-text-secondary max-w-xs">
-              {isCloudMode
-                ? 'No cached projects available. Connect to your laptop to see your projects.'
-                : 'Start a Claude Code session in any project to see it here.'}
-            </p>
-          </div>
+                Retry Connection
+              </>
+            )}
+          </button>
         )}
       </div>
 
-      {/* Fixed bottom slide-up panel for selected project */}
-      {selectedCachedProject && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60 animate-in fade-in duration-200"
-            onClick={() => setSelectedCachedProject(null)}
-          />
-
-          {/* Panel - fixed height, doesn't resize viewport */}
-          <div
-            className="relative bg-surface border-t border-border rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300"
-            style={{ maxHeight: '60%' }}
-          >
-            {/* Drag handle */}
-            <div className="sticky top-0 bg-surface pt-3 pb-2 px-4 border-b border-border/50">
-              <div className="w-10 h-1 bg-text-muted/30 rounded-full mx-auto mb-3" />
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-text-primary">{selectedCachedProject.name}</h3>
-                <button
-                  onClick={() => setSelectedCachedProject(null)}
-                  className="p-2 -mr-2 rounded-lg hover:bg-text-primary/10 transition-colors"
-                >
-                  <svg
-                    className="w-5 h-5 text-text-muted"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex border-b border-border">
-              <button
-                onClick={() => setPanelTab('prompt')}
-                className={cn(
-                  'flex-1 py-3 text-sm font-medium transition-colors',
-                  panelTab === 'prompt'
-                    ? 'text-accent border-b-2 border-accent'
-                    : 'text-text-muted hover:text-text-secondary'
-                )}
-              >
-                Send Prompt
-              </button>
-              <button
-                onClick={() => setPanelTab('files')}
-                className={cn(
-                  'flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2',
-                  panelTab === 'files'
-                    ? 'text-accent border-b-2 border-accent'
-                    : 'text-text-muted hover:text-text-secondary'
-                )}
-              >
-                Files
-                {(cachedTree || githubTree) && (
-                  <span className="px-1.5 py-0.5 text-xs bg-emerald-500/20 text-emerald-400 rounded-full">
-                    ✓
-                  </span>
-                )}
-                {isLoadingGithub && (
-                  <span className="w-4 h-4 border-2 border-text-muted/30 border-t-accent rounded-full animate-spin" />
-                )}
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 overflow-y-auto flex-1">
-              {panelTab === 'prompt' ? (
-                /* Prompt Tab */
-                selectedCachedProject.gitRemoteUrl ? (
-                  <>
-                    {/* Success message */}
-                    {cloudSuccess && (
-                      <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">
-                        ✅ {cloudSuccess}
-                      </div>
-                    )}
-
-                    {/* Error message */}
-                    {cloudError && (
-                      <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
-                        ❌ {cloudError}
-                      </div>
-                    )}
-
-                    {/* Cloud prompt input */}
-                    <div className="space-y-3">
-                      <textarea
-                        value={cloudPrompt}
-                        onChange={(e) => setCloudPrompt(e.target.value)}
-                        placeholder="What would you like Claude to work on?"
-                        className="w-full h-24 px-4 py-3 rounded-xl bg-background border border-border text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                      <button
-                        onClick={handleSendCloudPrompt}
-                        disabled={isSendingCloud || !cloudPrompt.trim()}
-                        className={cn(
-                          'w-full py-4 px-4 rounded-xl font-semibold text-base transition-all',
-                          'flex items-center justify-center gap-2',
-                          isSendingCloud || !cloudPrompt.trim()
-                            ? 'bg-accent/30 text-text-muted cursor-not-allowed'
-                            : 'bg-accent hover:bg-accent/90 text-white active:scale-[0.98]'
-                        )}
-                      >
-                        {isSendingCloud ? (
-                          <>
-                            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13 10V3L4 14h7v7l9-11h-7z"
-                              />
-                            </svg>
-                            Run in Cloud
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  /* No git URL */
-                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                    <p className="text-sm text-amber-400">
-                      ⚠️ No GitHub remote. Cloud execution requires a git repo URL.
-                    </p>
-                  </div>
-                )
-              ) : /* Files Tab */
-              isLoadingGithub ? (
-                <div className="text-center py-8">
-                  <div className="w-8 h-8 border-2 border-text-muted/30 border-t-accent rounded-full animate-spin mx-auto mb-3" />
-                  <p className="text-sm text-text-muted">Fetching from GitHub...</p>
-                </div>
-              ) : githubTree && githubTree.length > 0 ? (
-                <div className="space-y-0.5">
-                  <div className="text-xs text-text-muted mb-3 flex items-center gap-2">
-                    {treeSource === 'modal' ? (
-                      <>
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-                          />
-                        </svg>
-                        <span className="text-emerald-400">Live from Cloud</span>
-                        <span className="text-text-muted/50">(private repo)</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                        </svg>
-                        <span className="text-emerald-400">Live from GitHub</span>
-                      </>
-                    )}
-                  </div>
-                  <CachedTreeView
-                    entries={githubTree}
-                    expandedFolders={expandedFolders}
-                    onToggleFolder={toggleFolder}
-                  />
-                </div>
-              ) : cachedTree && cachedTree.entries.length > 0 ? (
-                <div className="space-y-0.5">
-                  {cachedTree.branch && (
-                    <div className="text-xs text-text-muted mb-3 flex items-center gap-2">
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 10V3L4 14h7v7l9-11h-7z"
-                        />
-                      </svg>
-                      Branch:{' '}
-                      <span className="text-text-secondary font-mono">{cachedTree.branch}</span>
-                      <span className="text-text-muted/50">(cached)</span>
-                    </div>
-                  )}
-                  <CachedTreeView
-                    entries={cachedTree.entries}
-                    expandedFolders={expandedFolders}
-                    onToggleFolder={toggleFolder}
-                  />
-                </div>
-              ) : githubError ? (
-                <div className="text-center py-8">
-                  <svg
-                    className="w-12 h-12 mx-auto mb-3 text-amber-500/50"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                  <p className="text-sm text-amber-400 mb-2">{githubError}</p>
-                  <button onClick={fetchFromGitHub} className="text-xs text-accent hover:underline">
-                    Try again
-                  </button>
-                </div>
-              ) : selectedCachedProject?.gitRemoteUrl ? (
-                <div className="text-center py-8">
-                  <button
-                    onClick={fetchFromGitHub}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                    </svg>
-                    Fetch from GitHub
-                  </button>
-                  <p className="text-xs text-text-muted/70 mt-2">
-                    Pull file tree directly from repo
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <svg
-                    className="w-12 h-12 mx-auto mb-3 text-text-muted/50"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
-                    />
-                  </svg>
-                  <p className="text-sm text-text-muted">No cached file tree</p>
-                  <p className="text-xs text-text-muted/70 mt-1">
-                    Browse files on laptop to cache the tree
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Safe area padding for iPhone */}
-            <div className="h-safe-area-inset-bottom" />
-          </div>
-        </div>
-      )}
-
-      {/* Settings modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
@@ -1037,10 +384,10 @@ function AppMain() {
     );
   }
 
-  // No projects found - show cached data if in cloud mode, or empty state
+  // No projects found - show empty state
   if (!projects || projects.length === 0) {
     return (
-      <CloudEmptyState
+      <EmptyProjectsState
         onOpenSettings={() => setIsSettingsOpen(true)}
         isSettingsOpen={isSettingsOpen}
         setIsSettingsOpen={setIsSettingsOpen}
@@ -1173,7 +520,11 @@ function AppMain() {
                 className="flex-1"
               />
             ) : (
-              <FileTreeView encodedPath={selectedProject} className="flex-1" />
+              <FileTreeView
+                encodedPath={selectedProject}
+                gitRemoteUrl={currentProject?.gitRemoteUrl}
+                className="flex-1"
+              />
             )}
           </div>
         )}

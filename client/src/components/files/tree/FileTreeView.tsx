@@ -17,6 +17,8 @@ import type { FileTreeEntry } from '@shared/types';
 interface FileTreeViewProps {
   /** Encoded project path to fetch files for */
   encodedPath: string | null;
+  /** Git remote URL for cloud mode fetching */
+  gitRemoteUrl?: string;
   /** Additional CSS classes */
   className?: string;
 }
@@ -143,24 +145,24 @@ function countFiles(entries: FileTreeEntry[]): number {
  * <FileTreeView encodedPath={project.encodedPath} />
  * ```
  */
-export function FileTreeView({ encodedPath, className }: FileTreeViewProps) {
+export function FileTreeView({ encodedPath, gitRemoteUrl, className }: FileTreeViewProps) {
   // Selected file path (null = show tree, string = show content)
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
-  // Fetch tree data
+  // Fetch tree data (uses gitRemoteUrl for cloud mode)
   const {
     data: treeData,
     isLoading: treeLoading,
     error: treeError,
     refresh: refreshTree,
-  } = useFileTree(encodedPath);
+  } = useFileTree(encodedPath, { gitRemoteUrl });
 
-  // Fetch file content (only when a file is selected)
+  // Fetch file content (only when a file is selected, uses gitRemoteUrl for cloud mode)
   const {
     data: fileContent,
     isLoading: contentLoading,
     error: contentError,
-  } = useFileContent(encodedPath, selectedFile);
+  } = useFileContent(encodedPath, selectedFile, { gitRemoteUrl });
 
   // Handle file selection
   const handleSelectFile = useCallback((path: string) => {

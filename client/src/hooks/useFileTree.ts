@@ -4,13 +4,16 @@
  * Uses SWR for caching. Does not auto-refresh since committed files
  * don't change frequently during a session.
  * Caches tree to localStorage for offline viewing.
+ *
+ * In cloud mode, fetches from Modal via gitRemoteUrl instead of local API.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import useSWR from 'swr';
-import { api } from '@/lib/api';
+import { api, getApiMode } from '@/lib/api';
 import { cacheFileTree } from '@/lib/localCache';
-import type { FileTreeResponse } from '@shared/types';
+import { fetchRepoTree, type NestedTreeEntry } from '@/lib/github';
+import type { FileTreeResponse, FileTreeEntry } from '@shared/types';
 
 /**
  * SWR fetcher that uses our typed API client
@@ -31,44 +34,115 @@ export interface UseFileTreeReturn {
   error: Error | undefined;
   /** Function to manually refresh the data */
   refresh: () => Promise<FileTreeResponse | undefined>;
+  /** Source of the data (local API or cloud) */
+  source?: 'local' | 'cloud';
+}
+
+/**
+ * Convert nested tree entries back to flat FileTreeEntry format
+ */
+function flattenTree(entries: NestedTreeEntry[], result: FileTreeEntry[] = []): FileTreeEntry[] {
+  for (const entry of entries) {
+    result.push({
+      name: entry.name,
+      path: entry.path,
+      type: entry.type === 'directory' ? 'directory' : 'file',
+      extension: entry.extension ?? null,
+      children: entry.children ? flattenTree(entry.children, []) : undefined,
+    });
+  }
+  return result;
 }
 
 /**
  * Hook for fetching the committed file tree of a project
  *
  * @param encodedPath - The encoded project path, or null to disable
- * @param subPath - Optional subdirectory path to fetch
+ * @param options - Optional configuration including gitRemoteUrl for cloud mode
  * @returns Object containing tree data, loading state, error, and refresh function
  *
  * @example
  * ```tsx
+ * // Local mode
  * const { data, isLoading, error } = useFileTree(project.encodedPath);
  *
- * if (isLoading) return <Loading />;
- * if (error) return <Error />;
- * return <FileTree entries={data.entries} />;
+ * // Cloud mode (with git URL)
+ * const { data, isLoading, error } = useFileTree(project.encodedPath, {
+ *   gitRemoteUrl: project.gitRemoteUrl
+ * });
  * ```
  */
-export function useFileTree(encodedPath: string | null, subPath?: string): UseFileTreeReturn {
-  // Build the API path with optional subPath query param
-  const apiPath = encodedPath
-    ? `/projects/${encodedPath}/tree${subPath ? `?path=${encodeURIComponent(subPath)}` : ''}`
-    : null;
+export function useFileTree(
+  encodedPath: string | null,
+  options?: { subPath?: string; gitRemoteUrl?: string }
+): UseFileTreeReturn {
+  const { subPath, gitRemoteUrl } = options ?? {};
+  const mode = getApiMode();
+  const isCloudMode = mode === 'cloud';
 
-  const { data, error, isLoading, mutate } = useSWR<FileTreeResponse>(
-    apiPath,
-    fetcher<FileTreeResponse>,
-    {
-      // Don't auto-refresh - committed files don't change often
-      refreshInterval: 0,
-      // Revalidate when window regains focus
-      revalidateOnFocus: true,
-      // Keep previous data while revalidating
-      keepPreviousData: true,
-      // Don't retry too aggressively
-      errorRetryCount: 2,
+  // State for cloud-fetched data
+  const [cloudData, setCloudData] = useState<FileTreeResponse | undefined>(undefined);
+  const [cloudLoading, setCloudLoading] = useState(false);
+  const [cloudError, setCloudError] = useState<Error | undefined>(undefined);
+
+  // Build the API path with optional subPath query param (for local mode)
+  const apiPath =
+    encodedPath && !isCloudMode
+      ? `/projects/${encodedPath}/tree${subPath ? `?path=${encodeURIComponent(subPath)}` : ''}`
+      : null;
+
+  // SWR for local mode
+  const {
+    data: localData,
+    error: localError,
+    isLoading: localLoading,
+    mutate,
+  } = useSWR<FileTreeResponse>(apiPath, fetcher<FileTreeResponse>, {
+    refreshInterval: 0,
+    revalidateOnFocus: true,
+    keepPreviousData: true,
+    errorRetryCount: 2,
+  });
+
+  // Cloud mode fetching
+  const fetchCloud = useCallback(async () => {
+    if (!gitRemoteUrl || !encodedPath) return;
+
+    setCloudLoading(true);
+    setCloudError(undefined);
+
+    try {
+      const result = await fetchRepoTree(gitRemoteUrl);
+      if (result.error) {
+        setCloudError(new Error(result.error));
+        setCloudData(undefined);
+      } else {
+        const treeData: FileTreeResponse = {
+          path: '/',
+          githubUrl: gitRemoteUrl,
+          branch: result.branch,
+          entries: flattenTree(result.entries),
+        };
+        setCloudData(treeData);
+      }
+    } catch (err) {
+      setCloudError(err instanceof Error ? err : new Error('Failed to fetch'));
+    } finally {
+      setCloudLoading(false);
     }
-  );
+  }, [gitRemoteUrl, encodedPath]);
+
+  // Fetch from cloud when in cloud mode
+  useEffect(() => {
+    if (isCloudMode && gitRemoteUrl && encodedPath && !subPath) {
+      fetchCloud();
+    }
+  }, [isCloudMode, gitRemoteUrl, encodedPath, subPath, fetchCloud]);
+
+  // Determine which data to use
+  const data = isCloudMode ? cloudData : localData;
+  const isLoading = isCloudMode ? cloudLoading : localLoading;
+  const error = isCloudMode ? cloudError : localError;
 
   // Cache file tree to localStorage for offline access (only for root path)
   useEffect(() => {
@@ -82,10 +156,17 @@ export function useFileTree(encodedPath: string | null, subPath?: string): UseFi
     }
   }, [data, encodedPath, subPath]);
 
+  // Wrap fetchCloud to match the expected return type
+  const refreshCloud = useCallback(async () => {
+    await fetchCloud();
+    return cloudData;
+  }, [fetchCloud, cloudData]);
+
   return {
     data,
     isLoading,
     error,
-    refresh: mutate,
+    refresh: isCloudMode ? refreshCloud : mutate,
+    source: isCloudMode ? 'cloud' : 'local',
   };
 }

@@ -302,6 +302,62 @@ function buildNestedTreeFromFlat(
 }
 
 /**
+ * Fetch file content via Modal cloud endpoint
+ */
+export async function fetchContentViaModal(
+  repoUrl: string,
+  filePath: string
+): Promise<{
+  content: string;
+  language: string;
+  path: string;
+  error?: string;
+} | null> {
+  const cloudUrl = getCloudApiUrl();
+  if (!cloudUrl) return null;
+
+  try {
+    const response = await fetch(`${cloudUrl}/api/cloud/content`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ repoUrl, filePath }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        content: '',
+        language: 'text',
+        path: filePath,
+        error: errorData?.detail?.error?.message || 'Failed to fetch content',
+      };
+    }
+
+    const data = await response.json();
+
+    if (data.data.error) {
+      return {
+        content: '',
+        language: 'text',
+        path: filePath,
+        error: data.data.error,
+      };
+    }
+
+    return {
+      content: data.data.content,
+      language: data.data.language,
+      path: data.data.path,
+    };
+  } catch (error) {
+    console.error('Modal content fetch failed:', error);
+    return null;
+  }
+}
+
+/**
  * Smart fetch that tries Modal first (for private repos), then GitHub API
  */
 export async function fetchRepoTree(repoUrl: string): Promise<{

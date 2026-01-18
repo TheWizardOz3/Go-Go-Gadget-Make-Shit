@@ -4,13 +4,15 @@
  * Uses SWR for caching and automatic revalidation.
  * Waits for API endpoint initialization before fetching to ensure correct URL.
  * Caches projects to localStorage for offline viewing.
+ *
+ * In cloud mode, falls back to cached projects if API returns empty.
  */
 
 import useSWR from 'swr';
-import { api, subscribeToBaseUrl, getApiBaseUrl } from '@/lib/api';
-import { cacheProjects } from '@/lib/localCache';
+import { api, subscribeToBaseUrl, getApiBaseUrl, getApiMode } from '@/lib/api';
+import { cacheProjects, getCachedProjects } from '@/lib/localCache';
 import type { ProjectSerialized } from '@shared/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 /**
  * SWR fetcher that uses our typed API client
@@ -76,15 +78,36 @@ export function useProjects(): UseProjectsReturn {
     }
   );
 
-  // Cache projects to localStorage for offline access (only when we have data)
+  // Cache projects to localStorage for offline access (only when we have data from local API)
   useEffect(() => {
-    if (data && data.length > 0) {
+    if (data && data.length > 0 && getApiMode() === 'local') {
       cacheProjects(data);
     }
   }, [data]);
 
+  // In cloud mode, fall back to cached projects if API returns empty
+  const projects = useMemo(() => {
+    const mode = getApiMode();
+
+    // If we have API data, use it
+    if (data && data.length > 0) {
+      return data;
+    }
+
+    // In cloud mode with no API data, use cached projects
+    if (mode === 'cloud') {
+      const cached = getCachedProjects();
+      if (cached && cached.length > 0) {
+        return cached;
+      }
+    }
+
+    // Return whatever we have (might be empty or undefined)
+    return data;
+  }, [data]);
+
   return {
-    projects: data,
+    projects,
     isLoading,
     error,
     refresh: mutate,
