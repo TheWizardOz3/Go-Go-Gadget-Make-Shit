@@ -46,7 +46,7 @@ image = (
         # Install Claude CLI globally
         "npm install -g @anthropic-ai/claude-code",
     )
-    .pip_install("fastapi[standard]", "pydantic", "httpx")
+    .pip_install("fastapi[standard]", "pydantic", "httpx", "requests")
 )
 
 
