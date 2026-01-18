@@ -449,8 +449,19 @@ function AppMain() {
             projectPath={currentProject?.path}
             projectName={currentProject?.name}
             gitRemoteUrl={currentProject?.gitRemoteUrl}
-            onNewSessionStarted={async () => {
-              // Poll for new session with direct API calls (bypasses SWR cache)
+            onNewSessionStarted={async (cloudSessionId?: string) => {
+              // If a cloud session ID is provided, select it directly
+              // This is the case for cloud mode where we know the exact session ID
+              if (cloudSessionId) {
+                setIsNewSessionMode(false);
+                setSelectedSession(cloudSessionId);
+                setSessionWasUserSelected(true); // Mark as user-selected so next message continues it
+                setStoredSession(selectedProject, cloudSessionId);
+                _refreshSessions();
+                return;
+              }
+
+              // For local mode: Poll for new session with direct API calls (bypasses SWR cache)
               // Claude takes a few seconds to write the JSONL
 
               // First, capture the existing session IDs before the new session is created
@@ -473,6 +484,7 @@ function AppMain() {
                       // Found the new session - select it
                       setIsNewSessionMode(false);
                       setSelectedSession(newSession.id);
+                      setSessionWasUserSelected(true); // Mark as user-selected
                       setStoredSession(selectedProject, newSession.id);
                       // Also refresh SWR cache
                       _refreshSessions();
@@ -494,6 +506,7 @@ function AppMain() {
                         if (Date.now() - newestTime < 60000) {
                           setIsNewSessionMode(false);
                           setSelectedSession(newest.id);
+                          setSessionWasUserSelected(true); // Mark as user-selected
                           setStoredSession(selectedProject, newest.id);
                           _refreshSessions();
                           return;

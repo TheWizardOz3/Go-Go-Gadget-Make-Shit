@@ -36,8 +36,12 @@ interface ConversationViewProps {
   projectName?: string;
   /** Git remote URL for cloud execution */
   gitRemoteUrl?: string;
-  /** Callback when a new session is started with the user's first message */
-  onNewSessionStarted?: () => void;
+  /**
+   * Callback when a new session is started.
+   * For cloud sessions, passes the sessionId directly to select it.
+   * For local sessions, no sessionId is passed (caller should poll).
+   */
+  onNewSessionStarted?: (cloudSessionId?: string) => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -183,13 +187,15 @@ export function ConversationView({
 
   /**
    * Handle cloud job completion
+   * Passes the cloud session ID to the parent so it can be selected directly
    */
   const handleCloudJobComplete = useCallback(
-    (sessionId?: string) => {
-      debugLog.info('handleCloudJobComplete called', { sessionId });
+    (cloudSessionId?: string) => {
+      debugLog.info('handleCloudJobComplete called', { cloudSessionId });
       setPendingCloudJob(null);
-      // Refresh sessions to pick up the new one
-      onNewSessionStarted?.();
+      // Pass the cloud session ID to parent for direct selection
+      // This avoids polling for local sessions which won't include cloud sessions
+      onNewSessionStarted?.(cloudSessionId);
     },
     [onNewSessionStarted]
   );
@@ -354,7 +360,13 @@ export function ConversationView({
   const handleSend = useCallback(
     async (prompt: string) => {
       const trimmedPrompt = prompt.trim();
-      debugLog.info('handleSend called', { prompt: trimmedPrompt.slice(0, 50) });
+      debugLog.info('handleSend called', {
+        prompt: trimmedPrompt.slice(0, 50),
+        sessionId,
+        sessionWasUserSelected,
+        hasCloudOptions: !!cloudOptions,
+        cloudSessionIdInOptions: cloudOptions?.sessionId || '(none)',
+      });
 
       const result = await sendPromptAdvanced(trimmedPrompt);
       debugLog.info('sendPromptAdvanced result', {
@@ -382,7 +394,7 @@ export function ConversationView({
         setToast({ message: result.errorMessage, type: 'error' });
       }
     },
-    [sendPromptAdvanced, scrollToBottom]
+    [sendPromptAdvanced, scrollToBottom, sessionId, sessionWasUserSelected, cloudOptions]
   );
 
   /**
