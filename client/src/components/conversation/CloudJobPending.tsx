@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
+import { debugLog } from '@/lib/debugLog';
 
 interface CloudJobPendingProps {
   /** The job ID returned from dispatch */
@@ -72,9 +73,15 @@ export function CloudJobPending({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Log when component mounts
+  useEffect(() => {
+    debugLog.info('CloudJobPending mounted', { jobId, projectName });
+  }, [jobId, projectName]);
+
   // Poll for job status
   const checkStatus = useCallback(async () => {
     try {
+      debugLog.info('Polling job status', { jobId });
       const response = await api.get<JobStatusResponse>(`/cloud/jobs/${jobId}`);
 
       if (response.status === 'completed') {

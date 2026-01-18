@@ -7,6 +7,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
+import { debugLog } from '@/lib/debugLog';
 import { useConversation } from '@/hooks/useConversation';
 import { useSendPrompt } from '@/hooks/useSendPrompt';
 import { useStopAgent } from '@/hooks/useStopAgent';
@@ -304,11 +305,20 @@ export function ConversationView({
   const handleSend = useCallback(
     async (prompt: string) => {
       const trimmedPrompt = prompt.trim();
+      debugLog.info('handleSend called', { prompt: trimmedPrompt.slice(0, 50) });
+
       const result = await sendPromptAdvanced(trimmedPrompt);
+      debugLog.info('sendPromptAdvanced result', {
+        success: result.success,
+        mode: result.mode,
+        jobId: result.jobId,
+        errorMessage: result.errorMessage,
+      });
 
       if (result.success) {
         // If this is a cloud job, show pending state with job ID
         if (result.mode === 'cloud' && result.jobId) {
+          debugLog.info('Setting pendingCloudJob state', { jobId: result.jobId });
           setPendingCloudJob({
             jobId: result.jobId,
             prompt: trimmedPrompt,
