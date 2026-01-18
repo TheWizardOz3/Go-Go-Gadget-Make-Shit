@@ -44,10 +44,14 @@ export interface CloudExecutionOptions {
   repoUrl: string;
   /** Project name (used for JSONL file organization) */
   projectName: string;
+  /** Existing session ID to continue (if resuming a conversation) */
+  sessionId?: string;
   /** Allowed tools for Claude (e.g., ["Task", "Bash", "Read", "Write"]) */
   allowedTools?: string[];
   /** Webhook URL for completion notification */
   notificationWebhook?: string;
+  /** ntfy topic for push notifications */
+  ntfyTopic?: string;
 }
 
 /**
@@ -184,8 +188,10 @@ export function useSendPrompt(
           prompt: trimmedPrompt,
           repoUrl: options.repoUrl,
           projectName: options.projectName,
+          sessionId: options.sessionId,
           allowedTools: options.allowedTools,
           notificationWebhook: options.notificationWebhook,
+          ntfyTopic: options.ntfyTopic,
         });
 
         debugLog.info('Cloud job dispatched successfully', {

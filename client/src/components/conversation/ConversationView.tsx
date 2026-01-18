@@ -5,13 +5,14 @@
  * auto-scroll behavior, and pull-to-refresh.
  */
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/cn';
 import { debugLog } from '@/lib/debugLog';
 import { useConversation } from '@/hooks/useConversation';
 import { useSendPrompt } from '@/hooks/useSendPrompt';
 import { useStopAgent } from '@/hooks/useStopAgent';
 import { useTemplates } from '@/hooks/useTemplates';
+import { useSettings } from '@/hooks/useSettings';
 import { ConversationSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { MessageList } from './MessageList';
@@ -69,9 +70,26 @@ export function ConversationView({
   const [textToInsert, setTextToInsert] = useState<string | undefined>(undefined);
 
   const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId);
+  const { settings } = useSettings();
+
+  // Get ntfy topic from settings for cloud notifications
+  const ntfyTopic = useMemo(() => {
+    const ntfySettings = settings?.channels?.ntfy;
+    return ntfySettings?.enabled ? ntfySettings.topic : undefined;
+  }, [settings]);
+
   // Pass cloud options from project's git remote URL for automatic cloud execution
-  const cloudOptions =
-    gitRemoteUrl && projectName ? { repoUrl: gitRemoteUrl, projectName } : undefined;
+  // Include sessionId for continuing existing conversations and ntfyTopic for notifications
+  const cloudOptions = useMemo(() => {
+    if (!gitRemoteUrl || !projectName) return undefined;
+    return {
+      repoUrl: gitRemoteUrl,
+      projectName,
+      sessionId: sessionId || undefined, // Pass existing session ID if continuing
+      ntfyTopic,
+    };
+  }, [gitRemoteUrl, projectName, sessionId, ntfyTopic]);
+
   const { sendPromptAdvanced, isSending } = useSendPrompt(sessionId, cloudOptions);
   const { stopAgent, isStopping } = useStopAgent(sessionId);
   const { templates, isLoading: templatesLoading } = useTemplates(encodedPath);

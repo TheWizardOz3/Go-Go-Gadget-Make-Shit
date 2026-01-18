@@ -222,8 +222,10 @@ def execute_prompt(
     prompt: str,
     project_repo: str,
     project_name: str,
+    session_id: str | None = None,
     allowed_tools: list[str] | None = None,
     notification_webhook: str | None = None,
+    ntfy_topic: str | None = None,
 ) -> dict[str, Any]:
     """
     Execute a Claude prompt on a git repository.
@@ -232,8 +234,10 @@ def execute_prompt(
         prompt: The prompt to send to Claude
         project_repo: Git repository URL to clone
         project_name: Name for the project (used for session organization)
+        session_id: Optional session ID to continue (if None, creates new session)
         allowed_tools: List of allowed tools (e.g., ["Task", "Bash", "Read", "Write"])
         notification_webhook: Optional webhook URL to call on completion
+        ntfy_topic: Optional ntfy topic for push notifications
 
     Returns:
         dict with sessionId, success status, and any output
@@ -241,7 +245,11 @@ def execute_prompt(
     import requests
 
     work_dir = Path(f"/tmp/repos/{project_name}")
-    session_id = str(uuid.uuid4())
+    
+    # Use existing session ID or generate new one
+    is_continuation = session_id is not None
+    if not session_id:
+        session_id = str(uuid.uuid4())
 
     try:
         # Clone the repository
@@ -268,6 +276,11 @@ def execute_prompt(
 
         # Build the Claude command
         cmd = ["claude", "-p", prompt]
+
+        # If continuing an existing session, add --continue flag
+        if is_continuation:
+            cmd.extend(["--continue", session_id])
+            print(f"Continuing existing session: {session_id}")
 
         if allowed_tools:
             cmd.extend(["--allowedTools", ",".join(allowed_tools)])
@@ -305,6 +318,30 @@ def execute_prompt(
                 )
             except Exception as e:
                 print(f"Failed to call notification webhook: {e}")
+
+        # Send ntfy push notification if topic is provided
+        if ntfy_topic:
+            try:
+                status_emoji = "✅" if success else "❌"
+                title = f"{status_emoji} Claude completed: {project_name}"
+                # Get first 200 chars of output for message body
+                body = output[:200] if output else "No output"
+                if len(output or "") > 200:
+                    body += "..."
+                
+                requests.post(
+                    f"https://ntfy.sh/{ntfy_topic}",
+                    data=body.encode("utf-8"),
+                    headers={
+                        "Title": title,
+                        "Priority": "high" if not success else "default",
+                        "Tags": "robot" if success else "warning",
+                    },
+                    timeout=10,
+                )
+                print(f"Sent ntfy notification to topic: {ntfy_topic}")
+            except Exception as e:
+                print(f"Failed to send ntfy notification: {e}")
 
         return {
             "sessionId": session_id,
@@ -718,8 +755,10 @@ class DispatchJobRequest(BaseModel):
     prompt: str
     repoUrl: str
     projectName: str
+    sessionId: str | None = None  # Existing session to continue
     allowedTools: list[str] | None = None
     notificationWebhook: str | None = None
+    ntfyTopic: str | None = None  # ntfy topic for push notifications
 
 
 @web_app.get("/api/status")
@@ -793,8 +832,10 @@ async def api_dispatch_job(request: DispatchJobRequest):
         prompt=request.prompt,
         project_repo=request.repoUrl,
         project_name=request.projectName,
+        session_id=request.sessionId,
         allowed_tools=request.allowedTools,
         notification_webhook=request.notificationWebhook,
+        ntfy_topic=request.ntfyTopic,
     )
 
     return {
