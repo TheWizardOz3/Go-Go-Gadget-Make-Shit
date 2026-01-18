@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, forwardRef } from 'react';
 import { cn } from '@/lib/cn';
 import { useSettings, sendTestNotification } from '@/hooks/useSettings';
 import { ServerlessSettingsSection } from './ServerlessSettingsSection';
+import { getDebugLogs, clearDebugLogs } from '@/lib/debugLog';
 import type {
   IMessageChannelSettings,
   NtfyChannelSettings,
@@ -211,6 +212,120 @@ function isValidPhoneNumber(phone: string): boolean {
   const cleaned = phone.replace(/[\s\-().]/g, '');
   // Must start with + or digit, and be 10-15 digits total
   return /^\+?\d{10,15}$/.test(cleaned);
+}
+
+/**
+ * Debug Logs Section - shows API logs for troubleshooting cloud mode
+ */
+function DebugLogsSection() {
+  const [logs, setLogs] = useState<ReturnType<typeof getDebugLogs>>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const refreshLogs = () => setLogs(getDebugLogs());
+
+  useEffect(() => {
+    refreshLogs();
+  }, []);
+
+  const handleClear = () => {
+    clearDebugLogs();
+    setLogs([]);
+  };
+
+  const logCount = logs.length;
+
+  return (
+    <section className="pt-4 border-t border-text-primary/10">
+      <button
+        type="button"
+        onClick={() => {
+          setIsExpanded(!isExpanded);
+          if (!isExpanded) refreshLogs();
+        }}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <div className="flex items-center gap-2">
+          <svg
+            className="h-5 w-5 text-text-muted"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 12.75c1.148 0 2.278.08 3.383.237 1.037.146 1.866.966 1.866 2.013 0 3.728-2.35 6.75-5.25 6.75S6.75 18.728 6.75 15c0-1.046.83-1.867 1.866-2.013A24.204 24.204 0 0112 12.75zm0 0c2.883 0 5.647.508 8.207 1.44a23.91 23.91 0 01-1.152 6.06M12 12.75c-2.883 0-5.647.508-8.207 1.44a23.91 23.91 0 001.152 6.06M12 12.75V6.75m0 0a2.25 2.25 0 10-4.5 0 2.25 2.25 0 004.5 0z"
+            />
+          </svg>
+          <span className="text-base font-medium text-text-primary">Debug Logs</span>
+          {logCount > 0 && (
+            <span className="px-1.5 py-0.5 text-xs bg-text-primary/10 rounded-full">
+              {logCount}
+            </span>
+          )}
+        </div>
+        <svg
+          className={cn('h-5 w-5 text-text-muted transition-transform', isExpanded && 'rotate-180')}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isExpanded && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-text-muted">API logs for troubleshooting cloud mode issues.</p>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={refreshLogs}
+              className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
+            >
+              Clear
+            </button>
+          </div>
+
+          {logs.length === 0 ? (
+            <p className="text-xs text-text-muted italic">No logs yet.</p>
+          ) : (
+            <div className="max-h-48 overflow-y-auto rounded-lg bg-black/50 p-2 text-[10px] font-mono">
+              {logs.map((log, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'py-0.5',
+                    log.level === 'error' && 'text-red-400',
+                    log.level === 'warn' && 'text-yellow-400',
+                    log.level === 'info' && 'text-text-secondary'
+                  )}
+                >
+                  <span className="text-text-muted">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>{' '}
+                  <span className="uppercase">{log.level}</span>: {log.message}
+                  {log.data !== undefined && (
+                    <span className="text-text-muted"> {String(JSON.stringify(log.data))}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }
 
 /**
@@ -963,6 +1078,9 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                 isUpdating={isUpdating}
                 onUpdateSettings={updateSettings}
               />
+
+              {/* Debug Logs Section */}
+              <DebugLogsSection />
 
               {/* Info Section */}
               <section className="pt-4 border-t border-text-primary/10">

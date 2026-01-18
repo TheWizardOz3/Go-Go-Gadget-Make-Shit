@@ -10,6 +10,7 @@
  */
 
 import type { ApiEndpointMode } from '@shared/types';
+import { debugLog } from './debugLog';
 
 // ============================================================
 // Types
@@ -111,7 +112,7 @@ export function setApiBaseUrl(baseUrl: string, mode: ApiEndpointMode = 'local'):
 
   if (changed) {
     // Log mode changes
-    console.log(`[API] Mode changed: ${prevMode} → ${mode}, URL: ${baseUrl}`);
+    debugLog.info(`API mode changed: ${prevMode} → ${mode}`, { baseUrl });
 
     // Notify subscribers
     subscribers.forEach((callback) => callback(baseUrl, mode));
@@ -168,6 +169,11 @@ async function request<T>(
   const baseUrl = options?.baseUrl ?? currentBaseUrl;
   const url = `${baseUrl}/api${path}`;
 
+  // Log all cloud mode requests
+  if (currentMode === 'cloud') {
+    debugLog.info(`${method} ${path} (cloud)`, { url, hasBody: body !== undefined });
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...options?.headers,
@@ -192,6 +198,11 @@ async function request<T>(
 
   try {
     const response = await fetch(url, fetchOptions);
+
+    // Log cloud mode responses
+    if (currentMode === 'cloud') {
+      debugLog.info(`${method} ${path} response`, { status: response.status, ok: response.ok });
+    }
 
     // Parse JSON response
     const json = await response.json();
@@ -224,12 +235,27 @@ async function request<T>(
         }
       }
 
+      // Log cloud mode errors
+      if (currentMode === 'cloud') {
+        debugLog.error(`${method} ${path} failed`, {
+          errorMessage,
+          errorCode,
+          status: response.status,
+        });
+      }
+
       throw new ApiError(errorMessage, errorCode, response.status, errorDetails);
     }
 
     // Return the data from success response
     const successResponse = json as ApiSuccessResponse<T>;
     return successResponse.data;
+  } catch (err) {
+    // Log network/fetch errors in cloud mode
+    if (currentMode === 'cloud' && !(err instanceof ApiError)) {
+      debugLog.error(`${method} ${path} network error`, { error: String(err) });
+    }
+    throw err;
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);
@@ -295,7 +321,7 @@ export const api = {
 
     // Debug logging for cloud mode
     if (currentMode === 'cloud') {
-      console.log('[API Upload] Cloud mode request:', { url, mode: currentMode, baseUrl });
+      debugLog.info('Upload request (cloud)', { url, path });
     }
 
     const fetchOptions: RequestInit = {
@@ -317,7 +343,7 @@ export const api = {
 
       // Debug logging for cloud mode
       if (currentMode === 'cloud') {
-        console.log('[API Upload] Response:', { status: response.status, ok: response.ok });
+        debugLog.info('Upload response (cloud)', { status: response.status, ok: response.ok });
       }
 
       // Parse JSON response
