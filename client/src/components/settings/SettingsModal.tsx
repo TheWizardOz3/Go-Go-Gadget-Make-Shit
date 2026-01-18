@@ -290,6 +290,22 @@ function DebugLogsSection() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                const text = logs
+                  .map((log) => {
+                    const time = new Date(log.timestamp).toLocaleTimeString();
+                    const data = log.data !== undefined ? ` ${JSON.stringify(log.data)}` : '';
+                    return `${time} ${log.level.toUpperCase()}: ${log.message}${data}`;
+                  })
+                  .join('\n');
+                navigator.clipboard.writeText(text);
+              }}
+              className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
+            >
+              Copy
+            </button>
+            <button
+              type="button"
               onClick={handleClear}
               className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
             >

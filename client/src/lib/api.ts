@@ -341,13 +341,17 @@ export const api = {
     try {
       const response = await fetch(url, fetchOptions);
 
-      // Debug logging for cloud mode
-      if (currentMode === 'cloud') {
-        debugLog.info('Upload response (cloud)', { status: response.status, ok: response.ok });
-      }
-
       // Parse JSON response
       const json = await response.json();
+
+      // Debug logging for cloud mode (include response body for errors)
+      if (currentMode === 'cloud') {
+        debugLog.info('Upload response (cloud)', {
+          status: response.status,
+          ok: response.ok,
+          body: response.ok ? undefined : json,
+        });
+      }
 
       // Handle error responses
       if (!response.ok) {

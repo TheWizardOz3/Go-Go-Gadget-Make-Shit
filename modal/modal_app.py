@@ -907,6 +907,9 @@ async def api_transcribe(request: Request):
             status_code=504,
             detail={"error": {"code": "TIMEOUT", "message": "Transcription request timed out"}},
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is (don't wrap them)
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
