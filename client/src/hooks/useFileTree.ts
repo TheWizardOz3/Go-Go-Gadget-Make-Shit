@@ -11,7 +11,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import useSWR from 'swr';
 import { api, getApiMode } from '@/lib/api';
-import { cacheFileTree } from '@/lib/localCache';
+import { cacheFileTree, getCachedFileTree } from '@/lib/localCache';
 import { fetchRepoTree, type NestedTreeEntry } from '@/lib/github';
 import type { FileTreeResponse, FileTreeEntry } from '@shared/types';
 
@@ -80,8 +80,21 @@ export function useFileTree(
   const mode = getApiMode();
   const isCloudMode = mode === 'cloud';
 
-  // State for cloud-fetched data
-  const [cloudData, setCloudData] = useState<FileTreeResponse | undefined>(undefined);
+  // State for cloud-fetched data - try to load from cache initially
+  const [cloudData, setCloudData] = useState<FileTreeResponse | undefined>(() => {
+    if (isCloudMode && encodedPath) {
+      const cached = getCachedFileTree(encodedPath);
+      if (cached) {
+        return {
+          path: cached.path,
+          githubUrl: cached.githubUrl,
+          branch: cached.branch,
+          entries: cached.entries,
+        };
+      }
+    }
+    return undefined;
+  });
   const [cloudLoading, setCloudLoading] = useState(false);
   const [cloudError, setCloudError] = useState<Error | undefined>(undefined);
 
@@ -124,6 +137,14 @@ export function useFileTree(
           entries: flattenTree(result.entries),
         };
         setCloudData(treeData);
+
+        // Cache to localStorage for faster subsequent loads
+        cacheFileTree(encodedPath, {
+          path: treeData.path,
+          githubUrl: treeData.githubUrl,
+          branch: treeData.branch,
+          entries: treeData.entries,
+        });
       }
     } catch (err) {
       setCloudError(err instanceof Error ? err : new Error('Failed to fetch'));

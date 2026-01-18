@@ -16,6 +16,7 @@ const CACHE_KEY_PROJECTS = 'ggg_cache_projects';
 const CACHE_KEY_SESSIONS_PREFIX = 'ggg_cache_sessions_';
 const CACHE_KEY_FILES_PREFIX = 'ggg_cache_files_';
 const CACHE_KEY_TREE_PREFIX = 'ggg_cache_tree_';
+const CACHE_KEY_CONTENT_PREFIX = 'ggg_cache_content_';
 const CACHE_KEY_LAST_SYNC = 'ggg_cache_last_sync';
 
 // ============================================================
@@ -199,6 +200,58 @@ export function getCachedFilesChanged(encodedPath: string): CachedFileChange[] |
     if (!stored) return null;
 
     const cached: CachedData<CachedFileChange[]> = JSON.parse(stored);
+    return cached.data;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================
+// File Content Cache
+// ============================================================
+
+/** Cached file content */
+export interface CachedFileContent {
+  path: string;
+  content: string;
+  language: string;
+  githubUrl: string | null;
+}
+
+/**
+ * Cache file content for a specific file
+ * Key is encodedPath + filePath to ensure uniqueness
+ */
+export function cacheFileContent(
+  encodedPath: string,
+  filePath: string,
+  content: CachedFileContent
+): void {
+  try {
+    const key = `${CACHE_KEY_CONTENT_PREFIX}${encodedPath}:${filePath}`;
+    const cached: CachedData<CachedFileContent> = {
+      data: content,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(key, JSON.stringify(cached));
+  } catch (e) {
+    console.warn('Failed to cache file content:', e);
+  }
+}
+
+/**
+ * Get cached file content for offline viewing
+ */
+export function getCachedFileContent(
+  encodedPath: string,
+  filePath: string
+): CachedFileContent | null {
+  try {
+    const key = `${CACHE_KEY_CONTENT_PREFIX}${encodedPath}:${filePath}`;
+    const stored = localStorage.getItem(key);
+    if (!stored) return null;
+
+    const cached: CachedData<CachedFileContent> = JSON.parse(stored);
     return cached.data;
   } catch {
     return null;

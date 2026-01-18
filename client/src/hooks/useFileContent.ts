@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from 'react';
 import useSWR from 'swr';
 import { api, getApiMode } from '@/lib/api';
 import { fetchContentViaModal } from '@/lib/github';
+import { cacheFileContent, getCachedFileContent } from '@/lib/localCache';
 import type { FileContentResponse } from '@shared/types';
 
 /**
@@ -64,8 +65,26 @@ export function useFileContent(
   const mode = getApiMode();
   const isCloudMode = mode === 'cloud';
 
-  // State for cloud-fetched data
-  const [cloudData, setCloudData] = useState<FileContentResponse | undefined>(undefined);
+  // State for cloud-fetched data - try to load from cache initially
+  const [cloudData, setCloudData] = useState<FileContentResponse | undefined>(() => {
+    if (isCloudMode && encodedPath && filePath) {
+      const cached = getCachedFileContent(encodedPath, filePath);
+      if (cached) {
+        const fileName = cached.path.split('/').pop() ?? cached.path;
+        const ext = fileName.includes('.') ? (fileName.split('.').pop() ?? null) : null;
+        return {
+          path: cached.path,
+          name: fileName,
+          extension: ext,
+          language: cached.language,
+          content: cached.content,
+          lineCount: cached.content.split('\n').length,
+          githubUrl: cached.githubUrl,
+        };
+      }
+    }
+    return undefined;
+  });
   const [cloudLoading, setCloudLoading] = useState(false);
   const [cloudError, setCloudError] = useState<Error | undefined>(undefined);
 
@@ -105,6 +124,7 @@ export function useFileContent(
         const fileName = result.path.split('/').pop() ?? result.path;
         const ext = fileName.includes('.') ? (fileName.split('.').pop() ?? null) : null;
         const lineCount = result.content.split('\n').length;
+        const githubUrl = gitRemoteUrl ? `${gitRemoteUrl}/blob/main/${filePath}` : null;
 
         const contentData: FileContentResponse = {
           path: result.path,
@@ -113,9 +133,19 @@ export function useFileContent(
           language: result.language,
           content: result.content,
           lineCount,
-          githubUrl: gitRemoteUrl ? `${gitRemoteUrl}/blob/main/${filePath}` : null,
+          githubUrl,
         };
         setCloudData(contentData);
+
+        // Cache to localStorage for faster subsequent loads
+        if (encodedPath) {
+          cacheFileContent(encodedPath, result.path, {
+            path: result.path,
+            content: result.content,
+            language: result.language,
+            githubUrl,
+          });
+        }
       }
     } catch (err) {
       setCloudError(err instanceof Error ? err : new Error('Failed to fetch'));
