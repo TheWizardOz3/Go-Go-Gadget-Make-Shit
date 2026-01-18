@@ -526,6 +526,7 @@ export async function getSettings(): Promise<AppSettings> {
  * Update settings
  *
  * Merges the partial update with existing settings and saves to file.
+ * Performs deep merge for nested objects like `channels` and `serverless`.
  *
  * @param partial - Partial settings to update
  * @returns Updated app settings
@@ -546,11 +547,49 @@ export async function updateSettings(partial: Partial<AppSettings>): Promise<App
 
   // Get current settings
   const current = await getSettings();
+  const update = parseResult.data;
 
-  // Merge with update
+  // Deep merge channels if both exist
+  let mergedChannels = current.channels;
+  if (update.channels) {
+    mergedChannels = {
+      ...current.channels,
+      ...update.channels,
+      // Deep merge each channel
+      ...(update.channels.imessage && {
+        imessage: { ...current.channels?.imessage, ...update.channels.imessage },
+      }),
+      ...(update.channels.ntfy && {
+        ntfy: { ...current.channels?.ntfy, ...update.channels.ntfy },
+      }),
+      ...(update.channels.slack && {
+        slack: { ...current.channels?.slack, ...update.channels.slack },
+      }),
+      ...(update.channels.telegram && {
+        telegram: { ...current.channels?.telegram, ...update.channels.telegram },
+      }),
+      ...(update.channels.email && {
+        email: { ...current.channels?.email, ...update.channels.email },
+      }),
+    };
+  }
+
+  // Deep merge serverless if both exist
+  let mergedServerless = current.serverless;
+  if (update.serverless) {
+    mergedServerless = {
+      ...current.serverless,
+      ...update.serverless,
+    };
+  }
+
+  // Merge with update (excluding nested objects that are deep-merged above)
+  const { channels: _channels, serverless: _serverless, ...otherUpdates } = update;
   const updated: AppSettings = {
     ...current,
-    ...parseResult.data,
+    ...otherUpdates,
+    ...(mergedChannels && { channels: mergedChannels }),
+    ...(mergedServerless && { serverless: mergedServerless }),
   };
 
   // Write to file

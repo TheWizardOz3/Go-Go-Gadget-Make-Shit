@@ -90,7 +90,17 @@ export function ConversationView({
     };
   }, [gitRemoteUrl, projectName, sessionId, ntfyTopic]);
 
-  const { sendPromptAdvanced, isSending } = useSendPrompt(sessionId, cloudOptions);
+  // Local session options for creating new sessions in local mode
+  const localSessionOptions = useMemo(() => {
+    if (!projectPath) return undefined;
+    return { projectPath };
+  }, [projectPath]);
+
+  const { sendPromptAdvanced, isSending } = useSendPrompt(
+    sessionId,
+    cloudOptions,
+    localSessionOptions
+  );
   const { stopAgent, isStopping } = useStopAgent(sessionId);
   const { templates, isLoading: templatesLoading } = useTemplates(encodedPath);
 

@@ -4,12 +4,13 @@
  * Uses SWR for caching and automatic revalidation.
  * Polls at a slower interval since files change less frequently than messages.
  * Caches files to localStorage for offline viewing.
+ * In cloud mode, uses cached data since Modal doesn't track file changes.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import useSWR from 'swr';
-import { api } from '@/lib/api';
-import { cacheFilesChanged, type CachedFileChange } from '@/lib/localCache';
+import { api, getApiMode } from '@/lib/api';
+import { cacheFilesChanged, getCachedFilesChanged, type CachedFileChange } from '@/lib/localCache';
 import type { FileChange } from '@shared/types';
 
 /**
@@ -33,6 +34,8 @@ export interface UseFilesChangedReturn {
   refresh: () => Promise<FileChange[] | undefined>;
   /** Number of changed files (0 if loading or error) */
   count: number;
+  /** Whether data is from cache (cloud mode) */
+  isCached: boolean;
 }
 
 /**
@@ -43,18 +46,35 @@ export interface UseFilesChangedReturn {
  *
  * @example
  * ```tsx
- * const { files, isLoading, error, count } = useFilesChanged(project.encodedPath);
+ * const { files, isLoading, error, count, isCached } = useFilesChanged(project.encodedPath);
  *
  * if (isLoading) return <Loading />;
  * if (error) return <Error />;
  * if (count === 0) return <EmptyState />;
- * return <FileList files={files} />;
+ * return <FileList files={files} isCached={isCached} />;
  * ```
  */
 export function useFilesChanged(encodedPath: string | null): UseFilesChangedReturn {
+  const mode = getApiMode();
+  const isCloudMode = mode === 'cloud';
+
+  // Get cached data for cloud mode
+  const cachedFiles = useMemo(() => {
+    if (!encodedPath || !isCloudMode) return undefined;
+    const cached = getCachedFilesChanged(encodedPath);
+    if (!cached) return undefined;
+    // Convert cached format back to FileChange format
+    return cached.map((f) => ({
+      path: f.path,
+      status: f.status,
+      additions: f.additions,
+      deletions: f.deletions,
+    })) as FileChange[];
+  }, [encodedPath, isCloudMode]);
+
   const { data, error, isLoading, mutate } = useSWR<FileChange[]>(
-    // Only fetch if we have a project path
-    encodedPath ? `/projects/${encodedPath}/files` : null,
+    // Only fetch from API in local mode
+    encodedPath && !isCloudMode ? `/projects/${encodedPath}/files` : null,
     fetcher<FileChange[]>,
     {
       // Revalidate every 5 seconds (files change less frequently than messages)
@@ -68,9 +88,9 @@ export function useFilesChanged(encodedPath: string | null): UseFilesChangedRetu
     }
   );
 
-  // Cache files to localStorage for offline access
+  // Cache files to localStorage for offline access (only in local mode)
   useEffect(() => {
-    if (data && data.length > 0 && encodedPath) {
+    if (data && data.length > 0 && encodedPath && !isCloudMode) {
       // Convert to cacheable format
       const cacheable: CachedFileChange[] = data.map((f) => ({
         path: f.path,
@@ -80,13 +100,17 @@ export function useFilesChanged(encodedPath: string | null): UseFilesChangedRetu
       }));
       cacheFilesChanged(encodedPath, cacheable);
     }
-  }, [data, encodedPath]);
+  }, [data, encodedPath, isCloudMode]);
+
+  // In cloud mode, use cached data
+  const files = isCloudMode ? cachedFiles : data;
 
   return {
-    files: data,
-    isLoading,
-    error,
+    files,
+    isLoading: isCloudMode ? false : isLoading,
+    error: isCloudMode ? undefined : error,
     refresh: mutate,
-    count: data?.length ?? 0,
+    count: files?.length ?? 0,
+    isCached: isCloudMode && !!cachedFiles,
   };
 }
