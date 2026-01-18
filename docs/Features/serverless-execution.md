@@ -200,14 +200,16 @@ Fallback to Local               Error notification sent
 │                         │    │  ┌─────────────────────────────────────────────┐  │
 │  Tailscale reachable?   │    │  │  Claude Execution Container (Ephemeral)     │  │
 │  ↓ Yes → Use local      │    │  │  - Claude CLI installed                     │  │
-│  ↓ No  → Use Modal      │    │  │  - Clones git repo                          │  │
+│  ↓ No  → Use Modal      │    │  │  - Uses persistent repo from Volume         │  │
 └─────────────────────────┘    │  │  - Runs claude -p "<prompt>"                │  │
-                               │  │  - Saves JSONL to Modal Volume              │  │
+                               │  │  - Commits locally (push is explicit)       │  │
                                │  └─────────────────────────────────────────────┘  │
                                │                        │                          │
                                │                        ▼                          │
                                │  ┌─────────────────────────────────────────────┐  │
-                               │  │  Modal Volume (Persistent JSONL Storage)    │  │
+                               │  │  Modal Volumes (Persistent Storage)          │  │
+                               │  │  - gogogadget-sessions: JSONL session data   │  │
+                               │  │  - gogogadget-repos: Git repositories        │  │
                                │  └─────────────────────────────────────────────┘  │
                                └───────────────────────────────────────────────────┘
                                                         │
@@ -220,13 +222,14 @@ Fallback to Local               Error notification sent
 
 ### Key Architecture Components
 
-| Component     | Hosted On             | Purpose                                   | Always Available?  |
-|---------------|-----------------------|-------------------------------------------|--------------------|
-| React SPA     | Vercel                | User interface                            | ✅ Yes              |
-| Local API     | Laptop                | Fast local execution, local conversations | When laptop online |
-| Cloud API     | Modal                 | Cloud execution, cloud conversations      | ✅ Yes              |
-| JSONL Storage | Laptop + Modal Volume | Conversation persistence                  | Respective to mode |
-| Notifications | ntfy.sh               | Completion alerts                         | ✅ Yes              |
+| Component       | Hosted On             | Purpose                                   | Always Available?  |
+|-----------------|-----------------------|-------------------------------------------|--------------------|
+| React SPA       | Vercel                | User interface                            | ✅ Yes              |
+| Local API       | Laptop                | Fast local execution, local conversations | When laptop online |
+| Cloud API       | Modal                 | Cloud execution, cloud conversations      | ✅ Yes              |
+| Sessions Volume | Modal Volume          | JSONL conversation persistence            | ✅ Yes              |
+| Repos Volume    | Modal Volume          | Persistent git repos (no re-clone!)       | ✅ Yes              |
+| Notifications   | ntfy.sh               | Completion alerts                         | ✅ Yes              |
 
 ### Platform Choice: Modal
 
@@ -244,10 +247,18 @@ Fallback to Local               Error notification sent
 
 **Modal Implementation Approach:**
 
-1. **Modal App** (`modal_app.py`): Defines the cloud function and volume
-2. **Container Image**: Docker with Claude CLI, git, Node.js
+1. **Modal App** (`modal_app.py`): Defines cloud functions and volumes
+2. **Container Image**: Debian with Claude CLI, git, Node.js
 3. **Entrypoint**: Python function that receives prompt, runs Claude, saves output
-4. **Volume**: Persistent storage for `~/.claude/` data
+4. **Two Volumes**:
+   - `gogogadget-sessions`: Persistent storage for `~/.claude/` session data
+   - `gogogadget-repos`: Persistent storage for cloned git repos (mounted at `/repos`)
+
+**Repo Persistence (as of v0.24.0):**
+- First prompt for a project: Clones repo to `/repos/{projectName}` on volume
+- Subsequent prompts: Reuses existing repo (fast!)
+- Changes committed locally but NOT auto-pushed
+- User explicitly pushes via `/api/cloud/push` endpoint
 
 ### Data Flow
 

@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.24.0 | 2026-01-18 | minor | Persistent Repo Volumes - repos persist across containers, explicit push |
 | 0.23.0 | 2026-01-18 | minor | Cloud Mode Polish - session continuation, ntfy notifications, debug logging |
 | 0.21.5 | 2026-01-17 | patch | Cloud prompt input - send prompts from cached projects |
 | 0.21.4 | 2026-01-17 | patch | Offline view - show cached projects when laptop is asleep |
@@ -57,6 +58,48 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.24.0] - 2026-01-18
+
+### Summary
+**Persistent Repo Volumes** - Major architectural improvement to cloud execution. Git repositories now persist in a Modal Volume across container restarts, eliminating re-cloning on every prompt. Changes are no longer auto-pushed; users explicitly push when ready.
+
+### Added
+- **Persistent repos volume** (`gogogadget-repos`) - Stores cloned git repos in Modal Volume
+  - First prompt for a project clones the repo once
+  - Subsequent prompts reuse existing repo (fast!)
+  - Changes accumulate across multiple prompts in same session
+- **Explicit push endpoint** (`POST /api/cloud/push`) - User controls when changes go to GitHub
+  - No more auto-push after every prompt
+  - Review changes before pushing
+  - Safer for iterative development
+- **Check changes endpoint** (`POST /api/cloud/changes`) - View pending uncommitted/unpushed changes
+  - Shows uncommitted files, unpushed commits, diff summary
+- **Cloud Repo Banner component** - UI for managing pending changes
+  - Shows count of unpushed commits
+  - Expandable details with commit list and diff
+  - "Push to GitHub" button with loading state
+- **`useCloudRepo` hook** - Client-side hook for cloud repo operations
+  - `checkChanges(projectName)` - Check for pending changes
+  - `pushChanges(projectName, repoUrl)` - Explicit push
+
+### Changed
+- **execute_prompt no longer auto-pushes** - Commits locally but doesn't push
+- **Repos volume mounted at `/repos`** instead of ephemeral `/tmp/repos`
+- **New sessions pull latest from origin** - Ensures fresh start
+- **Session continuation preserves local changes** - No `git pull` when continuing
+
+### Architecture
+- Two Modal Volumes now: `gogogadget-sessions` (JSONL) + `gogogadget-repos` (git repos)
+- Modal function `execute_prompt` mounts both volumes
+- New Modal functions: `check_repo_changes`, `push_repo_changes`
+
+### Developer Notes
+- Deploy with `modal deploy modal/modal_app.py`
+- Volumes are automatically created on first deploy
+- GitHub token (PAT) required in Modal secrets for private repos
 
 ---
 

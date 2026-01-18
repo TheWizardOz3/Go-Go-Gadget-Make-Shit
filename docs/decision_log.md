@@ -13,6 +13,7 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-026 | 2026-01-18 | arch     | active | Persistent repo volumes with explicit push for cloud mode |
 | ADR-025 | 2026-01-18 | arch     | active | Cloud session continuation via Claude CLI --continue flag |
 | ADR-024 | 2026-01-18 | infra    | active | Persistent client-side debug logging for cloud mode       |
 | ADR-023 | 2026-01-17 | arch     | active | Notification channel abstraction layer                    |
@@ -48,6 +49,97 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-026: Persistent Repo Volumes with Explicit Push
+
+**Date:** 2026-01-18  
+**Category:** arch  
+**Status:** active
+
+#### Context & Trigger
+
+Modal containers are ephemeral - their local filesystem is destroyed when the function returns. The original cloud execution implementation cloned repos to `/tmp` and auto-pushed changes after every prompt. This caused several problems:
+
+1. **Re-cloning on every prompt** - Slow, wasteful of bandwidth
+2. **Auto-push too aggressive** - Users couldn't review/reject changes before they went to GitHub
+3. **No iteration within sessions** - Each prompt was effectively isolated, changes from prompt N not visible to prompt N+1 within the same logical session (unless pushed+pulled)
+
+User feedback: "It seems like the modal containers are ephemeral, within a given conversation that container should not be disappearing and restarting. It just seems like this is going to be super slow and inefficient if we're pulling/pushing so often."
+
+#### Decision
+
+Introduce a **second Modal Volume** for persistent git repositories:
+
+1. **`gogogadget-repos` volume** - Stores cloned repos at `/repos/{projectName}`
+   - Repos persist across container restarts
+   - First prompt clones once, subsequent prompts reuse
+   - Changes accumulate across multiple prompts
+
+2. **Remove auto-push** - Changes are committed locally but never auto-pushed
+   - User must explicitly push via new `/api/cloud/push` endpoint
+   - Safer for iterative development
+   - User controls when changes go to GitHub
+
+3. **New endpoints for change management**:
+   - `POST /api/cloud/changes` - Check for pending changes
+   - `POST /api/cloud/push` - Explicitly push to GitHub
+
+4. **UI integration** - `CloudRepoBanner` component shows pending changes with push button
+
+#### Rationale
+
+- **Efficiency**: Clone once, reuse many times. No more re-cloning on every prompt.
+- **Safety**: Auto-push was too aggressive. User should review before pushing.
+- **Iteration**: Changes from prompt N are now visible to prompt N+1 within the same session.
+- **User control**: Explicit push gives users time to review, iterate, or abandon changes.
+
+#### Consequences
+
+**Positive:**
+- Much faster cloud execution (no re-clone overhead)
+- Changes accumulate properly within sessions
+- User controls when code goes to GitHub
+- Safer iterative development workflow
+
+**Negative:**
+- Two volumes to manage instead of one
+- Users must remember to push (or changes stay local to Modal volume)
+- Volume storage costs (small, ~$0.40/GB/month)
+
+**Risks:**
+- If user forgets to push, changes could be lost if volume is deleted
+- Stale repos if user doesn't pull latest (mitigated: new sessions always pull)
+
+#### Implementation
+
+```python
+# New repos volume in modal_app.py
+repos_volume = modal.Volume.from_name("gogogadget-repos", create_if_missing=True)
+
+@app.function(
+    volumes={
+        "/root/.claude": volume,  # Sessions JSONL
+        "/repos": repos_volume,   # Git repos
+    },
+    ...
+)
+def execute_prompt(...):
+    work_dir = Path(f"/repos/{project_name}")  # Persistent!
+    # Clone if not exists, else reuse
+    # Commit locally but do NOT push
+    repos_volume.commit()  # Persist changes
+```
+
+#### AI Instructions
+
+When working on cloud execution:
+1. Repos live in `/repos` volume, not `/tmp`
+2. Never auto-push changes - let user decide
+3. Use `repos_volume.commit()` to persist changes
+4. New sessions should `git fetch` + `git reset --hard origin/main`
+5. Session continuations should preserve local changes
+
+---
 
 ### ADR-025: Cloud Session Continuation via Claude CLI --continue Flag
 **Date:** 2026-01-18 | **Category:** arch | **Status:** active

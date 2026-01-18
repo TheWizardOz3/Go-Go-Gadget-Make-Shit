@@ -22,6 +22,7 @@ import { PullToRefresh } from './PullToRefresh';
 import { PromptInput } from './PromptInput';
 import { TemplateChips, TemplateChipsSkeleton } from './TemplateChips';
 import { CloudJobPending } from './CloudJobPending';
+import { CloudRepoBanner } from './CloudRepoBanner';
 
 interface ConversationViewProps {
   /** Session ID to load conversation for */
@@ -594,6 +595,11 @@ export function ConversationView({
   // Main conversation view
   return (
     <div className={cn('flex flex-col', className)}>
+      {/* Cloud repo banner - shows pending changes and push button */}
+      {projectName && gitRemoteUrl && (
+        <CloudRepoBanner projectName={projectName} gitRemoteUrl={gitRemoteUrl} />
+      )}
+
       {/* Messages area */}
       <div className="relative flex-1 overflow-hidden">
         {/* Pull-to-refresh indicator */}
