@@ -793,8 +793,55 @@ async def api_get_settings():
 
 @web_app.get("/api/cloud/sessions")
 async def api_get_cloud_sessions(projectPath: str = Query(None)):
-    """Return empty cloud sessions (placeholder for cloud mode)."""
-    return {"data": []}
+    """
+    List cloud sessions from Modal volume.
+    Claude Code stores sessions in ~/.claude/projects/[encoded-path]/[session-id].jsonl
+    """
+    try:
+        # Refresh volume to see latest sessions
+        volume.reload()
+        
+        claude_dir = Path("/root/.claude/projects")
+        if not claude_dir.exists():
+            return {"data": {"sessions": [], "available": True, "count": 0}}
+        
+        sessions = []
+        
+        # List all project directories
+        for project_dir in claude_dir.iterdir():
+            if not project_dir.is_dir():
+                continue
+            
+            # Filter by project path if provided
+            if projectPath:
+                # Encode the project path the same way Claude Code does
+                encoded = projectPath.replace("/", "-")
+                if project_dir.name != encoded:
+                    continue
+            
+            # Find all session files
+            for session_file in project_dir.glob("*.jsonl"):
+                summary = get_session_summary(session_file)
+                if summary:
+                    # Add cloud-specific fields
+                    summary["source"] = "cloud"
+                    summary["projectPath"] = projectPath or project_dir.name
+                    summary["status"] = "completed"
+                    sessions.append(summary)
+        
+        # Sort by most recent activity
+        sessions.sort(key=lambda s: s.get("lastActivityAt", ""), reverse=True)
+        
+        return {
+            "data": {
+                "sessions": sessions,
+                "available": True,
+                "count": len(sessions),
+            }
+        }
+    except Exception as e:
+        print(f"Error listing cloud sessions: {e}")
+        return {"data": {"sessions": [], "available": False, "count": 0, "message": str(e)}}
 
 
 @web_app.get("/api/projects/{encoded_path}/templates")
