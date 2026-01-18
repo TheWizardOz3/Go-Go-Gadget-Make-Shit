@@ -83,13 +83,24 @@ export function CloudJobPending({
     try {
       debugLog.info('Polling job status', { jobId });
       const response = await api.get<JobStatusResponse>(`/cloud/jobs/${jobId}`);
+      debugLog.info('Job status response', {
+        jobId,
+        status: response.status,
+        hasResult: Boolean(response.result),
+        sessionId: response.result?.sessionId,
+        success: response.result?.success,
+      });
 
       if (response.status === 'completed') {
         setStatus('completed');
         if (response.result?.success) {
+          debugLog.info('Job completed successfully, calling onComplete', {
+            sessionId: response.result.sessionId,
+          });
           onComplete(response.result.sessionId);
         } else {
           const errorMsg = response.result?.output || 'Job completed with errors';
+          debugLog.error('Job completed with errors', { errorMsg });
           setError(errorMsg);
           onError(errorMsg);
         }
@@ -98,6 +109,7 @@ export function CloudJobPending({
         setStatus('running');
         setStageIndex(2); // Jump to "Claude is thinking"
       } else if (response.status === 'unknown' && response.error) {
+        debugLog.error('Job failed with unknown status', { error: response.error });
         setStatus('failed');
         setError(response.error);
         onError(response.error);
@@ -106,8 +118,9 @@ export function CloudJobPending({
 
       return false; // Continue polling
     } catch (err) {
-      // Don't fail on polling errors, keep trying
-      console.warn('Failed to check job status:', err);
+      debugLog.warn('Failed to check job status', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return false;
     }
   }, [jobId, onComplete, onError]);

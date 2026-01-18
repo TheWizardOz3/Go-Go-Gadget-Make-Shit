@@ -87,11 +87,34 @@ async function fetchLocalSessions(encodedPath: string): Promise<SessionSummarySe
 
 /**
  * Fetch cloud sessions from Modal
+ * Extracts project name to match against Modal's path format (-tmp-repos-{name})
  */
 async function fetchCloudSessions(projectPath?: string): Promise<CloudSessionsResponse> {
   try {
-    const params = projectPath ? `?projectPath=${encodeURIComponent(projectPath)}` : '';
-    return await api.get<CloudSessionsResponse>(`/cloud/sessions${params}`);
+    // Fetch all cloud sessions (don't filter on server, filter on client)
+    // Modal stores paths as "-tmp-repos-{projectName}" which doesn't match local paths
+    const response = await api.get<CloudSessionsResponse>('/cloud/sessions');
+
+    // If we have a project path, filter sessions by project name
+    if (projectPath && response.sessions) {
+      // Extract project name from local path (e.g., "/Users/.../Knowledge" -> "Knowledge")
+      const projectName = projectPath.split('/').pop() || '';
+
+      // Filter sessions whose cloud path contains this project name
+      const filteredSessions = response.sessions.filter((session) => {
+        // Cloud sessions have paths like "-tmp-repos-Knowledge"
+        const cloudProjectName = session.projectPath?.split('-').pop() || '';
+        return cloudProjectName.toLowerCase() === projectName.toLowerCase();
+      });
+
+      return {
+        ...response,
+        sessions: filteredSessions,
+        count: filteredSessions.length,
+      };
+    }
+
+    return response;
   } catch (err) {
     // Cloud sessions are optional - don't fail the whole request
     console.debug(

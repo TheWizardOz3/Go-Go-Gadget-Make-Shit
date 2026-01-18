@@ -152,7 +152,8 @@ export function ConversationView({
    * Handle cloud job completion
    */
   const handleCloudJobComplete = useCallback(
-    (_sessionId?: string) => {
+    (sessionId?: string) => {
+      debugLog.info('handleCloudJobComplete called', { sessionId });
       setPendingCloudJob(null);
       // Refresh sessions to pick up the new one
       onNewSessionStarted?.();
