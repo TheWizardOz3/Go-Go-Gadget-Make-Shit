@@ -396,8 +396,11 @@ def execute_prompt(
         print(f"Checking ntfy notification - topic: '{ntfy_topic}'")
         if ntfy_topic:
             try:
-                status_emoji = "✅" if success else "❌"
-                title = f"{status_emoji} Claude completed: {project_name}"
+                import base64
+                
+                # Use ASCII-safe status prefix (ntfy "Tags" will add emoji)
+                status_word = "Success" if success else "Failed"
+                title = f"Claude {status_word}: {project_name}"
                 # Get first 200 chars of output for message body
                 body = output[:200] if output else "No output"
                 if len(output or "") > 200:
@@ -406,7 +409,10 @@ def execute_prompt(
                 ntfy_url = f"https://ntfy.sh/{ntfy_topic}"
                 print(f"Sending ntfy notification to: {ntfy_url}")
                 print(f"  Title: {title}")
-                print(f"  Body preview: {body[:50]}...")
+                print(f"  Body preview: {body[:50] if body else '(empty)'}...")
+                
+                # ntfy Tags add emojis automatically: robot=🤖, warning=⚠️, white_check_mark=✅
+                tags = "white_check_mark,robot" if success else "warning,robot"
                 
                 ntfy_response = requests.post(
                     ntfy_url,
@@ -414,7 +420,7 @@ def execute_prompt(
                     headers={
                         "Title": title,
                         "Priority": "high" if not success else "default",
-                        "Tags": "robot" if success else "warning",
+                        "Tags": tags,
                     },
                     timeout=10,
                 )
