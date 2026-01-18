@@ -983,7 +983,10 @@ interface TabBarProps {
 
 function TabBar({ activeTab, onTabChange, filesChangedCount }: TabBarProps) {
   return (
-    <nav className="flex-shrink-0 border-t border-text-primary/10 bg-surface safe-bottom">
+    <nav
+      className="flex-shrink-0 border-t border-text-primary/10 bg-surface"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
       <div className="flex items-center justify-around">
         {/* Conversation Tab */}
         <button
@@ -991,7 +994,7 @@ function TabBar({ activeTab, onTabChange, filesChangedCount }: TabBarProps) {
           onClick={() => onTabChange('conversation')}
           className={cn(
             'flex flex-col items-center justify-center gap-0.5',
-            'flex-1 py-1.5 min-h-[48px]',
+            'flex-1 py-1 min-h-[44px]',
             'transition-colors duration-150',
             'focus:outline-none focus-visible:bg-text-primary/5',
             activeTab === 'conversation' ? 'text-accent' : 'text-text-muted'
@@ -1009,7 +1012,7 @@ function TabBar({ activeTab, onTabChange, filesChangedCount }: TabBarProps) {
           onClick={() => onTabChange('files')}
           className={cn(
             'flex flex-col items-center justify-center gap-0.5',
-            'flex-1 py-1.5 min-h-[48px]',
+            'flex-1 py-1 min-h-[44px]',
             'transition-colors duration-150',
             'focus:outline-none focus-visible:bg-text-primary/5',
             activeTab === 'files' ? 'text-accent' : 'text-text-muted'

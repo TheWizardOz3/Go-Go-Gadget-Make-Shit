@@ -131,7 +131,7 @@ export function TemplateChips({
       className={cn(
         // Container styling
         'flex items-center',
-        'px-3 py-1.5',
+        'px-3 py-1',
         'bg-background',
         // Horizontal scroll
         'overflow-x-auto',
@@ -170,7 +170,7 @@ export function TemplateChipsSkeleton({ className }: { className?: string }) {
       className={cn(
         // Container styling (matches TemplateChips)
         'flex items-center',
-        'px-3 py-1.5',
+        'px-3 py-1',
         'bg-background',
         'overflow-x-auto',
         'scrollbar-hide',

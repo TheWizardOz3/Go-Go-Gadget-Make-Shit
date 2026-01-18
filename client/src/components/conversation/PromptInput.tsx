@@ -357,11 +357,10 @@ export function PromptInput({
     <div
       className={cn(
         // Container styling - vertical layout for waveform
-        'flex flex-col gap-1.5',
-        'px-3 py-1.5',
+        'flex flex-col gap-1',
+        'px-3 pt-1.5 pb-1',
         'bg-surface border-t border-text-primary/10',
-        // Safe area for notched devices
-        'pb-[max(0.375rem,env(safe-area-inset-bottom))]',
+        // Note: safe-area handled by TabBar below this component
         className
       )}
     >
