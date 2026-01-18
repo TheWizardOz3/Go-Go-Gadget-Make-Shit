@@ -19,6 +19,7 @@ import { JumpToLatest } from './JumpToLatest';
 import { PullToRefresh } from './PullToRefresh';
 import { PromptInput } from './PromptInput';
 import { TemplateChips, TemplateChipsSkeleton } from './TemplateChips';
+import { CloudJobPending } from './CloudJobPending';
 
 interface ConversationViewProps {
   /** Session ID to load conversation for */
@@ -80,6 +81,12 @@ export function ConversationView({
   // State for creating new session
   const [isStartingNewSession, setIsStartingNewSession] = useState(false);
 
+  // State for pending cloud job (shows loading UI while job runs)
+  const [pendingCloudJob, setPendingCloudJob] = useState<{
+    jobId: string;
+    prompt: string;
+  } | null>(null);
+
   /**
    * Handle starting a new session with the user's first message
    * In cloud mode, uses sendPromptAdvanced which dispatches to /cloud/jobs
@@ -102,6 +109,15 @@ export function ConversationView({
           return false;
         }
 
+        // If this is a cloud job, show pending state with job ID
+        if (result.mode === 'cloud' && result.jobId) {
+          setPendingCloudJob({
+            jobId: result.jobId,
+            prompt: trimmedPrompt,
+          });
+          return true;
+        }
+
         // Notify parent to refresh sessions and select the new one
         onNewSessionStarted?.();
         return true;
@@ -115,6 +131,26 @@ export function ConversationView({
     },
     [projectPath, isStartingNewSession, onNewSessionStarted, sendPromptAdvanced]
   );
+
+  /**
+   * Handle cloud job completion
+   */
+  const handleCloudJobComplete = useCallback(
+    (_sessionId?: string) => {
+      setPendingCloudJob(null);
+      // Refresh sessions to pick up the new one
+      onNewSessionStarted?.();
+    },
+    [onNewSessionStarted]
+  );
+
+  /**
+   * Handle cloud job error
+   */
+  const handleCloudJobError = useCallback((error: string) => {
+    setPendingCloudJob(null);
+    setToast({ message: error, type: 'error' });
+  }, []);
 
   /**
    * Handle template selection - insert text at cursor position
@@ -418,6 +454,22 @@ export function ConversationView({
           onStop={handleStop}
           isStopping={isStopping}
           onVoiceError={handleVoiceError}
+        />
+      </div>
+    );
+  }
+
+  // Cloud job pending - show loading state while job executes
+  if (pendingCloudJob) {
+    return (
+      <div className={cn('flex flex-col', className)}>
+        <CloudJobPending
+          jobId={pendingCloudJob.jobId}
+          prompt={pendingCloudJob.prompt}
+          projectName={projectName || 'Project'}
+          onComplete={handleCloudJobComplete}
+          onError={handleCloudJobError}
+          className="flex-1"
         />
       </div>
     );
