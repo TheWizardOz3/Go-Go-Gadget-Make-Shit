@@ -264,27 +264,67 @@ def execute_prompt(
         print(f"  Continuing existing session: {session_id}")
 
     try:
-        # Clone the repository
-        print(f"Cloning {project_repo} to {work_dir}...")
-        work_dir.parent.mkdir(parents=True, exist_ok=True)
-
-        if work_dir.exists():
-            # Clean up existing directory
-            subprocess.run(["rm", "-rf", str(work_dir)], check=True)
-
-        # Prepare clone URL with GitHub token for private repos
-        clone_url = project_repo
+        # Prepare GitHub token for authentication
         github_token = os.environ.get("GITHUB_TOKEN")
+        clone_url = project_repo
         if github_token and "github.com" in project_repo and project_repo.startswith("https://"):
-            # Insert token into URL: https://TOKEN@github.com/user/repo.git
             clone_url = project_repo.replace("https://github.com", f"https://{github_token}@github.com")
-            print("Using GitHub token for authentication")
-
-        subprocess.run(
-            ["git", "clone", "--depth=1", clone_url, str(work_dir)],
-            check=True,
-            capture_output=True,
-        )
+        
+        work_dir.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Check if we should reuse existing directory (for session continuation)
+        if work_dir.exists() and is_continuation:
+            print(f"Continuing session - checking existing work directory at {work_dir}")
+            # Pull latest changes instead of re-cloning
+            try:
+                # Check if it's a valid git repo
+                git_check = subprocess.run(
+                    ["git", "rev-parse", "--git-dir"],
+                    cwd=str(work_dir),
+                    capture_output=True,
+                )
+                if git_check.returncode == 0:
+                    print("Valid git repo found, pulling latest changes...")
+                    # Configure remote URL with token for pull
+                    subprocess.run(
+                        ["git", "remote", "set-url", "origin", clone_url],
+                        cwd=str(work_dir),
+                        capture_output=True,
+                    )
+                    # Pull latest (but keep local changes)
+                    pull_result = subprocess.run(
+                        ["git", "pull", "--rebase", "origin", "main"],
+                        cwd=str(work_dir),
+                        capture_output=True,
+                        text=True,
+                    )
+                    print(f"Git pull result: {pull_result.returncode}")
+                    if pull_result.stdout:
+                        print(f"Pull output: {pull_result.stdout[:200]}")
+                    if pull_result.returncode != 0 and pull_result.stderr:
+                        print(f"Pull stderr: {pull_result.stderr[:200]}")
+                        # If pull fails, fall through to fresh clone
+                        raise Exception("Pull failed, will re-clone")
+                else:
+                    raise Exception("Not a valid git directory")
+            except Exception as e:
+                print(f"Reuse failed ({e}), will re-clone")
+                subprocess.run(["rm", "-rf", str(work_dir)], check=True)
+                # Fall through to clone below
+        elif work_dir.exists():
+            print(f"New session - cleaning up existing directory")
+            subprocess.run(["rm", "-rf", str(work_dir)], check=True)
+        
+        # Clone if directory doesn't exist
+        if not work_dir.exists():
+            print(f"Cloning {project_repo} to {work_dir}...")
+            if github_token:
+                print("Using GitHub token for authentication")
+            subprocess.run(
+                ["git", "clone", "--depth=1", clone_url, str(work_dir)],
+                check=True,
+                capture_output=True,
+            )
 
         # Build the Claude command
         cmd = ["claude", "-p", prompt]
@@ -316,9 +356,11 @@ def execute_prompt(
         volume.commit()
         
         # Git commit and push changes if any were made
+        print("=== Checking for git changes ===")
+        changes_pushed = False  # Track whether we successfully pushed changes
         if success:
             try:
-                # Check if there are any changes to commit
+                # Check if there are any changes to commit (including untracked files)
                 git_status = subprocess.run(
                     ["git", "status", "--porcelain"],
                     cwd=str(work_dir),
@@ -326,8 +368,20 @@ def execute_prompt(
                     text=True,
                 )
                 
-                if git_status.stdout.strip():
-                    print(f"Git changes detected, committing and pushing...")
+                status_output = git_status.stdout.strip()
+                print(f"Git status output: '{status_output}'")
+                
+                # Also check git diff for modified files
+                git_diff = subprocess.run(
+                    ["git", "diff", "--stat"],
+                    cwd=str(work_dir),
+                    capture_output=True,
+                    text=True,
+                )
+                print(f"Git diff output: '{git_diff.stdout.strip()}'")
+                
+                if status_output:
+                    print(f"Git changes detected:\n{status_output}")
                     
                     # Configure git user for commit
                     subprocess.run(
@@ -342,39 +396,73 @@ def execute_prompt(
                     )
                     
                     # Add all changes
-                    subprocess.run(
+                    add_result = subprocess.run(
                         ["git", "add", "-A"],
                         cwd=str(work_dir),
-                        check=True,
+                        capture_output=True,
+                        text=True,
                     )
+                    print(f"Git add result: {add_result.returncode}")
                     
                     # Create commit with descriptive message
                     commit_msg = f"Cloud session update via GoGoGadget Claude\n\nSession: {session_id}\nPrompt: {prompt[:100]}..."
-                    subprocess.run(
+                    commit_result = subprocess.run(
                         ["git", "commit", "-m", commit_msg],
                         cwd=str(work_dir),
-                        check=True,
+                        capture_output=True,
+                        text=True,
                     )
+                    print(f"Git commit result: {commit_result.returncode}")
+                    if commit_result.stdout:
+                        print(f"Commit output: {commit_result.stdout}")
+                    if commit_result.stderr:
+                        print(f"Commit stderr: {commit_result.stderr}")
                     
                     # Push to main branch (using authenticated URL)
-                    # Note: We already have github_token in clone_url from earlier
                     push_url = project_repo
                     if github_token and "github.com" in project_repo:
                         push_url = project_repo.replace("https://github.com", f"https://{github_token}@github.com")
+                        print(f"Using authenticated push URL")
                     
-                    subprocess.run(
+                    push_result = subprocess.run(
                         ["git", "push", push_url, "HEAD:main"],
                         cwd=str(work_dir),
                         capture_output=True,
-                        check=True,
+                        text=True,
                     )
-                    print(f"Successfully pushed changes to main branch")
+                    print(f"Git push result: {push_result.returncode}")
+                    if push_result.stdout:
+                        print(f"Push output: {push_result.stdout}")
+                    if push_result.stderr:
+                        print(f"Push stderr: {push_result.stderr}")
+                    
+                    if push_result.returncode == 0:
+                        print(f"✓ Successfully pushed changes to main branch")
+                        changes_pushed = True
+                    else:
+                        print(f"✗ Git push failed with code {push_result.returncode}")
+                        changes_pushed = False
                 else:
-                    print("No git changes to commit")
+                    print("No git changes detected (Claude may have only read files without modifying)")
+                    changes_pushed = False
+                    # List what files exist to help debug
+                    ls_result = subprocess.run(
+                        ["ls", "-la"],
+                        cwd=str(work_dir),
+                        capture_output=True,
+                        text=True,
+                    )
+                    print(f"Working directory contents:\n{ls_result.stdout[:500]}")
             except subprocess.CalledProcessError as git_err:
-                print(f"Git push failed (non-fatal): {git_err.stderr if git_err.stderr else str(git_err)}")
+                print(f"Git operation failed: {git_err}")
+                if hasattr(git_err, 'stderr') and git_err.stderr:
+                    print(f"Git stderr: {git_err.stderr}")
             except Exception as git_err:
-                print(f"Git push error (non-fatal): {str(git_err)}")
+                print(f"Git error: {str(git_err)}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("Skipping git push due to Claude failure")
 
         # Call notification webhook if provided
         if notification_webhook:
@@ -441,6 +529,7 @@ def execute_prompt(
             "success": success,
             "output": output,
             "projectName": project_name,
+            "changesPushed": changes_pushed,
         }
 
     except subprocess.TimeoutExpired:
