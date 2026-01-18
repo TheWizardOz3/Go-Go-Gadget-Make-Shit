@@ -61,17 +61,15 @@
 }
 
 @layer base {
-  html {
+  html,
+  body {
+    /* Prevent page-level scrolling - only app content should scroll */
+    height: 100%;
+    overflow: hidden;
     /* Prevent iOS text size adjustment */
     -webkit-text-size-adjust: 100%;
-    /* Smooth scrolling */
-    scroll-behavior: smooth;
-  }
-
-  /* Fallback for h-dvh on older browsers */
-  .h-dvh {
-    height: 100vh; /* Fallback */
-    height: 100dvh; /* Modern browsers - accounts for iOS Safari address bar */
+    /* Prevent pull-to-refresh and bounce */
+    overscroll-behavior: none;
   }
 
   body {
@@ -83,10 +81,27 @@
       'Segoe UI',
       Roboto,
       sans-serif;
-    /* Prevent pull-to-refresh and page bounce on mobile */
-    overscroll-behavior: none;
-    /* Fill viewport */
-    min-height: 100dvh;
+    /* Fixed position prevents iOS keyboard from pushing/scrolling page */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Smooth touch scrolling for children */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* React root container - fill the fixed body */
+  #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  /* Fallback for h-dvh on older browsers */
+  .h-dvh {
+    height: 100vh; /* Fallback */
+    height: 100dvh; /* Modern browsers - accounts for iOS Safari address bar */
   }
 
   /*
