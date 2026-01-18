@@ -80,29 +80,28 @@ export function useProjects(): UseProjectsReturn {
 
   // Cache projects to localStorage for offline access (only when we have data from local API)
   useEffect(() => {
-    if (data && data.length > 0 && getApiMode() === 'local') {
+    if (data && data.length > 0 && getApiMode().mode === 'local') {
       cacheProjects(data);
     }
   }, [data]);
 
-  // In cloud mode, fall back to cached projects if API returns empty
+  // In cloud mode, ALWAYS use cached local projects (don't use Modal's project list)
+  // In local mode, use API data and cache it
   const projects = useMemo(() => {
-    const mode = getApiMode();
+    const { mode } = getApiMode();
 
-    // If we have API data, use it
-    if (data && data.length > 0) {
-      return data;
-    }
-
-    // In cloud mode with no API data, use cached projects
+    // In cloud mode, always use cached local projects
+    // Modal's /api/projects returns cloud session data, not the user's actual projects
     if (mode === 'cloud') {
       const cached = getCachedProjects();
       if (cached && cached.length > 0) {
         return cached;
       }
+      // If no cache, return empty (user needs to connect locally once first)
+      return [];
     }
 
-    // Return whatever we have (might be empty or undefined)
+    // In local mode, use API data
     return data;
   }, [data]);
 

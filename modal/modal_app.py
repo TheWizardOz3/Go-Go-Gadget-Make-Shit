@@ -741,9 +741,24 @@ async def api_get_sessions(encoded_path: str):
 @web_app.get("/api/sessions/{session_id}/messages")
 async def api_get_messages(
     session_id: str,
-    encoded_path: str = Query(..., alias="projectPath"),
+    encoded_path: str = Query(None, alias="projectPath"),
 ):
     """Get messages for a session."""
+    # If no projectPath provided, search all projects for this session
+    if not encoded_path:
+        volume.reload()
+        claude_dir = Path("/root/.claude/projects")
+        if claude_dir.exists():
+            for project_dir in claude_dir.iterdir():
+                if project_dir.is_dir():
+                    session_file = project_dir / f"{session_id}.jsonl"
+                    if session_file.exists():
+                        encoded_path = project_dir.name
+                        break
+    
+    if not encoded_path:
+        return {"data": {"messages": [], "summary": None}}
+    
     result = get_messages.remote(session_id, encoded_path)
     return {"data": result}
 
