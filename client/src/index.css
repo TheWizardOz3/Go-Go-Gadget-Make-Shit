@@ -66,12 +66,15 @@
     -webkit-text-size-adjust: 100%;
     /* Smooth scrolling */
     scroll-behavior: smooth;
+    /* Prevent iOS from scrolling the entire page when keyboard opens */
+    height: 100%;
+    overflow: hidden;
   }
 
   /* Fallback for h-dvh on older browsers */
   .h-dvh {
     height: 100vh; /* Fallback */
-    height: 100dvh; /* Modern browsers */
+    height: 100dvh; /* Modern browsers - accounts for iOS Safari address bar */
   }
 
   body {
@@ -83,17 +86,21 @@
       'Segoe UI',
       Roboto,
       sans-serif;
-    /* Prevent pull-to-refresh on mobile */
+    /* Prevent pull-to-refresh and page bounce on mobile */
     overscroll-behavior: none;
+    /* Prevent iOS from scrolling body when keyboard opens */
+    height: 100%;
+    overflow: hidden;
+    /* Ensure content stays in place */
+    position: fixed;
+    width: 100%;
   }
 
-  /* Ensure minimum touch targets for interactive elements */
-  button,
-  a,
-  [role='button'] {
-    min-height: 44px;
-    min-width: 44px;
-  }
+  /*
+   * Touch targets - 44px minimum is recommended but we allow smaller
+   * for inline elements. Critical buttons (send, stop) maintain 44px+.
+   * Template chips use 36px which is acceptable for non-critical actions.
+   */
 }
 
 @layer components {

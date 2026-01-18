@@ -357,11 +357,11 @@ export function PromptInput({
     <div
       className={cn(
         // Container styling - vertical layout for waveform
-        'flex flex-col gap-2',
-        'px-4 py-2',
+        'flex flex-col gap-1.5',
+        'px-3 py-1.5',
         'bg-surface border-t border-text-primary/10',
         // Safe area for notched devices
-        'pb-[max(0.5rem,env(safe-area-inset-bottom))]',
+        'pb-[max(0.375rem,env(safe-area-inset-bottom))]',
         className
       )}
     >

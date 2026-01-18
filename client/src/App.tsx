@@ -779,8 +779,8 @@ function Header({
   const sessionDisplayText = sessionTime ? `${sessionPreview} · ${sessionTime}` : sessionPreview;
 
   return (
-    <header className="flex-shrink-0 px-4 py-2 border-b border-text-primary/10 bg-surface safe-top">
-      <div className="flex items-center justify-between gap-3">
+    <header className="flex-shrink-0 px-3 py-1.5 border-b border-text-primary/10 bg-surface safe-top">
+      <div className="flex items-center justify-between gap-2">
         {/* Left side: Project + Session */}
         <div className="flex flex-col min-w-0 flex-1 gap-0.5">
           {/* Project name row */}
@@ -939,13 +939,13 @@ interface FilesSubNavProps {
 
 function FilesSubNav({ activeView, onViewChange }: FilesSubNavProps) {
   return (
-    <div className="flex-shrink-0 px-4 py-2 border-b border-border bg-bg-secondary">
-      <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary">
+    <div className="flex-shrink-0 px-3 py-1.5 border-b border-border bg-bg-secondary">
+      <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-bg-tertiary">
         <button
           type="button"
           onClick={() => onViewChange('changed')}
           className={cn(
-            'flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+            'flex-1 px-2.5 py-1 rounded text-sm font-medium transition-colors',
             activeView === 'changed'
               ? 'bg-bg-primary text-text-primary shadow-sm'
               : 'text-text-muted hover:text-text-secondary'
@@ -958,7 +958,7 @@ function FilesSubNav({ activeView, onViewChange }: FilesSubNavProps) {
           type="button"
           onClick={() => onViewChange('all')}
           className={cn(
-            'flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+            'flex-1 px-2.5 py-1 rounded text-sm font-medium transition-colors',
             activeView === 'all'
               ? 'bg-bg-primary text-text-primary shadow-sm'
               : 'text-text-muted hover:text-text-secondary'
@@ -990,8 +990,8 @@ function TabBar({ activeTab, onTabChange, filesChangedCount }: TabBarProps) {
           type="button"
           onClick={() => onTabChange('conversation')}
           className={cn(
-            'flex flex-col items-center justify-center gap-1',
-            'flex-1 py-2 min-h-[56px]',
+            'flex flex-col items-center justify-center gap-0.5',
+            'flex-1 py-1.5 min-h-[48px]',
             'transition-colors duration-150',
             'focus:outline-none focus-visible:bg-text-primary/5',
             activeTab === 'conversation' ? 'text-accent' : 'text-text-muted'
@@ -1008,8 +1008,8 @@ function TabBar({ activeTab, onTabChange, filesChangedCount }: TabBarProps) {
           type="button"
           onClick={() => onTabChange('files')}
           className={cn(
-            'flex flex-col items-center justify-center gap-1',
-            'flex-1 py-2 min-h-[56px]',
+            'flex flex-col items-center justify-center gap-0.5',
+            'flex-1 py-1.5 min-h-[48px]',
             'transition-colors duration-150',
             'focus:outline-none focus-visible:bg-text-primary/5',
             activeTab === 'files' ? 'text-accent' : 'text-text-muted'

@@ -608,13 +608,6 @@ export function ConversationView({
             transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
           }}
         >
-          {/* Status indicator at top */}
-          {status && (
-            <div className="sticky top-0 z-10 px-4 py-2 bg-background/80 backdrop-blur-sm border-b border-text-primary/5">
-              <StatusBadge status={status} isRefreshing={isRefreshing || isValidating} />
-            </div>
-          )}
-
           {/* Messages */}
           <MessageList messages={messages} />
 
@@ -685,71 +678,6 @@ export function ConversationView({
           )}
           {toast.message}
         </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Status badge showing current session state
- */
-function StatusBadge({
-  status,
-  isRefreshing = false,
-}: {
-  status: 'working' | 'waiting' | 'idle';
-  isRefreshing?: boolean;
-}) {
-  const config = {
-    working: {
-      label: 'Working',
-      className: 'bg-working/10 text-working border-working/30',
-      dot: 'bg-working animate-pulse',
-    },
-    waiting: {
-      label: 'Waiting for input',
-      className: 'bg-success/10 text-success border-success/30',
-      dot: 'bg-success',
-    },
-    idle: {
-      label: 'Idle',
-      className: 'bg-text-muted/10 text-text-muted border-text-muted/30',
-      dot: 'bg-text-muted',
-    },
-  };
-
-  const { label, className, dot } = config[status];
-
-  return (
-    <div className="flex items-center gap-3">
-      <span
-        className={cn(
-          'inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium border',
-          className
-        )}
-      >
-        <span className={cn('w-1.5 h-1.5 rounded-full', dot)} />
-        {label}
-      </span>
-
-      {/* Refresh indicator */}
-      {isRefreshing && (
-        <span className="text-xs text-text-muted flex items-center gap-1.5">
-          <svg
-            className="w-3 h-3 animate-spin"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          Syncing
-        </span>
       )}
     </div>
   );

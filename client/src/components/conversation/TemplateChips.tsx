@@ -77,15 +77,15 @@ function TemplateChip({ template, onClick, disabled = false }: TemplateChipProps
       className={cn(
         // Base styling
         'flex-shrink-0',
-        'flex items-center gap-1.5',
-        'px-3 py-2',
-        'rounded-lg',
+        'flex items-center gap-1',
+        'px-2.5 py-1.5',
+        'rounded-md',
         'border',
         'text-sm font-medium',
         'whitespace-nowrap',
         'transition-colors duration-150',
-        // Min height for touch target (44px)
-        'min-h-[44px]',
+        // Min height for touch target (36px - slightly smaller but still tappable)
+        'min-h-[36px]',
         // Enabled state
         !disabled &&
           'bg-surface border-text-primary/10 text-text-primary hover:bg-text-primary/5 active:bg-text-primary/10 active:scale-[0.98]',
@@ -93,7 +93,7 @@ function TemplateChip({ template, onClick, disabled = false }: TemplateChipProps
         disabled && 'bg-text-primary/5 border-text-primary/5 text-text-muted cursor-not-allowed'
       )}
     >
-      <span className="text-base" aria-hidden="true">
+      <span className="text-sm" aria-hidden="true">
         {template.icon}
       </span>
       <span>{template.label}</span>
@@ -131,15 +131,14 @@ export function TemplateChips({
       className={cn(
         // Container styling
         'flex items-center',
-        'px-4 py-2',
+        'px-3 py-1.5',
         'bg-background',
-        'border-b border-text-primary/10',
         // Horizontal scroll
         'overflow-x-auto',
         // Hide scrollbar but keep functionality
         'scrollbar-hide',
         // Gap between chips
-        'gap-2',
+        'gap-1.5',
         className
       )}
     >
@@ -171,12 +170,11 @@ export function TemplateChipsSkeleton({ className }: { className?: string }) {
       className={cn(
         // Container styling (matches TemplateChips)
         'flex items-center',
-        'px-4 py-2',
+        'px-3 py-1.5',
         'bg-background',
-        'border-b border-text-primary/10',
         'overflow-x-auto',
         'scrollbar-hide',
-        'gap-2',
+        'gap-1.5',
         className
       )}
     >
@@ -186,7 +184,7 @@ export function TemplateChipsSkeleton({ className }: { className?: string }) {
           key={index}
           className={cn(
             'flex-shrink-0',
-            'h-[44px]',
+            'h-[36px]',
             'rounded-lg',
             'bg-text-primary/10',
             'animate-pulse'
