@@ -105,10 +105,14 @@ const subscribers: Set<BaseUrlSubscriber> = new Set();
  */
 export function setApiBaseUrl(baseUrl: string, mode: ApiEndpointMode = 'local'): void {
   const changed = currentBaseUrl !== baseUrl || currentMode !== mode;
+  const prevMode = currentMode;
   currentBaseUrl = baseUrl;
   currentMode = mode;
 
   if (changed) {
+    // Log mode changes
+    console.log(`[API] Mode changed: ${prevMode} → ${mode}, URL: ${baseUrl}`);
+
     // Notify subscribers
     subscribers.forEach((callback) => callback(baseUrl, mode));
   }
@@ -194,13 +198,33 @@ async function request<T>(
 
     // Handle error responses
     if (!response.ok) {
+      // Handle both our format and FastAPI format
+      // Our format: { error: { code, message, details } }
+      // FastAPI format: { detail: { error: { code, message } } } or { detail: "string" }
       const errorResponse = json as ApiErrorResponse;
-      throw new ApiError(
-        errorResponse.error?.message || 'An error occurred',
-        errorResponse.error?.code || 'UNKNOWN_ERROR',
-        response.status,
-        errorResponse.error?.details
-      );
+      const fastApiDetail = (json as { detail?: unknown }).detail;
+
+      let errorMessage = 'An error occurred';
+      let errorCode = 'UNKNOWN_ERROR';
+      let errorDetails: Record<string, string> | undefined;
+
+      if (errorResponse.error?.message) {
+        // Our standard format
+        errorMessage = errorResponse.error.message;
+        errorCode = errorResponse.error.code || errorCode;
+        errorDetails = errorResponse.error.details;
+      } else if (fastApiDetail) {
+        // FastAPI format
+        if (typeof fastApiDetail === 'string') {
+          errorMessage = fastApiDetail;
+        } else if (typeof fastApiDetail === 'object') {
+          const detail = fastApiDetail as { error?: { code?: string; message?: string } };
+          errorMessage = detail.error?.message || JSON.stringify(fastApiDetail);
+          errorCode = detail.error?.code || errorCode;
+        }
+      }
+
+      throw new ApiError(errorMessage, errorCode, response.status, errorDetails);
     }
 
     // Return the data from success response
@@ -269,6 +293,11 @@ export const api = {
     const baseUrl = options?.baseUrl ?? currentBaseUrl;
     const url = `${baseUrl}/api${path}`;
 
+    // Debug logging for cloud mode
+    if (currentMode === 'cloud') {
+      console.log('[API Upload] Cloud mode request:', { url, mode: currentMode, baseUrl });
+    }
+
     const fetchOptions: RequestInit = {
       method: 'POST',
       body: formData,
@@ -286,23 +315,55 @@ export const api = {
     try {
       const response = await fetch(url, fetchOptions);
 
+      // Debug logging for cloud mode
+      if (currentMode === 'cloud') {
+        console.log('[API Upload] Response:', { status: response.status, ok: response.ok });
+      }
+
       // Parse JSON response
       const json = await response.json();
 
       // Handle error responses
       if (!response.ok) {
+        // Handle both our format and FastAPI format
         const errorResponse = json as ApiErrorResponse;
-        throw new ApiError(
-          errorResponse.error?.message || 'Upload failed',
-          errorResponse.error?.code || 'UPLOAD_ERROR',
-          response.status,
-          errorResponse.error?.details
-        );
+        const fastApiDetail = (json as { detail?: unknown }).detail;
+
+        let errorMessage = 'Upload failed';
+        let errorCode = 'UPLOAD_ERROR';
+        let errorDetails: Record<string, string> | undefined;
+
+        if (errorResponse.error?.message) {
+          errorMessage = errorResponse.error.message;
+          errorCode = errorResponse.error.code || errorCode;
+          errorDetails = errorResponse.error.details;
+        } else if (fastApiDetail) {
+          if (typeof fastApiDetail === 'string') {
+            errorMessage = fastApiDetail;
+          } else if (typeof fastApiDetail === 'object') {
+            const detail = fastApiDetail as { error?: { code?: string; message?: string } };
+            errorMessage = detail.error?.message || JSON.stringify(fastApiDetail);
+            errorCode = detail.error?.code || errorCode;
+          }
+        }
+
+        // Debug logging for cloud mode errors
+        if (currentMode === 'cloud') {
+          console.error('[API Upload] Error:', { errorMessage, errorCode, json });
+        }
+
+        throw new ApiError(errorMessage, errorCode, response.status, errorDetails);
       }
 
       // Return the data from success response
       const successResponse = json as ApiSuccessResponse<T>;
       return successResponse.data;
+    } catch (err) {
+      // Log fetch errors in cloud mode
+      if (currentMode === 'cloud' && !(err instanceof ApiError)) {
+        console.error('[API Upload] Fetch error:', err);
+      }
+      throw err;
     } finally {
       if (timeoutId) {
         clearTimeout(timeoutId);
