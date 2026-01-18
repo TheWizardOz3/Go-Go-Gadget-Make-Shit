@@ -327,7 +327,7 @@ export function useSendPrompt(
             success: false,
             mode: 'cloud',
             errorMessage:
-              'Cloud execution requires repository URL and project name. Configure in Settings → Serverless.',
+              'Cloud mode requires git repository info. Connect to laptop once to refresh project cache.',
           };
           setError(new Error(result.errorMessage));
           setLastResult(result);

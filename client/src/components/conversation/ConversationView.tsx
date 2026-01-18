@@ -71,7 +71,7 @@ export function ConversationView({
   // Pass cloud options from project's git remote URL for automatic cloud execution
   const cloudOptions =
     gitRemoteUrl && projectName ? { repoUrl: gitRemoteUrl, projectName } : undefined;
-  const { sendPrompt, isSending } = useSendPrompt(sessionId, cloudOptions);
+  const { sendPromptAdvanced, isSending } = useSendPrompt(sessionId, cloudOptions);
   const { stopAgent, isStopping } = useStopAgent(sessionId);
   const { templates, isLoading: templatesLoading } = useTemplates(encodedPath);
 
@@ -264,13 +264,16 @@ export function ConversationView({
    */
   const handleSend = useCallback(
     async (prompt: string) => {
-      const success = await sendPrompt(prompt);
-      if (success) {
+      const result = await sendPromptAdvanced(prompt);
+      if (result.success) {
         // Scroll to bottom after a short delay to allow for UI update
         setTimeout(() => scrollToBottom('smooth'), 100);
+      } else if (result.errorMessage) {
+        // Show error to user
+        setToast({ message: result.errorMessage, type: 'error' });
       }
     },
-    [sendPrompt, scrollToBottom]
+    [sendPromptAdvanced, scrollToBottom]
   );
 
   /**
