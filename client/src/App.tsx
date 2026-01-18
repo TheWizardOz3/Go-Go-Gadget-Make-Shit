@@ -307,11 +307,18 @@ function AppMain() {
   // When sessions load, try to restore from localStorage or auto-select most recent
   // Skip auto-selection when in "new session" mode (user explicitly wants blank conversation)
   // Auto-selected sessions are marked as NOT user-selected (for cloud mode behavior)
+  // CRITICAL: Never override sessions that were explicitly selected by user (sessionWasUserSelected)
   useEffect(() => {
     if (!sessions || sessions.length === 0) return;
 
     // Don't auto-select when user clicked "New Session"
     if (isNewSessionMode) return;
+
+    // NEVER override a user-selected session, even if it's not in the list yet
+    // This prevents race conditions where cloud sessions take a moment to appear
+    if (sessionWasUserSelected && selectedSession) {
+      return;
+    }
 
     if (selectedSession) {
       // Validate that selected session still exists
@@ -339,7 +346,7 @@ function AppMain() {
     });
     setSelectedSession(sorted[0].id);
     setSessionWasUserSelected(false); // Auto-selected, not user-selected
-  }, [sessions, selectedSession, selectedProject, isNewSessionMode]);
+  }, [sessions, selectedSession, selectedProject, isNewSessionMode, sessionWasUserSelected]);
 
   // Persist selected session to localStorage when it changes
   useEffect(() => {

@@ -7,6 +7,7 @@
 
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/cn';
+import { api } from '@/lib/api';
 import { debugLog } from '@/lib/debugLog';
 import { useConversation } from '@/hooks/useConversation';
 import { useSendPrompt } from '@/hooks/useSendPrompt';
@@ -120,10 +121,16 @@ export function ConversationView({
   // State for creating new session
   const [isStartingNewSession, setIsStartingNewSession] = useState(false);
 
-  // State for pending cloud job (shows loading UI while job runs)
+  // State for pending cloud job (shows FULL-SCREEN loading UI for NEW sessions)
   const [pendingCloudJob, setPendingCloudJob] = useState<{
     jobId: string;
     prompt: string;
+  } | null>(null);
+
+  // State for pending follow-up cloud job (shows INLINE indicator for existing sessions)
+  // This allows the conversation to remain visible while processing
+  const [pendingFollowUp, setPendingFollowUp] = useState<{
+    jobId: string;
   } | null>(null);
 
   /**
@@ -208,6 +215,43 @@ export function ConversationView({
     setPendingCloudJob(null);
     setToast({ message: error, type: 'error' });
   }, []);
+
+  /**
+   * Poll for follow-up cloud job completion (inline indicator mode)
+   * When complete, clears the indicator and refreshes messages
+   */
+  useEffect(() => {
+    if (!pendingFollowUp) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        debugLog.info('Polling follow-up job status', { jobId: pendingFollowUp.jobId });
+        const response = await api.get<{
+          jobId: string;
+          status: string;
+          result?: { sessionId?: string; success?: boolean };
+        }>(`/cloud/jobs/${pendingFollowUp.jobId}`);
+
+        if (response.status === 'completed') {
+          debugLog.info('Follow-up job completed', { result: response.result });
+          setPendingFollowUp(null);
+          // Refresh messages - they should now include the new response
+          refresh();
+          setToast({ message: 'Claude responded', type: 'info' });
+        } else if (response.status === 'failed' || response.status === 'unknown') {
+          debugLog.error('Follow-up job failed', { status: response.status });
+          setPendingFollowUp(null);
+          setToast({ message: 'Failed to process message', type: 'error' });
+        }
+        // Still running - continue polling
+      } catch (err) {
+        debugLog.error('Error polling follow-up job', { error: err });
+        // Don't clear on network error - keep trying
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [pendingFollowUp, refresh]);
 
   /**
    * Handle template selection - insert text at cursor position
@@ -356,7 +400,10 @@ export function ConversationView({
   }, [pullDistance, isRefreshing, refresh]);
 
   /**
-   * Handle sending a prompt
+   * Handle sending a prompt (for existing sessions)
+   *
+   * In cloud mode, this dispatches a job but shows an INLINE indicator
+   * instead of full-screen CloudJobPending (that's only for NEW sessions).
    */
   const handleSend = useCallback(
     async (prompt: string) => {
@@ -378,13 +425,13 @@ export function ConversationView({
       });
 
       if (result.success) {
-        // If this is a cloud job, show pending state with job ID
         if (result.mode === 'cloud' && result.jobId) {
-          debugLog.info('Setting pendingCloudJob state', { jobId: result.jobId });
-          setPendingCloudJob({
+          // For EXISTING sessions: show inline indicator, NOT full-screen loading
+          // The conversation remains visible while processing
+          debugLog.info('Setting pendingFollowUp state (inline indicator)', {
             jobId: result.jobId,
-            prompt: trimmedPrompt,
           });
+          setPendingFollowUp({ jobId: result.jobId });
           return;
         }
 
@@ -647,16 +694,24 @@ export function ConversationView({
         <TemplateChips
           templates={templates}
           onSelect={handleTemplateSelect}
-          disabled={status === 'working'}
+          disabled={status === 'working' || !!pendingFollowUp}
         />
       ) : null}
+
+      {/* Inline indicator for pending follow-up cloud job */}
+      {pendingFollowUp && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-accent/5 border-t border-accent/20">
+          <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+          <span className="text-sm text-accent">Claude is thinking...</span>
+        </div>
+      )}
 
       {/* Prompt input */}
       <PromptInput
         onSend={handleSend}
-        isSending={isSending}
-        disabled={status === 'working'}
-        status={status}
+        isSending={isSending || !!pendingFollowUp}
+        disabled={status === 'working' || !!pendingFollowUp}
+        status={pendingFollowUp ? 'working' : status}
         onStop={handleStop}
         isStopping={isStopping}
         insertText={textToInsert}
