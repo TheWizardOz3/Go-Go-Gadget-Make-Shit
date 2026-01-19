@@ -73,6 +73,7 @@
   }
 
   body {
+    /* Use surface color so safe-area blends with tab bar */
     @apply bg-surface text-text-primary;
     font-family:
       'SF Pro Display',
@@ -93,15 +94,17 @@
 
   /* React root container - fill the fixed body */
   #root {
-    height: 100%;
-    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     overflow: hidden;
   }
 
-  /* Fallback for h-dvh on older browsers */
+  /* h-dvh should use 100% when inside fixed container */
   .h-dvh {
-    height: 100vh; /* Fallback */
-    height: 100dvh; /* Modern browsers - accounts for iOS Safari address bar */
+    height: 100%;
   }
 
   /*

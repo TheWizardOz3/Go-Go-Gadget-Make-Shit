@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-18 (V1.1 Cloud Mode Polish complete, v0.23.0)
+**Last Updated**: 2026-01-18 (V1.5 Dashboard Framework planned)
 
 ---
 
@@ -70,34 +70,7 @@
 
 ---
 
-## Next Milestone: V1 - Floating Voice & Async Execution
-
-**Functionality Summary**: Persistent voice recording across views, push notifications, and serverless execution.
-
-### V1 Build Order
-
-| Order | Feature                        | Status     | Description                                                                       |
-|-------|--------------------------------|------------|-----------------------------------------------------------------------------------|
-| 1     | Floating Voice Button          | ✅ Complete | Persistent mic across views; record while browsing file tree                      |
-| 2     | Notification Abstraction Layer | ✅ Complete | Extract iMessage into pluggable abstraction for all channels                      |
-| 3     | ntfy Notifications             | ✅ Complete | Push notifications via ntfy.sh - [doc](Features/ntfy-notifications.md)            |
-| 4     | Serverless/Async Execution     | ✅ Complete | Run agents without laptop awake (Modal) - [doc](Features/serverless-execution.md) |
-
-### Dependency Notes
-- **Floating Voice Button** is independent (no backend dependencies beyond existing voice infrastructure)
-- **Notification Abstraction** must precede ntfy (ntfy builds on the abstraction)
-- **Serverless** benefits from notifications being complete (remote task completion alerts)
-
-### Technical Scope
-- SharedPromptContext for syncing prompt text between views
-- FloatingVoiceButton component with long-press-to-send gesture
-- Notification channel abstraction layer - [doc](Features/notification-abstraction-layer.md)
-- NtfyChannel class with HTTP POST to ntfy.sh - [doc](Features/ntfy-notifications.md)
-- Modal cloud compute + Vercel app hosting - [doc](Features/serverless-execution.md)
-
----
-
-## V1 Progress - COMPLETE ✅
+## V1 - Floating Voice & Async Execution ✅ COMPLETE
 
 **Test Count: 726 tests** (423 client + 303 server)
 
@@ -115,17 +88,65 @@
 
 **Completed**: 2026-01-18 (v0.23.0)
 
-| Feature/Task                    | Completion Date | Notes                                                                            |
-|---------------------------------|-----------------|----------------------------------------------------------------------------------|
-| Cloud session continuation      | 2026-01-18      | Messages to existing sessions continue the conversation, not create new ones     |
-| ntfy notifications from cloud   | 2026-01-18      | Push notifications when Modal jobs complete                                      |
-| Cloud job pending UI            | 2026-01-18      | Loading animation with stages while jobs execute                                 |
-| Persistent debug logging        | 2026-01-18      | `localStorage` logs for debugging cloud mode without DevTools                    |
-| File tree caching               | 2026-01-18      | Cached trees for offline viewing, faster navigation                              |
-| Unified UI for local/cloud      | 2026-01-18      | Same experience regardless of connection mode                                    |
-| Cloud sessions endpoint         | 2026-01-18      | `/api/cloud/sessions` scans Modal volume for actual sessions                     |
-| Modal transcription endpoint    | 2026-01-18      | `/api/transcribe` for voice input in cloud mode                                  |
-| Multiple cloud mode bug fixes   | 2026-01-18      | Path mismatches, URL parsing, endpoint routing, error handling                   |
+| Feature/Task                  | Completion Date | Notes                                                                        |
+|-------------------------------|-----------------|------------------------------------------------------------------------------|
+| Cloud session continuation    | 2026-01-18      | Messages to existing sessions continue the conversation, not create new ones |
+| ntfy notifications from cloud | 2026-01-18      | Push notifications when Modal jobs complete                                  |
+| Cloud job pending UI          | 2026-01-18      | Loading animation with stages while jobs execute                             |
+| Persistent debug logging      | 2026-01-18      | `localStorage` logs for debugging cloud mode without DevTools                |
+| File tree caching             | 2026-01-18      | Cached trees for offline viewing, faster navigation                          |
+| Unified UI for local/cloud    | 2026-01-18      | Same experience regardless of connection mode                                |
+| Cloud sessions endpoint       | 2026-01-18      | `/api/cloud/sessions` scans Modal volume for actual sessions                 |
+| Modal transcription endpoint  | 2026-01-18      | `/api/transcribe` for voice input in cloud mode                              |
+| Multiple cloud mode bug fixes | 2026-01-18      | Path mismatches, URL parsing, endpoint routing, error handling               |
+
+---
+
+## Next Milestone: V1.5 - Dashboard Framework
+
+**Functionality Summary:** A flexible dashboard framework within GoGoGadgetClaude where Claude Code generates self-contained dashboard configs with embedded data, rendered as visualizations in the app.
+
+### Architecture Summary
+
+- **Data model:** Dashboard configs are self-contained JSON with embedded data (no file references at render time)
+- **Storage:** `~/.gogogadgetclaude/dashboards/` (local) + Modal volume (cloud)
+- **Refresh:** Re-run prompt to regenerate dashboard with fresh data
+- **Widgets:** MetricCard, Table, List, BarChart, LineChart, PieChart
+- **Future:** Database integration for real-time data (out of scope for V1.5)
+
+### V1.5 Build Order
+
+| Order | Feature                        | Status  | Description                                                      |
+|-------|--------------------------------|---------|------------------------------------------------------------------|
+| 1     | Dashboard Schema & Types       | Pending | TypeScript types for configs, widgets, embedded data structures  |
+| 2     | Dashboard Storage Service      | Pending | CRUD operations for configs in `~/.gogogadgetclaude/dashboards/` |
+| 3     | Dashboard API Endpoints        | Pending | REST endpoints: list, get, create, update, delete dashboards     |
+| 4     | Dashboard Renderer Core        | Pending | Main component that reads config and dispatches to widgets       |
+| 5     | Basic Widget Components        | Pending | MetricCard, Table, List — simpler widgets first                  |
+| 6     | Dashboard View                 | Pending | New tab/view in the app to display dashboards                    |
+| 7     | Dashboard Switcher             | Pending | UI to navigate between multiple dashboards                       |
+| 8     | Chart Widgets                  | Pending | BarChart, LineChart, PieChart using Recharts                     |
+| 9     | Cloud Dashboard Support        | Pending | Modal endpoints for dashboard storage (mirrors local)            |
+| 10    | Schema Reference Documentation | Pending | Doc for Claude Code to generate valid dashboard configs          |
+
+### Deferred to Future
+
+| Feature                  | Reason                                      |
+|--------------------------|---------------------------------------------|
+| Calendar Widget          | More complex date handling, month views     |
+| Database Integration     | Real-time data queries — future enhancement |
+| Dashboard Sharing/Export | Nice-to-have, not core                      |
+
+### Technical Scope
+
+- Dashboard config JSON schema with embedded data
+- Dashboard storage service (local filesystem)
+- REST API endpoints for dashboard CRUD
+- Widget component library (6 widget types)
+- Dashboard rendering engine
+- Recharts integration for charts
+- Modal volume storage for cloud mode
+- Schema reference documentation for Claude Code
 
 ---
 
@@ -173,20 +194,18 @@
 
 ## Future Milestones
 
-### V1.2: Model Control & Notification Channels
-**Functionality Summary**: Multiple notification channels and model control from mobile
+### V1.6: Model Control & Advanced Widgets
+**Functionality Summary**: Model switching from mobile UI and additional dashboard widgets
 
 **Key Features:**
 - Claude model picker (change models from mobile UI)
-- Notification channel abstraction layer
-- Slack webhook notifications
-- Telegram bot notifications
+- Calendar widget for date-based visualizations
+- Dashboard data refresh improvements
 
 **Technical Scope:**
 - Claude CLI model switching integration
-- Notification channel abstraction layer
-- Slack webhook integration
-- Telegram bot setup
+- Calendar widget component
+- Enhanced refresh mechanisms
 
 ---
 
@@ -214,10 +233,13 @@
 ---
 
 ### Long-Term / Future Considerations
-| Feature/Capability          | Rationale                | Tentative Timeline |
-|-----------------------------|--------------------------|--------------------|
-| Command history & favorites | Power user convenience   | V2+                |
-| iPad optimization           | Better tablet experience | V2+                |
+| Feature/Capability           | Rationale                            | Tentative Timeline |
+|------------------------------|--------------------------------------|--------------------|
+| Dashboard database backend   | Real-time data queries, live updates | V2+                |
+| Dashboard sharing/export     | Share dashboards as images or links  | V2+                |
+| Command history & favorites  | Power user convenience               | V2+                |
+| iPad optimization            | Better tablet experience             | V2+                |
+| Slack/Telegram notifications | Additional notification channels     | V2+                |
 
 ---
 
