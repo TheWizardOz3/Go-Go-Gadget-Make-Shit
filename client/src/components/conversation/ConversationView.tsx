@@ -534,12 +534,30 @@ export function ConversationView({
   const isCloudAutoSelected = currentMode === 'cloud' && !sessionWasUserSelected && sessionId;
   const shouldShowEmptyState = !pendingSessionId && (!sessionId || isCloudAutoSelected);
 
+  // Debug logging to trace empty state logic
+  debugLog.info('ConversationView: empty state check', {
+    sessionId: sessionId?.slice(0, 8) || null,
+    sessionWasUserSelected,
+    currentMode,
+    isCloudAutoSelected,
+    pendingSessionId: pendingSessionId?.slice(0, 8) || null,
+    shouldShowEmptyState,
+  });
+
   // No session selected (or cloud mode with auto-selected session) - show "new conversation" UI
   if (shouldShowEmptyState) {
     // If no project is selected, show basic empty state
     if (!projectPath) {
       return (
         <div className={cn('flex flex-col', className)}>
+          {/* Cloud repo banner - even in empty state, show pending changes */}
+          {projectName && gitRemoteUrl && (
+            <CloudRepoBanner
+              projectName={projectName}
+              gitRemoteUrl={gitRemoteUrl}
+              onViewChanges={onViewChanges}
+            />
+          )}
           <div className="flex-1 flex items-center justify-center">
             <EmptyState
               title="No session selected"
@@ -553,6 +571,15 @@ export function ConversationView({
     // Project is selected - show new conversation UI
     return (
       <div className={cn('flex flex-col', className)}>
+        {/* Cloud repo banner - even in empty state, show pending changes */}
+        {projectName && gitRemoteUrl && (
+          <CloudRepoBanner
+            projectName={projectName}
+            gitRemoteUrl={gitRemoteUrl}
+            onViewChanges={onViewChanges}
+          />
+        )}
+
         {/* Empty conversation area with prompt to start */}
         <div className="flex-1 flex flex-col items-center justify-center px-4">
           <div className="mb-6 text-center">
