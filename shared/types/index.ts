@@ -387,6 +387,8 @@ export interface CloudJobDispatchRequest {
   allowedTools?: string[];
   /** Webhook URL for completion notification */
   notificationWebhook?: string;
+  /** Optional image attachment */
+  imageAttachment?: ImageAttachment;
 }
 
 /** Cloud job information */
@@ -479,6 +481,23 @@ export interface CloudCostEstimate {
   /** Warning message if applicable */
   warning?: string;
 }
+
+// =============================================================================
+// Image Attachment Types (for prompt attachments)
+// =============================================================================
+
+/** Image attachment for prompts (MVP: single image only) */
+export interface ImageAttachment {
+  /** Original filename */
+  filename: string;
+  /** MIME type (image/png, image/jpeg, image/webp) */
+  mimeType: string;
+  /** Base64-encoded image content (without data URL prefix) */
+  base64: string;
+}
+
+/** Max image size: 5MB */
+export const IMAGE_ATTACHMENT_MAX_SIZE = 5 * 1024 * 1024;
 
 // =============================================================================
 // Settings Types

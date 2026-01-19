@@ -17,8 +17,15 @@ const router: RouterType = Router();
 // Validation Schemas
 // ============================================================
 
+const imageAttachmentSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+  base64: z.string().min(1),
+});
+
 const sendPromptSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required').max(50000, 'Prompt too long'),
+  imageAttachment: imageAttachmentSchema.optional(),
 });
 
 const newSessionSchema = z.object({
@@ -270,7 +277,7 @@ router.post('/:id/send', validateRequest({ body: sendPromptSchema }), async (req
     // route definition it's always a string. Cast to ensure TypeScript is happy.
     const id = req.params.id as string;
     // Body is validated by sendPromptSchema, so prompt is guaranteed to be a string
-    const { prompt } = req.body as z.infer<typeof sendPromptSchema>;
+    const { prompt, imageAttachment } = req.body as z.infer<typeof sendPromptSchema>;
 
     // Get session to find project path
     const session = await getSession(id);
@@ -284,6 +291,7 @@ router.post('/:id/send', validateRequest({ body: sendPromptSchema }), async (req
       sessionId: id,
       projectPath: session.projectPath,
       prompt,
+      imageAttachment,
     });
 
     if (!result.success) {

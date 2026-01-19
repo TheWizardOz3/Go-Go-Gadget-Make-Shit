@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.25.0 | 2026-01-19 | minor | Image Attachments - attach screenshots to prompts in local and cloud modes |
 | 0.24.0 | 2026-01-18 | minor | Persistent Repo Volumes - repos persist across containers, explicit push |
 | 0.23.0 | 2026-01-18 | minor | Cloud Mode Polish - session continuation, ntfy notifications, debug logging |
 | 0.21.5 | 2026-01-17 | patch | Cloud prompt input - send prompts from cached projects |
@@ -58,6 +59,36 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.25.0] - 2026-01-19
+
+### Summary
+**Image Attachments** - Attach a screenshot or image to your prompts for visual context. Works in both local and cloud (Modal) execution modes.
+
+### Added
+- **Attach button** in PromptInput — Tap to select an image (PNG, JPG, WebP)
+- **Image preview** with remove button before sending
+- **Local mode support** — Image saved to temp file, referenced via `@filepath` in prompt
+- **Cloud mode support** — Image sent as base64 to Modal, processed the same way
+- **5MB file size limit** enforced on client
+
+### Technical Details
+- `ImageAttachment` type added to shared types
+- `claudeService.ts` saves base64 to `/tmp/gogogadget-<uuid>.png`, prepends `@path` to prompt
+- Modal `execute_prompt` handles `image_attachment` parameter identically
+- Temp files cleaned up after Claude process exits
+
+### Files Changed
+- `shared/types/index.ts` — New `ImageAttachment` interface
+- `server/src/api/sessions.ts` — Accept `imageAttachment` in send prompt
+- `server/src/services/claudeService.ts` — Temp file handling, cleanup
+- `server/src/api/cloud.ts` — Accept `imageAttachment` in dispatch job
+- `server/src/services/modalClient.ts` — Pass to Modal
+- `modal/modal_app.py` — Handle `image_attachment` parameter
+- `client/src/components/conversation/PromptInput.tsx` — Attach UI
+- `client/src/hooks/useSendPrompt.ts` — Accept `ImageAttachment` parameter
 
 ---
 

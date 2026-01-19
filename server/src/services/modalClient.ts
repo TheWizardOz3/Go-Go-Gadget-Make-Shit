@@ -326,6 +326,7 @@ export async function dispatchJob(request: CloudJobDispatchRequest): Promise<Dis
   logger.info('Dispatching job to Modal', {
     projectName: request.projectName,
     promptLength: request.prompt.length,
+    hasImageAttachment: !!request.imageAttachment,
   });
 
   try {
@@ -337,6 +338,13 @@ export async function dispatchJob(request: CloudJobDispatchRequest): Promise<Dis
         project_name: request.projectName,
         allowed_tools: request.allowedTools,
         notification_webhook: request.notificationWebhook,
+        image_attachment: request.imageAttachment
+          ? {
+              filename: request.imageAttachment.filename,
+              mimeType: request.imageAttachment.mimeType,
+              base64: request.imageAttachment.base64,
+            }
+          : undefined,
       },
       timeout: DISPATCH_TIMEOUT,
     });

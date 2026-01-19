@@ -68,12 +68,19 @@ const router: RouterType = Router();
 // Validation Schemas
 // ============================================================
 
+const imageAttachmentSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+  base64: z.string().min(1),
+});
+
 const dispatchJobSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required').max(50000, 'Prompt too long'),
   repoUrl: z.string().url('Must be a valid git URL'),
   projectName: z.string().min(1, 'Project name is required').max(100, 'Project name too long'),
   allowedTools: z.array(z.string()).optional(),
   notificationWebhook: z.string().url().optional(),
+  imageAttachment: imageAttachmentSchema.optional(),
 });
 
 // ============================================================
@@ -150,14 +157,14 @@ router.get('/health', async (_req, res) => {
  */
 router.post('/jobs', validateRequest({ body: dispatchJobSchema }), async (req, res) => {
   try {
-    const { prompt, repoUrl, projectName, allowedTools, notificationWebhook } = req.body as z.infer<
-      typeof dispatchJobSchema
-    >;
+    const { prompt, repoUrl, projectName, allowedTools, notificationWebhook, imageAttachment } =
+      req.body as z.infer<typeof dispatchJobSchema>;
 
     logger.info('Dispatching cloud job', {
       projectName,
       repoUrl: repoUrl.replace(/\/\/[^@]+@/, '//***@'), // Mask credentials in logs
       promptLength: prompt.length,
+      hasImageAttachment: !!imageAttachment,
     });
 
     // Check if Modal is configured
@@ -191,6 +198,7 @@ router.post('/jobs', validateRequest({ body: dispatchJobSchema }), async (req, r
       projectName,
       allowedTools,
       notificationWebhook: webhookUrl,
+      imageAttachment,
     });
 
     if (!result.success) {

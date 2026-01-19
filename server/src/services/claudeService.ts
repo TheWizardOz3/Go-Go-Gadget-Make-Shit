@@ -7,11 +7,15 @@
  */
 
 import path from 'node:path';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import crypto from 'node:crypto';
 import { execa } from 'execa';
 import { logger } from '../lib/logger.js';
 import { trackProcess, untrackProcess, getActiveProcess } from './processManager.js';
 import { sendTaskCompleteNotification } from './notificationService.js';
 import { getSettings } from './settingsService.js';
+import type { ImageAttachment } from '../../../shared/types/index.js';
 
 // ============================================================
 // Types
@@ -24,6 +28,8 @@ export interface SendPromptOptions {
   projectPath: string;
   /** The prompt text to send */
   prompt: string;
+  /** Optional image attachment */
+  imageAttachment?: ImageAttachment;
 }
 
 export interface SendPromptResult {
@@ -95,22 +101,59 @@ export interface StopAgentResult {
  * @returns Result indicating success and the process ID
  */
 export async function sendPrompt(options: SendPromptOptions): Promise<SendPromptResult> {
-  const { sessionId, projectPath, prompt } = options;
+  const { sessionId, projectPath, prompt, imageAttachment } = options;
 
   logger.info('Sending prompt to Claude', {
     sessionId,
     projectPath,
     promptLength: prompt.length,
+    hasImage: !!imageAttachment,
   });
+
+  // If there's an image attachment, save it to a temp file
+  let tempImagePath: string | null = null;
+  if (imageAttachment) {
+    try {
+      const ext = imageAttachment.mimeType.split('/')[1] || 'png';
+      const filename = `gogogadget-${crypto.randomUUID()}.${ext}`;
+      tempImagePath = path.join(os.tmpdir(), filename);
+
+      // Decode base64 and write to temp file
+      const imageBuffer = Buffer.from(imageAttachment.base64, 'base64');
+      await fs.writeFile(tempImagePath, imageBuffer);
+
+      logger.debug('Saved image attachment to temp file', {
+        sessionId,
+        tempImagePath,
+        size: imageBuffer.length,
+      });
+    } catch (err) {
+      logger.error('Failed to save image attachment', {
+        sessionId,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+      return {
+        success: false,
+        error: 'Failed to process image attachment',
+      };
+    }
+  }
 
   try {
     // Check settings for allowEdits flag
     const settings = await getSettings();
     const allowEdits = settings.allowEdits ?? false;
 
+    // Build the prompt - include image reference if present
+    // Claude CLI uses @filepath syntax to include files
+    let finalPrompt = prompt;
+    if (tempImagePath) {
+      finalPrompt = `@${tempImagePath}\n\n${prompt}`;
+    }
+
     // Build args: -p for prompt, --continue for existing session
     // If allowEdits is true, add --dangerously-skip-permissions to auto-approve actions
-    const args = ['-p', prompt, '--continue'];
+    const args = ['-p', finalPrompt, '--continue'];
     if (allowEdits) {
       args.push('--dangerously-skip-permissions');
     }
@@ -119,6 +162,7 @@ export async function sendPrompt(options: SendPromptOptions): Promise<SendPrompt
       sessionId,
       allowEdits,
       argsCount: args.length,
+      hasImageRef: !!tempImagePath,
     });
 
     // Spawn claude command
@@ -149,6 +193,16 @@ export async function sendPrompt(options: SendPromptOptions): Promise<SendPrompt
         });
         untrackProcess(sessionId);
 
+        // Clean up temp image file if it exists
+        if (tempImagePath) {
+          fs.unlink(tempImagePath).catch((err) => {
+            logger.warn('Failed to clean up temp image file', {
+              tempImagePath,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
+
         // Send notification when Claude completes successfully
         if (code === 0) {
           const projectName = path.basename(projectPath);
@@ -168,6 +222,13 @@ export async function sendPrompt(options: SendPromptOptions): Promise<SendPrompt
           error: err.message,
         });
         untrackProcess(sessionId);
+
+        // Clean up temp image file if it exists
+        if (tempImagePath) {
+          fs.unlink(tempImagePath).catch(() => {
+            // Ignore cleanup errors on process error
+          });
+        }
       });
     }
 

@@ -233,6 +233,7 @@ def execute_prompt(
     allowed_tools: list[str] | None = None,
     notification_webhook: str | None = None,
     ntfy_topic: str | None = None,
+    image_attachment: dict[str, str] | None = None,  # {filename, mimeType, base64}
 ) -> dict[str, Any]:
     """
     Execute a Claude prompt on a git repository.
@@ -269,6 +270,30 @@ def execute_prompt(
     print(f"  notification_webhook: {notification_webhook}")
     print(f"  allowed_tools: {allowed_tools}")
     print(f"  work_dir: {work_dir} (persistent volume)")
+    print(f"  has_image_attachment: {image_attachment is not None}")
+
+    # Handle image attachment - save to temp file and prepend to prompt
+    temp_image_path = None
+    final_prompt = prompt
+    if image_attachment:
+        try:
+            import base64
+            mime_type = image_attachment.get("mimeType", "image/png")
+            ext = mime_type.split("/")[1] if "/" in mime_type else "png"
+            temp_image_path = f"/tmp/gogogadget-{uuid.uuid4()}.{ext}"
+            
+            # Decode base64 and write to temp file
+            image_data = base64.b64decode(image_attachment["base64"])
+            with open(temp_image_path, "wb") as f:
+                f.write(image_data)
+            
+            print(f"  Saved image attachment to: {temp_image_path} ({len(image_data)} bytes)")
+            
+            # Prepend image reference to prompt using @filepath syntax
+            final_prompt = f"@{temp_image_path}\n\n{prompt}"
+        except Exception as e:
+            print(f"  Failed to save image attachment: {e}")
+            # Continue without the image
 
     # Use existing session ID or generate new one
     is_continuation = session_id is not None
@@ -369,7 +394,7 @@ def execute_prompt(
             )
 
         # Build the Claude command
-        cmd = ["claude", "-p", prompt]
+        cmd = ["claude", "-p", final_prompt]
 
         # If continuing an existing session, add --continue flag
         if is_continuation:
@@ -385,7 +410,7 @@ def execute_prompt(
         print(f"Using allowed tools: {tools_to_use}")
 
         # Run Claude in the repo directory
-        print(f"Running Claude with prompt: {prompt[:100]}...")
+        print(f"Running Claude with prompt: {final_prompt[:100]}...")
         result = subprocess.run(
             cmd,
             cwd=str(work_dir),
@@ -400,6 +425,14 @@ def execute_prompt(
         print(f"Claude finished with return code: {result.returncode}")
         if not success:
             print(f"Claude stderr: {result.stderr[:500] if result.stderr else '(empty)'}")
+
+        # Clean up temp image file
+        if temp_image_path:
+            try:
+                os.remove(temp_image_path)
+                print(f"Cleaned up temp image: {temp_image_path}")
+            except Exception as e:
+                print(f"Failed to clean up temp image: {e}")
 
         # Commit the session data volume
         volume.commit()
@@ -1108,6 +1141,12 @@ web_app.add_middleware(
 )
 
 
+class ImageAttachment(BaseModel):
+    filename: str
+    mimeType: str
+    base64: str
+
+
 class DispatchJobRequest(BaseModel):
     prompt: str
     repoUrl: str
@@ -1116,6 +1155,7 @@ class DispatchJobRequest(BaseModel):
     allowedTools: list[str] | None = None
     notificationWebhook: str | None = None
     ntfyTopic: str | None = None  # ntfy topic for push notifications
+    imageAttachment: ImageAttachment | None = None  # Optional image attachment
 
 
 @web_app.get("/api/status")
@@ -1193,6 +1233,7 @@ async def api_dispatch_job(request: DispatchJobRequest):
         allowed_tools=request.allowedTools,
         notification_webhook=request.notificationWebhook,
         ntfy_topic=request.ntfyTopic,
+        image_attachment=request.imageAttachment.model_dump() if request.imageAttachment else None,
     )
 
     return {

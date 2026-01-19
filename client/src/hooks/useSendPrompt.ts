@@ -12,7 +12,7 @@
 import { useState, useCallback } from 'react';
 import { api, ApiError, getApiMode } from '@/lib/api';
 import { debugLog } from '@/lib/debugLog';
-import type { ApiEndpointMode, CloudJobStatus } from '@shared/types';
+import type { ApiEndpointMode, CloudJobStatus, ImageAttachment } from '@shared/types';
 
 // ============================================================
 // Types
@@ -94,29 +94,37 @@ export interface UseSendPromptReturn {
   /**
    * Send a prompt to the current session (local mode)
    * @param prompt - The prompt text to send
+   * @param imageAttachment - Optional image attachment
    * @returns True if sent successfully, false otherwise
    */
-  sendPrompt: (prompt: string) => Promise<boolean>;
+  sendPrompt: (prompt: string, imageAttachment?: ImageAttachment) => Promise<boolean>;
 
   /**
    * Send a prompt with full control over mode and options
    * Returns detailed result including mode used and job ID
    * @param prompt - The prompt text to send
    * @param options - Cloud execution options (required for cloud mode)
+   * @param imageAttachment - Optional image attachment
    * @returns Detailed send result
    */
   sendPromptAdvanced: (
     prompt: string,
-    options?: CloudExecutionOptions
+    options?: CloudExecutionOptions,
+    imageAttachment?: ImageAttachment
   ) => Promise<SendPromptResult>;
 
   /**
    * Dispatch a prompt directly to cloud execution
    * @param prompt - The prompt text to send
    * @param options - Cloud execution options
+   * @param imageAttachment - Optional image attachment
    * @returns Job ID if successful, null otherwise
    */
-  dispatchCloudJob: (prompt: string, options: CloudExecutionOptions) => Promise<string | null>;
+  dispatchCloudJob: (
+    prompt: string,
+    options: CloudExecutionOptions,
+    imageAttachment?: ImageAttachment
+  ) => Promise<string | null>;
 
   /** Whether a prompt is currently being sent */
   isSending: boolean;
@@ -177,9 +185,13 @@ export function useSendPrompt(
    * Dispatch a job to cloud execution
    */
   const dispatchCloudJob = useCallback(
-    async (prompt: string, options: CloudExecutionOptions): Promise<string | null> => {
+    async (
+      prompt: string,
+      options: CloudExecutionOptions,
+      imageAttachment?: ImageAttachment
+    ): Promise<string | null> => {
       const trimmedPrompt = prompt.trim();
-      if (!trimmedPrompt) {
+      if (!trimmedPrompt && !imageAttachment) {
         setError(new Error('Prompt cannot be empty'));
         return null;
       }
@@ -203,6 +215,7 @@ export function useSendPrompt(
           projectName: options.projectName,
           sessionId: options.sessionId || '(new session)',
           ntfyTopic: options.ntfyTopic || '(not configured)',
+          hasImageAttachment: !!imageAttachment,
         });
 
         const response = await api.post<CloudDispatchResponse>('/cloud/jobs', {
@@ -213,6 +226,7 @@ export function useSendPrompt(
           allowedTools: options.allowedTools,
           notificationWebhook: options.notificationWebhook,
           ntfyTopic: options.ntfyTopic,
+          imageAttachment,
         });
 
         debugLog.info('Cloud job dispatched successfully', {
@@ -321,8 +335,12 @@ export function useSendPrompt(
    * Send a prompt locally to the current session
    */
   const sendPromptLocal = useCallback(
-    async (prompt: string): Promise<SendPromptResult> => {
-      debugLog.info('sendPromptLocal called', { sessionId, promptLen: prompt.length });
+    async (prompt: string, imageAttachment?: ImageAttachment): Promise<SendPromptResult> => {
+      debugLog.info('sendPromptLocal called', {
+        sessionId,
+        promptLen: prompt.length,
+        hasImageAttachment: !!imageAttachment,
+      });
 
       if (!sessionId) {
         // If no session, try to create one with the localSessionOptions
@@ -343,7 +361,7 @@ export function useSendPrompt(
       }
 
       const trimmedPrompt = prompt.trim();
-      if (!trimmedPrompt) {
+      if (!trimmedPrompt && !imageAttachment) {
         const result: SendPromptResult = {
           success: false,
           mode: 'local',
@@ -360,10 +378,12 @@ export function useSendPrompt(
       try {
         debugLog.info('sendPromptLocal: Sending to API', {
           endpoint: `/sessions/${sessionId}/send`,
+          hasImage: !!imageAttachment,
         });
 
         const response = await api.post<LocalSendPromptResponse>(`/sessions/${sessionId}/send`, {
           prompt: trimmedPrompt,
+          imageAttachment,
         });
 
         debugLog.info('sendPromptLocal: Success', { responseSessionId: response.sessionId });
@@ -406,7 +426,11 @@ export function useSendPrompt(
    * Falls back to cloud if local fails due to network issues
    */
   const sendPromptAdvanced = useCallback(
-    async (prompt: string, options?: CloudExecutionOptions): Promise<SendPromptResult> => {
+    async (
+      prompt: string,
+      options?: CloudExecutionOptions,
+      imageAttachment?: ImageAttachment
+    ): Promise<SendPromptResult> => {
       // Get current API mode from the global api module
       const currentMode = getApiMode();
       debugLog.info('sendPromptAdvanced called', {
@@ -414,6 +438,7 @@ export function useSendPrompt(
         sessionId,
         hasOptions: !!options,
         promptLen: prompt.length,
+        hasImageAttachment: !!imageAttachment,
       });
 
       // Don't allow concurrent sends
@@ -427,7 +452,7 @@ export function useSendPrompt(
       }
 
       const trimmedPrompt = prompt.trim();
-      if (!trimmedPrompt) {
+      if (!trimmedPrompt && !imageAttachment) {
         const result: SendPromptResult = {
           success: false,
           mode: 'local',
@@ -470,7 +495,7 @@ export function useSendPrompt(
         setIsSending(true);
         setError(null);
 
-        const jobId = await dispatchCloudJob(trimmedPrompt, cloudOptions);
+        const jobId = await dispatchCloudJob(trimmedPrompt, cloudOptions, imageAttachment);
         // dispatchCloudJob already sets state, just need to return result
         const result: SendPromptResult = jobId
           ? { success: true, mode: 'cloud', jobId }
@@ -481,7 +506,7 @@ export function useSendPrompt(
 
       // Local mode - send to session
       debugLog.info('sendPromptAdvanced: Local mode - calling sendPromptLocal');
-      return sendPromptLocal(trimmedPrompt);
+      return sendPromptLocal(trimmedPrompt, imageAttachment);
     },
     [isSending, defaultCloudOptions, dispatchCloudJob, sendPromptLocal, error, sessionId]
   );
@@ -491,13 +516,13 @@ export function useSendPrompt(
    * Just sends the prompt and returns success/failure boolean
    */
   const sendPrompt = useCallback(
-    async (prompt: string): Promise<boolean> => {
+    async (prompt: string, imageAttachment?: ImageAttachment): Promise<boolean> => {
       // Don't allow concurrent sends
       if (isSending) {
         return false;
       }
 
-      const result = await sendPromptAdvanced(prompt);
+      const result = await sendPromptAdvanced(prompt, undefined, imageAttachment);
       return result.success;
     },
     [isSending, sendPromptAdvanced]

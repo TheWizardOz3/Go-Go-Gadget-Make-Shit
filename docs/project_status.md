@@ -84,6 +84,16 @@
 
 ---
 
+## V1.2 Progress - Image Attachments ✅
+
+**Completed**: 2026-01-19 (v0.25.0)
+
+| Feature/Task       | Completion Date | Notes                                                           |
+|--------------------|-----------------|------------------------------------------------------------------|
+| Image Attachments  | 2026-01-19      | Attach screenshots to prompts, works in local and cloud modes   |
+
+---
+
 ## V1.1 Progress - Cloud Mode Polish ✅
 
 **Completed**: 2026-01-18 (v0.23.0)

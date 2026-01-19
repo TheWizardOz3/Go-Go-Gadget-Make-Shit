@@ -13,11 +13,12 @@ import { VoiceButton } from './VoiceButton';
 import { Waveform } from './Waveform';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useSharedPrompt } from '@/contexts/SharedPromptContext';
-import type { SessionStatus } from '@shared/types';
+import type { SessionStatus, ImageAttachment } from '@shared/types';
+import { IMAGE_ATTACHMENT_MAX_SIZE } from '@shared/types';
 
 interface PromptInputProps {
-  /** Callback when user sends a prompt */
-  onSend: (prompt: string) => void;
+  /** Callback when user sends a prompt (with optional image attachment) */
+  onSend: (prompt: string, imageAttachment?: ImageAttachment) => void;
   /** Whether a prompt is currently being sent */
   isSending?: boolean;
   /** External disable (e.g., when Claude is working) */
@@ -90,6 +91,11 @@ export function PromptInput({
     }
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Image attachment state
+  const [imageAttachment, setImageAttachment] = useState<ImageAttachment | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   // Track if we've initialized from localStorage (to avoid overwriting on first render)
   const hasInitializedRef = useRef(false);
@@ -212,8 +218,60 @@ export function PromptInput({
 
   // Trim value to check if it's empty (whitespace-only counts as empty)
   const hasContent = value.trim().length > 0;
+  const hasImage = imageAttachment !== null;
   const isDisabled = disabled || isSending || isStarting || isRecording || isProcessing;
-  const canSend = hasContent && !isDisabled;
+  const canSend = (hasContent || hasImage) && !isDisabled;
+
+  /**
+   * Handle file selection for image attachment
+   */
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      alert('Please select a PNG, JPG, or WebP image.');
+      return;
+    }
+
+    // Validate file size
+    if (file.size > IMAGE_ATTACHMENT_MAX_SIZE) {
+      alert(`Image too large. Max size is ${IMAGE_ATTACHMENT_MAX_SIZE / 1024 / 1024}MB.`);
+      return;
+    }
+
+    // Read file as base64
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // Extract base64 content (remove data:image/xxx;base64, prefix)
+      const base64 = dataUrl.split(',')[1];
+
+      setImageAttachment({
+        filename: file.name,
+        mimeType: file.type,
+        base64,
+      });
+      setImagePreviewUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
+
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
+  }, []);
+
+  /**
+   * Remove the attached image
+   */
+  const handleRemoveImage = useCallback(() => {
+    setImageAttachment(null);
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+      setImagePreviewUrl(null);
+    }
+  }, [imagePreviewUrl]);
 
   /**
    * Auto-resize textarea based on content
@@ -266,9 +324,17 @@ export function PromptInput({
     if (!canSend) return;
 
     const trimmedValue = value.trim();
-    onSend(trimmedValue);
+    onSend(trimmedValue, imageAttachment ?? undefined);
     setValue('');
     setPromptText(''); // Clear shared context
+
+    // Clear image attachment
+    if (imageAttachment) {
+      setImageAttachment(null);
+      if (imagePreviewUrl) {
+        setImagePreviewUrl(null);
+      }
+    }
 
     // Clear localStorage draft
     try {
@@ -281,19 +347,25 @@ export function PromptInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = `${MIN_HEIGHT}px`;
     }
-  }, [canSend, value, onSend, setPromptText]);
+  }, [canSend, value, onSend, setPromptText, imageAttachment, imagePreviewUrl]);
 
   // Handle send request from FloatingVoiceButton (long-press to send)
   useEffect(() => {
-    if (shouldSend && hasContent) {
+    if (shouldSend && (hasContent || hasImage)) {
       // Clear the request flag first to prevent re-triggering
       clearSendRequest();
 
       // Send the prompt
       const trimmedValue = value.trim();
-      onSend(trimmedValue);
+      onSend(trimmedValue, imageAttachment ?? undefined);
       setValue('');
       setPromptText('');
+
+      // Clear image attachment
+      if (imageAttachment) {
+        setImageAttachment(null);
+        setImagePreviewUrl(null);
+      }
 
       // Clear localStorage draft
       try {
@@ -310,7 +382,16 @@ export function PromptInput({
       // No content to send, just clear the flag
       clearSendRequest();
     }
-  }, [shouldSend, hasContent, value, onSend, setPromptText, clearSendRequest]);
+  }, [
+    shouldSend,
+    hasContent,
+    hasImage,
+    value,
+    imageAttachment,
+    onSend,
+    setPromptText,
+    clearSendRequest,
+  ]);
 
   /**
    * Handle keyboard events for submit
@@ -364,11 +445,90 @@ export function PromptInput({
         className
       )}
     >
+      {/* Image preview - shown when an image is attached */}
+      {imagePreviewUrl && (
+        <div className="relative inline-flex self-start mb-1">
+          <img
+            src={imagePreviewUrl}
+            alt="Attached"
+            className="h-16 w-auto rounded-lg object-cover border border-text-primary/10"
+          />
+          <button
+            type="button"
+            onClick={handleRemoveImage}
+            className={cn(
+              'absolute -top-1.5 -right-1.5',
+              'w-5 h-5 rounded-full',
+              'bg-red-500 text-white',
+              'flex items-center justify-center',
+              'hover:bg-red-600 active:bg-red-700',
+              'transition-colors'
+            )}
+            aria-label="Remove image"
+          >
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={3}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Waveform visualization - only shown when recording */}
       {isRecording && <Waveform audioStream={audioStream} />}
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={handleFileSelect}
+        className="hidden"
+        aria-hidden="true"
+      />
+
       {/* Input row with larger buttons and increased gap */}
       <div className="flex items-end gap-3">
+        {/* Attach button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isDisabled || hasImage}
+          aria-label="Attach image"
+          className={cn(
+            'flex-shrink-0',
+            'flex items-center justify-center',
+            'w-11 h-11',
+            'rounded-xl',
+            'transition-colors duration-150',
+            // Enabled state
+            !isDisabled &&
+              !hasImage &&
+              'bg-text-primary/5 text-text-muted hover:bg-text-primary/10 active:bg-text-primary/15',
+            // Disabled state
+            (isDisabled || hasImage) && 'bg-text-primary/5 text-text-primary/20 cursor-not-allowed'
+          )}
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+            />
+          </svg>
+        </button>
+
         {/* Text input */}
         <div className="relative flex-1">
           <textarea
