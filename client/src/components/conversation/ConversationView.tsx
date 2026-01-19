@@ -7,7 +7,7 @@
 
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/cn';
-import { api } from '@/lib/api';
+import { api, getApiMode } from '@/lib/api';
 import { debugLog } from '@/lib/debugLog';
 import { useConversation } from '@/hooks/useConversation';
 import { useSendPrompt } from '@/hooks/useSendPrompt';
@@ -508,8 +508,15 @@ export function ConversationView({
     );
   }
 
-  // No session selected - show "new conversation" UI if project is selected
-  if (!sessionId) {
+  // Determine if we should show empty state:
+  // 1. No session selected at all
+  // 2. In cloud mode with auto-selected session (user hasn't explicitly chosen one)
+  const currentMode = getApiMode();
+  const isCloudAutoSelected = currentMode === 'cloud' && !sessionWasUserSelected && sessionId;
+  const shouldShowEmptyState = !sessionId || isCloudAutoSelected;
+
+  // No session selected (or cloud mode with auto-selected session) - show "new conversation" UI
+  if (shouldShowEmptyState) {
     // If no project is selected, show basic empty state
     if (!projectPath) {
       return (

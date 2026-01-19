@@ -369,17 +369,20 @@ def execute_prompt(
             )
 
         # Build the Claude command
-        # --dangerously-skip-permissions is required for headless execution
-        # Without it, Claude will hang waiting for user to approve tool calls
-        cmd = ["claude", "-p", prompt, "--dangerously-skip-permissions"]
+        cmd = ["claude", "-p", prompt]
 
         # If continuing an existing session, add --continue flag
         if is_continuation:
             cmd.extend(["--continue", session_id])
             print(f"Using --continue with session: {session_id}")
 
-        if allowed_tools:
-            cmd.extend(["--allowedTools", ",".join(allowed_tools)])
+        # Use --allowedTools to grant permissions for headless execution
+        # Note: --dangerously-skip-permissions doesn't work with root (Modal runs as root)
+        # These tools cover typical file editing and task operations
+        default_tools = ["Read", "Write", "Edit", "Bash", "Task", "WebSearch", "TodoRead", "TodoWrite"]
+        tools_to_use = allowed_tools if allowed_tools else default_tools
+        cmd.extend(["--allowedTools", ",".join(tools_to_use)])
+        print(f"Using allowed tools: {tools_to_use}")
 
         # Run Claude in the repo directory
         print(f"Running Claude with prompt: {prompt[:100]}...")

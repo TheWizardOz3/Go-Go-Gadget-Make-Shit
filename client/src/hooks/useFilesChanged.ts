@@ -58,9 +58,15 @@ export function useFilesChanged(encodedPath: string | null): UseFilesChangedRetu
   const mode = getApiMode();
   const isCloudMode = mode === 'cloud';
 
-  // Get cached data for cloud mode
+  // In cloud mode, DON'T use cached files from local sessions - they're misleading
+  // Cloud mode shows git changes via the CloudRepoBanner instead
+  // Keeping this commented out for reference if we want session-specific file tracking later
   const cachedFiles = useMemo(() => {
-    if (!encodedPath || !isCloudMode) return undefined;
+    // Disabled in cloud mode - cached files are from LOCAL sessions, not current cloud session
+    // In cloud mode, use the CloudRepoBanner to see pending git changes
+    if (isCloudMode) return undefined;
+
+    if (!encodedPath) return undefined;
     const cached = getCachedFilesChanged(encodedPath);
     if (!cached) return undefined;
     // Convert cached format back to FileChange format
