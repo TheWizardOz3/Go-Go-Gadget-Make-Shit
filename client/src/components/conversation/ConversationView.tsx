@@ -193,6 +193,9 @@ export function ConversationView({
     [projectPath, isStartingNewSession, onNewSessionStarted, sendPromptAdvanced]
   );
 
+  // Track the session we're waiting for (to prevent showing empty state during transition)
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+
   /**
    * Handle cloud job completion
    * Passes the cloud session ID to the parent so it can be selected directly
@@ -200,10 +203,22 @@ export function ConversationView({
   const handleCloudJobComplete = useCallback(
     (cloudSessionId?: string) => {
       debugLog.info('handleCloudJobComplete called', { cloudSessionId });
-      setPendingCloudJob(null);
+
+      if (cloudSessionId) {
+        // Store the session ID we're transitioning to - prevents showing empty state
+        setPendingSessionId(cloudSessionId);
+      }
+
       // Pass the cloud session ID to parent for direct selection
       // This avoids polling for local sessions which won't include cloud sessions
       onNewSessionStarted?.(cloudSessionId);
+
+      // Clear the job loading state after a short delay
+      // This gives React time to propagate the new session props
+      setTimeout(() => {
+        setPendingCloudJob(null);
+        setPendingSessionId(null);
+      }, 200);
     },
     [onNewSessionStarted]
   );
@@ -511,9 +526,10 @@ export function ConversationView({
   // Determine if we should show empty state:
   // 1. No session selected at all
   // 2. In cloud mode with auto-selected session (user hasn't explicitly chosen one)
+  // BUT: Don't show empty state if we're transitioning to a new session (pendingSessionId)
   const currentMode = getApiMode();
   const isCloudAutoSelected = currentMode === 'cloud' && !sessionWasUserSelected && sessionId;
-  const shouldShowEmptyState = !sessionId || isCloudAutoSelected;
+  const shouldShowEmptyState = !pendingSessionId && (!sessionId || isCloudAutoSelected);
 
   // No session selected (or cloud mode with auto-selected session) - show "new conversation" UI
   if (shouldShowEmptyState) {
