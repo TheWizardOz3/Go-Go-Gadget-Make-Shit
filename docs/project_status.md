@@ -88,9 +88,9 @@
 
 **Completed**: 2026-01-19 (v0.25.0)
 
-| Feature/Task       | Completion Date | Notes                                                           |
-|--------------------|-----------------|------------------------------------------------------------------|
-| Image Attachments  | 2026-01-19      | Attach screenshots to prompts, works in local and cloud modes   |
+| Feature/Task      | Completion Date | Notes                                                         |
+|-------------------|-----------------|---------------------------------------------------------------|
+| Image Attachments | 2026-01-19      | Attach screenshots to prompts, works in local and cloud modes |
 
 ---
 

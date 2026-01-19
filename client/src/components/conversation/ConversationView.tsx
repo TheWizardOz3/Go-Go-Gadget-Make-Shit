@@ -24,6 +24,7 @@ import { PromptInput } from './PromptInput';
 import { TemplateChips, TemplateChipsSkeleton } from './TemplateChips';
 import { CloudJobPending } from './CloudJobPending';
 import { CloudRepoBanner } from './CloudRepoBanner';
+import type { ImageAttachment } from '@shared/types';
 
 interface ConversationViewProps {
   /** Session ID to load conversation for */
@@ -141,8 +142,12 @@ export function ConversationView({
    * In cloud mode, uses sendPromptAdvanced which dispatches to /cloud/jobs
    */
   const handleStartNewSession = useCallback(
-    async (prompt: string) => {
-      debugLog.info('handleStartNewSession called', { projectPath, prompt: prompt.slice(0, 50) });
+    async (prompt: string, imageAttachment?: ImageAttachment) => {
+      debugLog.info('handleStartNewSession called', {
+        projectPath,
+        prompt: prompt.slice(0, 50),
+        hasImageAttachment: !!imageAttachment,
+      });
 
       if (!projectPath || isStartingNewSession) {
         debugLog.warn('handleStartNewSession aborted', { projectPath, isStartingNewSession });
@@ -150,13 +155,13 @@ export function ConversationView({
       }
 
       const trimmedPrompt = prompt.trim();
-      if (!trimmedPrompt) return false;
+      if (!trimmedPrompt && !imageAttachment) return false;
 
       setIsStartingNewSession(true);
 
       try {
         // Use sendPromptAdvanced which handles cloud mode automatically
-        const result = await sendPromptAdvanced(trimmedPrompt);
+        const result = await sendPromptAdvanced(trimmedPrompt, undefined, imageAttachment);
 
         debugLog.info('handleStartNewSession result', {
           success: result.success,
@@ -432,7 +437,7 @@ export function ConversationView({
    * - If cloudOptions.sessionId is undefined: Show FULL-SCREEN loader (new session)
    */
   const handleSend = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, imageAttachment?: ImageAttachment) => {
       const trimmedPrompt = prompt.trim();
       const isCloudContinuation = !!cloudOptions?.sessionId;
 
@@ -443,9 +448,10 @@ export function ConversationView({
         hasCloudOptions: !!cloudOptions,
         cloudSessionIdInOptions: cloudOptions?.sessionId || '(none)',
         isCloudContinuation,
+        hasImageAttachment: !!imageAttachment,
       });
 
-      const result = await sendPromptAdvanced(trimmedPrompt);
+      const result = await sendPromptAdvanced(trimmedPrompt, undefined, imageAttachment);
       debugLog.info('sendPromptAdvanced result', {
         success: result.success,
         mode: result.mode,
