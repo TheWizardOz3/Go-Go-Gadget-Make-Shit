@@ -3,6 +3,7 @@
  *
  * This banner appears in cloud mode when there are unpushed changes in the
  * persistent repo volume. Users must explicitly push changes to GitHub.
+ * Banner is STICKY so it's always visible when there are unpushed changes.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -15,11 +16,18 @@ interface CloudRepoBannerProps {
   projectName: string;
   /** Git remote URL (used for pushing) */
   gitRemoteUrl: string;
+  /** Callback to view changes in the Files tab diff viewer */
+  onViewChanges?: () => void;
   /** Additional CSS classes */
   className?: string;
 }
 
-export function CloudRepoBanner({ projectName, gitRemoteUrl, className }: CloudRepoBannerProps) {
+export function CloudRepoBanner({
+  projectName,
+  gitRemoteUrl,
+  onViewChanges,
+  className,
+}: CloudRepoBannerProps) {
   const { checkChanges, pushChanges, pendingChanges, isChecking, isPushing } = useCloudRepo();
   const [isExpanded, setIsExpanded] = useState(false);
   const [pushResult, setPushResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -60,7 +68,16 @@ export function CloudRepoBanner({ projectName, gitRemoteUrl, className }: CloudR
   const commitCount = pendingChanges.commitCount || 0;
 
   return (
-    <div className={cn('bg-amber-500/10 border-b border-amber-500/20', 'px-3 py-2', className)}>
+    <div
+      className={cn(
+        // Sticky positioning - always visible at top when scrolling
+        'sticky top-0 z-20',
+        'bg-amber-500/10 border-b border-amber-500/20',
+        'backdrop-blur-sm',
+        'px-3 py-2',
+        className
+      )}
+    >
       {/* Main banner row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
@@ -81,11 +98,19 @@ export function CloudRepoBanner({ projectName, gitRemoteUrl, className }: CloudR
             </svg>
           </div>
 
-          {/* Text */}
-          <div className="min-w-0">
+          {/* Text + View Changes link */}
+          <div className="min-w-0 flex items-center gap-2">
             <p className="text-sm font-medium text-amber-700 dark:text-amber-400 truncate">
               {commitCount} unpushed commit{commitCount !== 1 ? 's' : ''}
             </p>
+            {onViewChanges && (
+              <button
+                onClick={onViewChanges}
+                className="text-xs text-amber-600 dark:text-amber-300 underline hover:text-amber-700 dark:hover:text-amber-200"
+              >
+                View diff
+              </button>
+            )}
           </div>
 
           {/* Expand button */}

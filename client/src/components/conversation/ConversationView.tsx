@@ -44,6 +44,8 @@ interface ConversationViewProps {
    * For local sessions, no sessionId is passed (caller should poll).
    */
   onNewSessionStarted?: (cloudSessionId?: string) => void;
+  /** Callback to view changes (switches to Files tab) */
+  onViewChanges?: () => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -62,6 +64,7 @@ export function ConversationView({
   projectName,
   gitRemoteUrl,
   onNewSessionStarted,
+  onViewChanges,
   className,
 }: ConversationViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -690,7 +693,11 @@ export function ConversationView({
     <div className={cn('flex flex-col', className)}>
       {/* Cloud repo banner - shows pending changes and push button */}
       {projectName && gitRemoteUrl && (
-        <CloudRepoBanner projectName={projectName} gitRemoteUrl={gitRemoteUrl} />
+        <CloudRepoBanner
+          projectName={projectName}
+          gitRemoteUrl={gitRemoteUrl}
+          onViewChanges={onViewChanges}
+        />
       )}
 
       {/* Messages area */}

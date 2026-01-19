@@ -436,7 +436,11 @@ def execute_prompt(
                     )
 
                     # Create commit locally (but do NOT push)
-                    commit_msg = f"Cloud session: {session_id[:8]}\n\nPrompt: {prompt[:100]}..."
+                    # Use the user's prompt as the commit message (truncated for git)
+                    # Format: First 50 chars of prompt as subject, full prompt in body
+                    prompt_clean = prompt.strip().replace('\n', ' ')
+                    subject = prompt_clean[:50] + ('...' if len(prompt_clean) > 50 else '')
+                    commit_msg = f"{subject}\n\nFull prompt: {prompt_clean[:500]}\n\nCloud session: {session_id[:8]}"
                     commit_result = subprocess.run(
                         ["git", "commit", "-m", commit_msg],
                         cwd=str(work_dir),

@@ -456,6 +456,7 @@ function AppMain() {
             projectPath={currentProject?.path}
             projectName={currentProject?.name}
             gitRemoteUrl={currentProject?.gitRemoteUrl}
+            onViewChanges={() => setActiveTab('files')}
             onNewSessionStarted={async (cloudSessionId?: string) => {
               // If a cloud session ID is provided, select it directly
               // This is the case for cloud mode where we know the exact session ID
