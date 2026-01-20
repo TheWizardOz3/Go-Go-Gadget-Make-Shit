@@ -11,6 +11,7 @@ import {
   getScheduleDescription,
   formatNextRun,
   formatLastExecution,
+  isPromptMissed,
 } from '@/hooks/useScheduledPrompts';
 
 interface ScheduledPromptListItemProps {
@@ -22,6 +23,8 @@ interface ScheduledPromptListItemProps {
   onDelete: (id: string) => void;
   /** Callback when edit is clicked */
   onEdit: (prompt: ScheduledPrompt) => void;
+  /** Callback when run now is clicked */
+  onRunNow: (id: string) => void;
   /** Whether an action is in progress */
   isLoading?: boolean;
 }
@@ -111,6 +114,17 @@ function TrashIcon({ className }: { className?: string }) {
 }
 
 /**
+ * Play icon for run now button
+ */
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg className={cn('h-4 w-4', className)} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+/**
  * Toggle switch component
  */
 function ToggleSwitch({
@@ -166,12 +180,14 @@ export function ScheduledPromptListItem({
   onToggle,
   onDelete,
   onEdit,
+  onRunNow,
   isLoading,
 }: ScheduledPromptListItemProps) {
   const scheduleDesc = getScheduleDescription(prompt);
   const nextRun = formatNextRun(prompt.nextRunAt);
   const lastExec = formatLastExecution(prompt);
   const projectName = getProjectName(prompt.projectPath);
+  const isMissed = isPromptMissed(prompt);
 
   return (
     <div
@@ -275,9 +291,31 @@ export function ScheduledPromptListItem({
         </span>
       </div>
 
-      {/* Bottom row: next run + last execution */}
+      {/* Bottom row: next run + last execution OR run now button if missed */}
       <div className="flex items-center justify-between text-xs text-text-muted">
-        <span>Next: {nextRun}</span>
+        {isMissed ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRunNow(prompt.id);
+            }}
+            disabled={isLoading}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg',
+              'bg-warning/20 text-warning font-medium',
+              'hover:bg-warning/30 active:bg-warning/40',
+              'transition-colors duration-150',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-warning',
+              isLoading && 'opacity-50 cursor-not-allowed'
+            )}
+          >
+            <PlayIcon />
+            Run Now (Missed)
+          </button>
+        ) : (
+          <span>Next: {nextRun}</span>
+        )}
         {lastExec && (
           <span
             className={cn(

@@ -432,9 +432,13 @@ export async function startScheduler(): Promise<void> {
       if (registerCronJob(prompt)) {
         registered++;
 
-        // Update next run time (this will skip past any missed times)
-        const nextRunAt = calculateNextRunAt(prompt);
-        await updateNextRunAt(prompt.id, nextRunAt);
+        // Only update next run time if NOT missed (preserve missed state for UI)
+        const isMissed = prompt.nextRunAt && new Date(prompt.nextRunAt) < new Date();
+        if (!isMissed) {
+          const nextRunAt = calculateNextRunAt(prompt);
+          await updateNextRunAt(prompt.id, nextRunAt);
+        }
+        // If missed, keep the old nextRunAt so UI shows "any moment" / missed state
       }
     }
 

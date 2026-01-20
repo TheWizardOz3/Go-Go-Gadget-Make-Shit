@@ -173,7 +173,8 @@ export function ScheduledPromptsPanel({
   className,
 }: ScheduledPromptsPanelProps) {
   const modalRef = useRef<HTMLDivElement>(null);
-  const { prompts, isLoading, error, refresh, togglePrompt, deletePrompt } = useScheduledPrompts();
+  const { prompts, isLoading, error, refresh, togglePrompt, deletePrompt, runPrompt } =
+    useScheduledPrompts();
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   // Handle escape key to close modal
@@ -227,6 +228,17 @@ export function ScheduledPromptsPanel({
     setActionInProgress(id);
     try {
       await deletePrompt(id);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // Handle run now for missed prompts
+  const handleRunNow = async (id: string) => {
+    setActionInProgress(id);
+    try {
+      await runPrompt(id);
+      // Optionally show a toast notification here
     } finally {
       setActionInProgress(null);
     }
@@ -333,6 +345,7 @@ export function ScheduledPromptsPanel({
                   onToggle={handleToggle}
                   onDelete={handleDelete}
                   onEdit={onEdit}
+                  onRunNow={handleRunNow}
                   isLoading={actionInProgress === prompt.id}
                 />
               ))}

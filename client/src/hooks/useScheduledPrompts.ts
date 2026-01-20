@@ -24,6 +24,14 @@ export type { ScheduledPrompt, ScheduledPromptInput, ScheduleType };
 /**
  * Return type for useScheduledPrompts hook
  */
+/** Result of running a prompt manually */
+export interface RunPromptResult {
+  executed: boolean;
+  promptId: string;
+  timestamp: string;
+  message: string;
+}
+
 export interface UseScheduledPromptsReturn {
   /** Array of scheduled prompts */
   prompts: ScheduledPrompt[] | undefined;
@@ -41,6 +49,8 @@ export interface UseScheduledPromptsReturn {
   deletePrompt: (id: string) => Promise<void>;
   /** Toggle a prompt's enabled state */
   togglePrompt: (id: string) => Promise<ScheduledPrompt>;
+  /** Manually run a prompt now */
+  runPrompt: (id: string) => Promise<RunPromptResult>;
 }
 
 // ============================================================
@@ -153,6 +163,21 @@ export function useScheduledPrompts(): UseScheduledPromptsReturn {
     [mutate]
   );
 
+  /**
+   * Manually run a prompt now
+   */
+  const runPrompt = useCallback(
+    async (id: string): Promise<RunPromptResult> => {
+      const result = await api.post<RunPromptResult>(`/scheduled-prompts/${id}/run`, {});
+
+      // Refresh data to get updated lastExecution and nextRunAt
+      await mutate();
+
+      return result;
+    },
+    [mutate]
+  );
+
   return {
     prompts: data,
     isLoading,
@@ -162,6 +187,7 @@ export function useScheduledPrompts(): UseScheduledPromptsReturn {
     updatePrompt,
     deletePrompt,
     togglePrompt,
+    runPrompt,
   };
 }
 
@@ -211,6 +237,14 @@ export function getScheduleDescription(prompt: ScheduledPrompt): string {
 }
 
 /**
+ * Check if a prompt was missed (nextRunAt is in the past)
+ */
+export function isPromptMissed(prompt: ScheduledPrompt): boolean {
+  if (!prompt.nextRunAt || !prompt.enabled) return false;
+  return new Date(prompt.nextRunAt) < new Date();
+}
+
+/**
  * Format the next run time for display
  */
 export function formatNextRun(nextRunAt: string | undefined): string {
@@ -220,8 +254,8 @@ export function formatNextRun(nextRunAt: string | undefined): string {
   const now = new Date();
   const diffMs = next.getTime() - now.getTime();
 
-  // If in the past, say "any moment"
-  if (diffMs < 0) return 'Any moment';
+  // If in the past, it was missed
+  if (diffMs < 0) return 'Missed - tap to run';
 
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
