@@ -93,15 +93,14 @@ export interface UseApiEndpointReturn {
  * Uses AbortController for timeout handling.
  */
 async function checkLaptopAvailability(laptopUrl: string): Promise<boolean> {
-  if (!laptopUrl) {
-    return false;
-  }
+  // If laptopUrl is empty, check same origin (for production builds served by Express)
+  const checkUrl = laptopUrl || '';
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), LAPTOP_CHECK_TIMEOUT);
 
   try {
-    const response = await fetch(`${laptopUrl}/api/status`, {
+    const response = await fetch(`${checkUrl}/api/status`, {
       method: 'GET',
       signal: controller.signal,
       // Don't send credentials - this is just a connectivity check

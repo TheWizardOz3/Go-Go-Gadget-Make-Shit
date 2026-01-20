@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-20 (Context Continuation - continue sessions across environments)
+**Last Updated**: 2026-01-20 (v0.28.1 - Cloud session selection bug fixes)
 
 ---
 
@@ -100,7 +100,7 @@
 
 ## V1.5 Progress - Context Continuation ✅
 
-**Completed**: 2026-01-20 (v0.28.0)
+**Completed**: 2026-01-20 (v0.28.0, v0.28.1)
 
 | Feature/Task                   | Completion Date | Notes                                                            |
 |--------------------------------|-----------------|------------------------------------------------------------------|
@@ -109,6 +109,13 @@
 | "Continue in..." action        | 2026-01-20      | Button on session list items to continue in opposite environment |
 | Cross-environment continuation | 2026-01-20      | Fetches context and injects as preamble for new session          |
 | Modal cloud endpoint           | 2026-01-20      | `/api/sessions/{session_id}/context-summary` for cloud sessions  |
+| **Bug fixes (v0.28.1)**        | 2026-01-20      | Cloud session selection, Modal API endpoints, same-origin check  |
+
+### v0.28.1 Bug Fixes
+
+- **Cloud session messages not loading**: `useConversation` now routes to cloud API for cloud sessions
+- **Modal API endpoint mismatch**: Updated `modalClient.ts` to use correct FastAPI paths
+- **Production build same-origin check**: Fixed `useApiEndpoint` to check same origin for production builds
 
 ---
 

@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.1 | 2026-01-20 | patch | Cloud session selection fixes - viewing cloud sessions from unified list |
 | 0.28.0 | 2026-01-20 | minor | Context Continuation - continue sessions across environments |
 | 0.27.0 | 2026-01-19 | minor | Unified session visibility - merge local and cloud sessions |
 | 0.26.0 | 2026-01-19 | minor | Cloud-based scheduled prompts via Modal, edit prompt functionality |
@@ -62,6 +63,31 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.1] - 2026-01-20
+
+### Summary
+**Cloud Session Selection Fixes** - Bug fixes for selecting and viewing cloud sessions from the unified session list.
+
+### Fixed
+- **Cloud session messages not loading** - `useConversation` hook now correctly routes to `/api/cloud/sessions/:id/messages` when viewing cloud sessions
+- **Modal API endpoint mismatch** - Updated `modalClient.ts` to use correct FastAPI paths (`/api/projects`, `/api/cloud/jobs`, etc.)
+- **Production build same-origin check** - Fixed `useApiEndpoint` to check same origin when running production build served by Express (empty laptopUrl)
+- **Modal response schema parsing** - Fixed response parsing to handle `data` wrapper in Modal API responses
+
+### Changed
+- `useConversation` hook now accepts `sessionSource` parameter to determine API routing
+- `ConversationView` and `App.tsx` updated to pass session source through component hierarchy
+- `modalClient.ts` updated all endpoint paths to match Modal's FastAPI structure
+
+### Technical Details
+- Modified `client/src/hooks/useConversation.ts` - Dynamic endpoint selection based on session source
+- Modified `client/src/components/conversation/ConversationView.tsx` - Accept and use `sessionSource` prop
+- Modified `client/src/App.tsx` - Derive `currentSessionSource` from selected session and pass to ConversationView
+- Modified `server/src/services/modalClient.ts` - Updated all API paths and response parsing
+- Modified `client/src/hooks/useApiEndpoint.tsx` - Allow same-origin check for production builds
 
 ---
 
