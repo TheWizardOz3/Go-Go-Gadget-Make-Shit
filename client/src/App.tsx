@@ -296,8 +296,8 @@ function AppMain() {
     async (sessionId: string, targetEnvironment: 'local' | 'cloud') => {
       // Determine source environment (opposite of target)
       const sourceEnvironment = targetEnvironment === 'cloud' ? 'local' : 'cloud';
-      const projectPath = currentProject?.path || '';
-      const gitRemoteUrl = currentProject?.gitRemoteUrl;
+      const projectPath = selectedProjectData?.path || '';
+      const gitRemoteUrl = selectedProjectData?.gitRemoteUrl;
 
       const result = await continueInEnvironment(
         sessionId,
@@ -326,7 +326,7 @@ function AppMain() {
         console.error('Failed to continue session:', result.error);
       }
     },
-    [continueInEnvironment, setPromptText, currentProject, selectedProject]
+    [continueInEnvironment, setPromptText, selectedProjectData, selectedProject]
   );
 
   // Determine if continuation should be shown (both environments must have sessions)
@@ -505,6 +505,8 @@ function AppMain() {
         {activeTab === 'conversation' ? (
           <ConversationView
             sessionId={selectedSession}
+            sessionSource={currentSession?.source}
+            sessionProjectPath={currentSession?.projectPath}
             sessionWasUserSelected={sessionWasUserSelected}
             encodedPath={selectedProject}
             projectPath={currentProject?.path}

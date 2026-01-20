@@ -2,6 +2,7 @@
  * Hook for fetching and polling conversation messages
  *
  * Uses SWR for caching, deduplication, and automatic polling.
+ * Supports both local and cloud sessions.
  */
 
 import useSWR from 'swr';
@@ -16,6 +17,14 @@ const POLL_INTERVAL_MS = 2500;
  */
 async function fetcher<T>(path: string): Promise<T> {
   return api.get<T>(path);
+}
+
+/** Options for useConversation hook */
+export interface UseConversationOptions {
+  /** Session source - 'local' or 'cloud' (default: 'local') */
+  source?: 'local' | 'cloud';
+  /** Project path for cloud sessions (required if source is 'cloud') */
+  projectPath?: string;
 }
 
 /**
@@ -39,22 +48,49 @@ export interface UseConversationReturn {
 /**
  * Hook for fetching conversation messages with automatic polling
  *
+ * Supports both local and cloud sessions. For cloud sessions, pass
+ * source: 'cloud' and the projectPath in options.
+ *
  * @param sessionId - The session ID to fetch messages for, or null to disable
+ * @param options - Optional configuration for cloud sessions
  * @returns Object containing messages, status, loading state, error, and refresh function
  *
  * @example
  * ```tsx
- * const { messages, status, isLoading, error, refresh } = useConversation(sessionId);
+ * // Local session
+ * const { messages, status, isLoading } = useConversation(sessionId);
  *
- * if (isLoading) return <Loading />;
- * if (error) return <Error message={error.message} onRetry={refresh} />;
- * return <MessageList messages={messages} />;
+ * // Cloud session
+ * const { messages, status, isLoading } = useConversation(sessionId, {
+ *   source: 'cloud',
+ *   projectPath: 'cloud--tmp-repos-MyProject'
+ * });
  * ```
  */
-export function useConversation(sessionId: string | null): UseConversationReturn {
+export function useConversation(
+  sessionId: string | null,
+  options?: UseConversationOptions
+): UseConversationReturn {
+  const { source = 'local', projectPath } = options || {};
+
+  // Build the endpoint path based on source
+  const getEndpointPath = (): string | null => {
+    if (!sessionId) return null;
+
+    if (source === 'cloud' && projectPath) {
+      // Use cloud endpoint with projectPath query param
+      return `/cloud/sessions/${sessionId}/messages?projectPath=${encodeURIComponent(projectPath)}`;
+    }
+
+    // Default to local endpoint
+    return `/sessions/${sessionId}/messages`;
+  };
+
+  const endpointPath = getEndpointPath();
+
   const { data, error, isLoading, isValidating, mutate } = useSWR<MessagesResponse>(
     // Only fetch if sessionId is provided (conditional fetching)
-    sessionId ? `/sessions/${sessionId}/messages` : null,
+    endpointPath,
     fetcher<MessagesResponse>,
     {
       // Poll every 2.5 seconds for new messages

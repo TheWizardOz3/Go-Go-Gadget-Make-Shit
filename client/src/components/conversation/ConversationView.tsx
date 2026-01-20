@@ -29,6 +29,10 @@ import type { ImageAttachment } from '@shared/types';
 interface ConversationViewProps {
   /** Session ID to load conversation for */
   sessionId: string | null;
+  /** Session source - 'local' or 'cloud' */
+  sessionSource?: 'local' | 'cloud';
+  /** Session project path (for cloud sessions) */
+  sessionProjectPath?: string;
   /** Whether the user explicitly selected this session (vs auto-selected) */
   sessionWasUserSelected?: boolean;
   /** Encoded project path for loading templates */
@@ -59,6 +63,8 @@ const PULL_THRESHOLD = 80;
 
 export function ConversationView({
   sessionId,
+  sessionSource,
+  sessionProjectPath,
   sessionWasUserSelected = false,
   encodedPath,
   projectPath,
@@ -82,7 +88,11 @@ export function ConversationView({
   // Text to insert into PromptInput (from template selection)
   const [textToInsert, setTextToInsert] = useState<string | undefined>(undefined);
 
-  const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId);
+  // Pass source and projectPath for cloud sessions
+  const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId, {
+    source: sessionSource,
+    projectPath: sessionProjectPath,
+  });
   const { settings } = useSettings();
 
   // Get ntfy topic from settings for cloud notifications
