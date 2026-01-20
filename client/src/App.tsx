@@ -27,9 +27,8 @@ import { FilesChangedView, FilesBadge } from '@/components/files';
 import { DiffViewer } from '@/components/files/diff';
 import { FileTreeView } from '@/components/files/tree';
 import { FloatingVoiceButton } from '@/components/voice';
-import { SharedPromptProvider, useSharedPrompt } from '@/contexts/SharedPromptContext';
+import { SharedPromptProvider } from '@/contexts/SharedPromptContext';
 import { ApiEndpointProvider, useApiEndpointContext } from '@/hooks/useApiEndpoint';
-import { useContextContinuation } from '@/hooks/useContextContinuation';
 import { useScheduledPrompts } from '@/hooks/useScheduledPrompts';
 import { useScheduledPromptNotifications } from '@/hooks/useScheduledPromptNotifications';
 import type { SessionStatus, SessionSummarySerialized, ScheduledPromptInput } from '@shared/types';
@@ -286,51 +285,6 @@ function AppMain() {
 
   // Monitor scheduled prompt executions and show toast notifications
   useScheduledPromptNotifications();
-
-  // Context continuation for cross-environment session continuation
-  const { continueInEnvironment, isLoading: _continuationLoading } = useContextContinuation();
-  const { setPromptText } = useSharedPrompt();
-
-  // Handler for continuing a session in a different environment
-  const handleContinueInEnvironment = useCallback(
-    async (sessionId: string, targetEnvironment: 'local' | 'cloud') => {
-      // Determine source environment (opposite of target)
-      const sourceEnvironment = targetEnvironment === 'cloud' ? 'local' : 'cloud';
-      const projectPath = selectedProjectData?.path || '';
-      const gitRemoteUrl = selectedProjectData?.gitRemoteUrl;
-
-      const result = await continueInEnvironment(
-        sessionId,
-        sourceEnvironment,
-        targetEnvironment,
-        projectPath,
-        gitRemoteUrl
-      );
-
-      if (result.success && result.prompt) {
-        // Inject the context preamble into the shared prompt
-        setPromptText(result.prompt);
-
-        // Close the session picker and switch to conversation view
-        setIsSessionPickerOpen(false);
-
-        // Clear selected session so user can start a new session with the context
-        setSelectedSession(null);
-        setStoredSession(selectedProject, null);
-        setIsNewSessionMode(true);
-
-        // Switch to conversation tab
-        setActiveTab('conversation');
-      } else if (result.error) {
-        // Show error - could add toast notification here
-        console.error('Failed to continue session:', result.error);
-      }
-    },
-    [continueInEnvironment, setPromptText, selectedProjectData, selectedProject]
-  );
-
-  // Determine if continuation should be shown (both environments must have sessions)
-  const showContinueAction = sessionsLocalCount > 0 && sessionsCloudCount > 0;
 
   // Persist selected project to localStorage
   useEffect(() => {
@@ -646,8 +600,6 @@ function AppMain() {
         projectPath={currentProject?.path}
         localCount={sessionsLocalCount}
         cloudCount={sessionsCloudCount}
-        onContinueIn={handleContinueInEnvironment}
-        showContinueAction={showContinueAction}
         onNewSession={() => {
           // Enter "new session" mode - prevents auto-select from re-selecting
           setIsNewSessionMode(true);

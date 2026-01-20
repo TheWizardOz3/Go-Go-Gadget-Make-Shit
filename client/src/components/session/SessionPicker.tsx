@@ -33,10 +33,6 @@ interface SessionPickerProps {
   localCount?: number;
   /** Number of cloud sessions included in the list */
   cloudCount?: number;
-  /** Callback to continue a session in a different environment */
-  onContinueIn?: (sessionId: string, targetEnvironment: 'local' | 'cloud') => void;
-  /** Whether to show the continue action (requires both environments available) */
-  showContinueAction?: boolean;
   /** Additional CSS classes */
   className?: string;
 }
@@ -192,8 +188,6 @@ export function SessionPicker({
   onNewSession,
   localCount = 0,
   cloudCount = 0,
-  onContinueIn,
-  showContinueAction = false,
   className,
 }: SessionPickerProps) {
   const modalRef = useRef<HTMLDivElement>(null);
@@ -458,8 +452,6 @@ export function SessionPicker({
                   session={session}
                   isSelected={selectedSession === session.id}
                   onSelect={handleSelectSession}
-                  onContinueIn={onContinueIn}
-                  showContinueAction={showContinueAction}
                 />
               ))}
             </div>
