@@ -237,7 +237,122 @@ interface SessionSummary {
 
 ---
 
-## 8. Future Enhancements
+## 8. Cross-Environment Session Visibility (Phase 1)
+
+**Added:** 2026-01-19
+
+### 8.1 Overview
+
+Sessions from both local (laptop) and cloud (Modal) environments are now merged into a single unified list. This enables users to:
+- See all sessions for a project regardless of where they were executed
+- Distinguish between local and cloud sessions with visual badges
+- Continue work seamlessly across environments
+
+### 8.2 Implementation
+
+**New Type Fields:**
+- `projectIdentifier` - Git remote URL or project name for cross-environment matching
+- `source` - Either `'local'` or `'cloud'` to indicate session origin
+- `continuedFrom` - (Phase 2 prep) Tracks when a session continues from another environment
+
+**Session Matching Logic:**
+1. **Primary:** Match by `projectIdentifier` (git remote URL) for accurate cross-repo matching
+2. **Fallback:** Match by extracted project name from paths
+
+**UI Enhancements:**
+- Source badges (green for local, violet for cloud) shown on all sessions
+- Session count breakdown in picker header (e.g., "3 local · 2 cloud")
+- Merged session list sorted by most recent activity
+
+### 8.3 Files Modified
+- `shared/types/index.ts` - Added `projectIdentifier`, `source`, `continuedFrom` fields
+- `server/src/services/projectScanner.ts` - Include git remote URL in session scanning
+- `client/src/hooks/useSessions.ts` - Improved session merging with projectIdentifier
+- `client/src/components/session/SessionListItem.tsx` - Show source badge for all sessions
+- `client/src/components/session/SessionPicker.tsx` - Display source counts in header
+- `client/src/App.tsx` - Pass counts to SessionPicker
+
+---
+
+## 9. Context Continuation (Phase 2)
+
+**Added:** 2026-01-20
+
+### 9.1 Overview
+
+Users can now continue sessions from one environment to another (local → cloud or cloud → local) with automatic context transfer. When continuing a session, a compact summary of the conversation is generated and injected as a preamble to the new session.
+
+### 9.2 User Flow
+
+1. User views session list with sessions from both environments
+2. User clicks the "Continue in..." button (arrow + target environment icon) on a session
+3. System fetches context summary from the source environment
+4. Context preamble is injected into the prompt input
+5. Session picker closes, user is on the conversation tab with context pre-filled
+6. User can optionally add to the prompt before sending to start new session with context
+
+### 9.3 Context Summary Format
+
+```
+=== CONTEXT FROM PREVIOUS SESSION ===
+Project: {projectName}
+Source: {Local laptop | Cloud (Modal)}
+Session: {sessionId}...
+Messages: {count}
+
+--- Summary ---
+Topic: {first user message}
+Message counts: {x} user, {y} assistant
+Tools used: {tool(count), ...}
+
+--- Recent Messages ---
+[{n}] User:
+{content}
+
+[{n+1}] Assistant:
+{content}
+...
+
+=== END PREVIOUS CONTEXT ===
+
+Please continue from where this session left off.
+```
+
+### 9.4 API Endpoints
+
+**Local Server:**
+```
+GET /api/sessions/:id/context-summary?source=local|cloud
+```
+
+**Modal Cloud:**
+```
+GET /api/sessions/{session_id}/context-summary?encoded_path=...
+```
+
+### 9.5 Files Added/Modified
+
+**New Files:**
+- `server/src/services/contextSummaryService.ts` - Context summary generation
+- `client/src/hooks/useContextContinuation.ts` - Client hook for continuation flow
+
+**Modified Files:**
+- `server/src/api/sessions.ts` - Added `/context-summary` endpoint
+- `modal/modal_app.py` - Added `get_context_summary()` and API endpoint
+- `shared/types/index.ts` - Added `ContextSummary` interface
+- `client/src/components/session/SessionListItem.tsx` - Added "Continue in..." button
+- `client/src/components/session/SessionPicker.tsx` - Pass continuation props
+- `client/src/App.tsx` - Handle continuation flow
+
+### 9.6 Visibility Conditions
+
+The "Continue in..." action is only visible when:
+- Sessions exist in BOTH environments (local and cloud)
+- This ensures there's a meaningful target environment
+
+---
+
+## 10. Future Enhancements
 
 - Swipe to delete session
 - Session rename/labeling
@@ -247,7 +362,7 @@ interface SessionSummary {
 
 ---
 
-## 9. Open Questions
+## 11. Open Questions
 
 1. ~~Should "New Session" require an initial prompt, or start empty?~~ → Start with optional prompt (can be empty)
 2. ~~Should we show session status (working/waiting/idle) in the list?~~ → Nice to have, not MVP
@@ -255,7 +370,7 @@ interface SessionSummary {
 
 ---
 
-## 10. References
+## 12. References
 
 - [Product Spec - Session Picker](../product_spec.md#feature-session-picker)
 - [Architecture - API Endpoints](../architecture.md#53-endpoint-groups)

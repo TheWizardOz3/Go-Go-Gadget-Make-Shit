@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-19 (Cloud-based scheduled prompts via Modal, edit prompt functionality)
+**Last Updated**: 2026-01-20 (Context Continuation - continue sessions across environments)
 
 ---
 
@@ -81,6 +81,34 @@
 | ntfy Notifications             | 2026-01-17      | Push notifications via ntfy.sh (44 tests) - [doc](Features/ntfy-notifications.md)                          |
 | Serverless/Async Execution     | 2026-01-17      | Run agents without laptop awake (Modal + Vercel) - [doc](Features/serverless-execution.md)                 |
 | Auto Git Remote URLs (patch)   | 2026-01-17      | Projects auto-include git remote URL for seamless cloud execution                                          |
+
+---
+
+## V1.4 Progress - Unified Session Visibility ✅
+
+**Completed**: 2026-01-19 (v0.27.0)
+
+| Feature/Task                       | Completion Date | Notes                                                      |
+|------------------------------------|-----------------|------------------------------------------------------------|
+| Cross-environment session matching | 2026-01-19      | Uses git remote URL as projectIdentifier for matching      |
+| Merged session list                | 2026-01-19      | Local + cloud sessions in single list, sorted by recency   |
+| Enhanced source badges             | 2026-01-19      | Visual badges for all sessions (green=local, violet=cloud) |
+| Session count breakdown            | 2026-01-19      | Header shows "X local · Y cloud" counts                    |
+| Phase 2 prep (continuedFrom field) | 2026-01-19      | Types ready for context continuation feature               |
+
+---
+
+## V1.5 Progress - Context Continuation ✅
+
+**Completed**: 2026-01-20 (v0.28.0)
+
+| Feature/Task                   | Completion Date | Notes                                                            |
+|--------------------------------|-----------------|------------------------------------------------------------------|
+| Context summary API endpoint   | 2026-01-20      | `/api/sessions/:id/context-summary` on local server and Modal    |
+| Context summarization service  | 2026-01-20      | Generates compact summary from session messages                  |
+| "Continue in..." action        | 2026-01-20      | Button on session list items to continue in opposite environment |
+| Cross-environment continuation | 2026-01-20      | Fetches context and injects as preamble for new session          |
+| Modal cloud endpoint           | 2026-01-20      | `/api/sessions/{session_id}/context-summary` for cloud sessions  |
 
 ---
 

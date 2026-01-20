@@ -20,6 +20,7 @@ import {
   extractProjectPath,
   getFirstUserMessagePreview,
 } from '../lib/jsonlParser.js';
+import { getGitHubRepoUrl } from './gitService.js';
 
 // ============================================================
 // Types
@@ -55,6 +56,10 @@ export interface SessionSummary {
   messageCount: number;
   /** First user message preview (truncated to 100 chars) */
   preview: string | null;
+  /** Unified project identifier (git remote URL or project name) for cross-environment matching */
+  projectIdentifier?: string;
+  /** Source environment where the session was created */
+  source?: 'local' | 'cloud';
 }
 
 // ============================================================
@@ -292,9 +297,13 @@ export async function getProject(encodedPath: string): Promise<Project | null> {
  * Get all sessions for a project
  *
  * @param encodedPath - The encoded folder name
+ * @param projectPath - Optional decoded project path (for efficiency if already known)
  * @returns Array of session summaries sorted by most recent first
  */
-export async function getSessionsForProject(encodedPath: string): Promise<SessionSummary[]> {
+export async function getSessionsForProject(
+  encodedPath: string,
+  projectPath?: string
+): Promise<SessionSummary[]> {
   const projectsPath = getProjectsBasePath();
   const projectDirPath = path.join(projectsPath, encodedPath);
 
@@ -305,6 +314,38 @@ export async function getSessionsForProject(encodedPath: string): Promise<Sessio
 
   const jsonlFiles = await getJsonlFiles(projectDirPath);
   const mainSessionFiles = jsonlFiles.filter(isMainSession);
+
+  // Get the project path if not provided
+  let decodedProjectPath = projectPath;
+  if (!decodedProjectPath) {
+    // Try to extract from JSONL files
+    for (const file of jsonlFiles) {
+      if (decodedProjectPath) break;
+      const filePath = path.join(projectDirPath, file);
+      try {
+        const entries = await parseJsonlFile(filePath);
+        decodedProjectPath = extractProjectPath(entries) ?? undefined;
+      } catch {
+        // Ignore errors, try next file
+      }
+    }
+    // Fall back to decoding folder name
+    if (!decodedProjectPath) {
+      decodedProjectPath = decodePath(encodedPath);
+    }
+  }
+
+  // Get the project identifier (git remote URL or project name)
+  // This is used for cross-environment session matching
+  let projectIdentifier: string | undefined;
+  if (decodedProjectPath) {
+    try {
+      const gitRemoteUrl = await getGitHubRepoUrl(decodedProjectPath);
+      projectIdentifier = gitRemoteUrl ?? getProjectName(decodedProjectPath);
+    } catch {
+      projectIdentifier = getProjectName(decodedProjectPath);
+    }
+  }
 
   const sessions: SessionSummary[] = [];
 
@@ -324,6 +365,8 @@ export async function getSessionsForProject(encodedPath: string): Promise<Sessio
         lastActivityAt: metadata.lastActivityAt,
         messageCount: metadata.messageCount,
         preview,
+        projectIdentifier,
+        source: 'local',
       });
     } catch (error) {
       logger.warn('Failed to parse session file', { file: filePath, error });
@@ -335,6 +378,8 @@ export async function getSessionsForProject(encodedPath: string): Promise<Sessio
         lastActivityAt: null,
         messageCount: 0,
         preview: null,
+        projectIdentifier,
+        source: 'local',
       });
     }
   }

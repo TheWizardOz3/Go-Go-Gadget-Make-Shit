@@ -13,6 +13,8 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.0 | 2026-01-20 | minor | Context Continuation - continue sessions across environments |
+| 0.27.0 | 2026-01-19 | minor | Unified session visibility - merge local and cloud sessions |
 | 0.26.0 | 2026-01-19 | minor | Cloud-based scheduled prompts via Modal, edit prompt functionality |
 | 0.25.0 | 2026-01-19 | minor | Image Attachments - attach screenshots to prompts in local and cloud modes |
 | 0.24.0 | 2026-01-18 | minor | Persistent Repo Volumes - repos persist across containers, explicit push |
@@ -60,6 +62,96 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.0] - 2026-01-20
+
+### Summary
+**Context Continuation (Phase 2)** - Continue sessions from one environment to another with automatic context transfer. When you have a conversation on your laptop and want to continue it in the cloud (or vice versa), the context summary is automatically generated and injected as a preamble to the new session.
+
+### Added
+- **"Continue in..." Action** - New action on session list items to continue a session in the opposite environment
+  - Arrow icon with target environment icon (cloud or local laptop)
+  - Only visible when sessions exist in both environments
+  - Automatically fetches context summary and injects into prompt input
+- **Context Summary API Endpoint** - `GET /api/sessions/:id/context-summary`
+  - Generates compact context summary from session messages
+  - Includes topic, message counts, tool usage, and recent messages
+  - Available on both local server and Modal cloud
+- **Context Summarization Service** - `contextSummaryService.ts`
+  - Extracts key information from session messages
+  - Generates formatted preamble for continuation
+  - Limits summary to ~4000 chars for token efficiency
+- **Client Hook** - `useContextContinuation.ts`
+  - Fetches context summaries from appropriate environment
+  - Handles cross-environment API calls
+
+### Changed
+- `SessionListItem` component now accepts `onContinueIn` callback and `showContinueAction` prop
+- `SessionPicker` component passes continuation props to list items
+- `App.tsx` handles continuation flow and injects context into shared prompt
+
+### Technical Details
+- Server: New `contextSummaryService.ts` with `generateContextSummary()` and `formatContextPreamble()`
+- Server API: New `/api/sessions/:id/context-summary` endpoint
+- Modal: Added `get_context_summary()` function and `/api/sessions/{session_id}/context-summary` endpoint
+- Client: New `useContextContinuation` hook for managing continuation state
+- Types: Added `ContextSummary` interface to shared types
+
+### Context Summary Format
+```
+=== CONTEXT FROM PREVIOUS SESSION ===
+Project: {projectName}
+Source: {Local laptop | Cloud (Modal)}
+Session: {sessionId}...
+Messages: {count}
+
+--- Summary ---
+Topic: {first user message}
+Message counts: {x} user, {y} assistant
+Tools used: {tool(count), ...}
+
+--- Recent Messages ---
+[{n}] User:
+{content}
+
+[{n+1}] Assistant:
+{content}
+...
+
+=== END PREVIOUS CONTEXT ===
+
+Please continue from where this session left off.
+```
+
+---
+
+## [0.27.0] - 2026-01-19
+
+### Summary
+**Unified Session Visibility (Phase 1)** - Sessions from both local (laptop) and cloud (Modal) environments are now merged into a single unified list, making it easier to cross-reference and interact with sessions across environments.
+
+### Added
+- **Cross-Environment Session Matching** - Sessions are matched by `projectIdentifier` (git remote URL) for accurate cross-repo identification
+  - Added `projectIdentifier` field to `SessionSummary` types
+  - Added `source` field (`'local'` | `'cloud'`) to identify session origin
+  - Added `continuedFrom` field structure for future Phase 2 context continuation
+- **Enhanced Source Badges** - Visual badges now shown for ALL sessions (both local and cloud)
+  - Green badge for local sessions
+  - Violet badge for cloud sessions
+  - Clear visual distinction in merged list
+- **Session Count Breakdown** - Header shows counts by source (e.g., "3 local · 2 cloud")
+
+### Changed
+- `useSessions` hook now accepts `projectIdentifier` option for more accurate filtering
+- `SessionPicker` component now accepts `localCount` and `cloudCount` props
+- Session merging logic improved with deduplication by session ID
+
+### Technical Details
+- Server: `projectScanner.ts` now fetches git remote URL via `gitService.ts`
+- Client: `useSessions.ts` normalizes project identifiers for matching
+- Types: `shared/types/index.ts` extended with new session fields
 
 ---
 

@@ -1329,6 +1329,117 @@ def get_messages(session_id: str, encoded_path: str) -> dict[str, Any]:
     return {"messages": messages, "status": status}
 
 
+@app.function(
+    image=image,
+    volumes={"/root/.claude": volume},
+)
+def get_context_summary(session_id: str, encoded_path: str) -> dict[str, Any] | None:
+    """
+    Generate a context summary for a session (for cross-environment continuation).
+
+    Args:
+        session_id: The session UUID
+        encoded_path: The encoded project path
+
+    Returns:
+        Context summary dict or None if session not found
+    """
+    volume.reload()
+
+    # Remove cloud- prefix if present
+    if encoded_path.startswith("cloud-"):
+        encoded_path = encoded_path[6:]
+
+    session_file = Path(f"/root/.claude/projects/{encoded_path}/{session_id}.jsonl")
+
+    if not session_file.exists():
+        return None
+
+    entries = parse_jsonl_file(session_file)
+    messages = transform_to_messages(entries, session_id)
+
+    if not messages:
+        return None
+
+    # Generate summary
+    project_name = encoded_path.replace("-", "/").split("/")[-1] or encoded_path
+
+    # Get first and last timestamps
+    first_timestamp = None
+    last_timestamp = None
+    for msg in messages:
+        ts = msg.get("timestamp")
+        if ts:
+            if first_timestamp is None:
+                first_timestamp = ts
+            last_timestamp = ts
+
+    # Build summary text
+    parts = [
+        "=== CONTEXT FROM PREVIOUS SESSION ===",
+        f"Project: {project_name}",
+        f"Source: Cloud (Modal)",
+        f"Session: {session_id[:8]}...",
+        f"Messages: {len(messages)}",
+        "",
+        "--- Summary ---",
+    ]
+
+    # High-level summary
+    user_messages = [m for m in messages if m.get("type") == "user"]
+    assistant_messages = [m for m in messages if m.get("type") == "assistant"]
+
+    if user_messages:
+        first_user = user_messages[0].get("content", "")[:200]
+        parts.append(f"Topic: {first_user}")
+    parts.append(f"Message counts: {len(user_messages)} user, {len(assistant_messages)} assistant")
+
+    # Count tool uses
+    all_tools = []
+    for msg in assistant_messages:
+        for tool in msg.get("toolUse", []):
+            all_tools.append(tool.get("tool", "unknown"))
+    if all_tools:
+        tool_counts = {}
+        for t in all_tools:
+            tool_counts[t] = tool_counts.get(t, 0) + 1
+        tool_summary = ", ".join(f"{t}({c})" for t, c in tool_counts.items())
+        parts.append(f"Tools used: {tool_summary}")
+
+    parts.extend(["", "--- Recent Messages ---"])
+
+    # Last 10 messages
+    max_messages = 10
+    recent = messages[-max_messages:]
+    for i, msg in enumerate(recent):
+        global_idx = len(messages) - max_messages + i
+        role = "User" if msg.get("type") == "user" else "Assistant"
+        content = msg.get("content", "")[:500]
+        parts.append(f"[{global_idx + 1}] {role}:")
+        parts.append(content)
+        parts.append("")
+
+    parts.extend([
+        "=== END PREVIOUS CONTEXT ===",
+        "",
+        "Please continue from where this session left off.",
+    ])
+
+    summary_text = "\n".join(parts)
+
+    return {
+        "sessionId": session_id,
+        "source": "cloud",
+        "projectPath": f"/cloud/{encoded_path}",
+        "projectName": project_name,
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "summaryText": summary_text,
+        "messageCount": len(messages),
+        "startedAt": first_timestamp,
+        "lastActivityAt": last_timestamp,
+    }
+
+
 # =============================================================================
 # FastAPI Web App (Single App for All Routes)
 # =============================================================================
@@ -1387,6 +1498,37 @@ async def api_get_sessions(encoded_path: str):
     """List sessions for a project."""
     sessions = get_sessions.remote(encoded_path)
     return {"data": sessions}
+
+
+@web_app.get("/api/sessions/{session_id}/context-summary")
+async def api_get_context_summary(session_id: str, encoded_path: str = ""):
+    """
+    Get context summary for a session (for cross-environment continuation).
+
+    Query params:
+        - encoded_path: The encoded project path (optional, will search if not provided)
+        - source: 'local' | 'cloud' (ignored - always returns cloud for this endpoint)
+    """
+    if not encoded_path:
+        # Search all projects for the session
+        volume.reload()
+        base_path = Path("/root/.claude/projects")
+        if base_path.exists():
+            for project_dir in base_path.iterdir():
+                if project_dir.is_dir():
+                    session_file = project_dir / f"{session_id}.jsonl"
+                    if session_file.exists():
+                        encoded_path = project_dir.name
+                        break
+
+    if not encoded_path:
+        raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Session not found"}})
+
+    summary = get_context_summary.remote(session_id, encoded_path)
+    if not summary:
+        raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Session not found or empty"}})
+
+    return {"data": summary}
 
 
 @web_app.get("/api/sessions/{session_id}/messages")

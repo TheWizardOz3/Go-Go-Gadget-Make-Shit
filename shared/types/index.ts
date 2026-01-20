@@ -54,6 +54,19 @@ export interface SessionSummary {
   messageCount: number;
   /** First user message preview (truncated to 100 chars) */
   preview: string | null;
+  /** Unified project identifier (git remote URL or project name) for cross-environment matching */
+  projectIdentifier?: string;
+  /** Source environment where the session was created */
+  source?: 'local' | 'cloud';
+  /** If this session was continued from another environment (Phase 2) */
+  continuedFrom?: {
+    /** Original session ID */
+    sessionId: string;
+    /** Source environment of the original session */
+    source: 'local' | 'cloud';
+    /** When the continuation happened */
+    timestamp: Date;
+  };
 }
 
 /** SessionSummary with ISO string dates (for API responses) */
@@ -65,6 +78,19 @@ export interface SessionSummarySerialized {
   messageCount: number;
   /** First user message preview (truncated to 100 chars) */
   preview: string | null;
+  /** Unified project identifier (git remote URL or project name) for cross-environment matching */
+  projectIdentifier?: string;
+  /** Source environment where the session was created */
+  source?: 'local' | 'cloud';
+  /** If this session was continued from another environment (Phase 2) */
+  continuedFrom?: {
+    /** Original session ID */
+    sessionId: string;
+    /** Source environment of the original session */
+    source: 'local' | 'cloud';
+    /** When the continuation happened */
+    timestamp: string;
+  };
 }
 
 // =============================================================================
@@ -445,6 +471,34 @@ export interface CloudSession {
   status: SessionStatus;
   /** Source indicator - 'cloud' for cloud-executed sessions */
   source: 'cloud';
+  /** Unified project identifier (git remote URL or project name) for cross-environment matching */
+  projectIdentifier?: string;
+}
+
+// ============================================================
+// Context Continuation Types
+// ============================================================
+
+/** Context summary for cross-environment session continuation */
+export interface ContextSummary {
+  /** Original session ID */
+  sessionId: string;
+  /** Source environment */
+  source: 'local' | 'cloud';
+  /** Project path for context */
+  projectPath: string;
+  /** Project name */
+  projectName: string;
+  /** When the summary was generated (ISO string) */
+  generatedAt: string;
+  /** Compact summary text to inject as preamble */
+  summaryText: string;
+  /** Number of messages summarized */
+  messageCount: number;
+  /** First message timestamp (ISO string) */
+  startedAt: string | null;
+  /** Last message timestamp (ISO string) */
+  lastActivityAt: string | null;
 }
 
 /** Local session with source indicator (for merged lists) */

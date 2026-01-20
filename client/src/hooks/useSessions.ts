@@ -26,6 +26,8 @@ export interface MergedSessionSummary extends SessionSummarySerialized {
   projectPath?: string;
   /** Session status (available for cloud sessions) */
   status?: SessionStatus;
+  /** Unified project identifier for cross-environment matching */
+  projectIdentifier?: string;
 }
 
 /**
@@ -78,7 +80,7 @@ async function fetchLocalSessions(encodedPath: string): Promise<SessionSummarySe
   } catch (err) {
     // If we're in cloud mode and can't reach local, that's expected
     if (getApiMode() === 'cloud') {
-      console.debug('Local sessions unavailable in cloud mode');
+      // Local sessions unavailable in cloud mode - this is expected
       return [];
     }
     throw err;
@@ -87,21 +89,33 @@ async function fetchLocalSessions(encodedPath: string): Promise<SessionSummarySe
 
 /**
  * Fetch cloud sessions from Modal
- * Extracts project name to match against Modal's path format (-tmp-repos-{name})
+ * Uses projectIdentifier for matching when available, falls back to name matching
  */
-async function fetchCloudSessions(projectPath?: string): Promise<CloudSessionsResponse> {
+async function fetchCloudSessions(
+  projectPath?: string,
+  projectIdentifier?: string
+): Promise<CloudSessionsResponse> {
   try {
     // Fetch all cloud sessions (don't filter on server, filter on client)
     // Modal stores paths as "-tmp-repos-{projectName}" which doesn't match local paths
     const response = await api.get<CloudSessionsResponse>('/cloud/sessions');
 
-    // If we have a project path, filter sessions by project name
-    if (projectPath && response.sessions) {
+    // If we have a project identifier or path, filter sessions
+    if ((projectIdentifier || projectPath) && response.sessions) {
       // Extract project name from local path (e.g., "/Users/.../Knowledge" -> "Knowledge")
-      const projectName = projectPath.split('/').pop() || '';
+      const projectName = projectPath?.split('/').pop() || '';
 
-      // Filter sessions whose cloud path contains this project name
+      // Filter sessions that match this project
       const filteredSessions = response.sessions.filter((session) => {
+        // Priority 1: Match by projectIdentifier (git remote URL)
+        if (projectIdentifier && session.projectIdentifier) {
+          return (
+            normalizeProjectIdentifier(session.projectIdentifier) ===
+            normalizeProjectIdentifier(projectIdentifier)
+          );
+        }
+
+        // Priority 2: Fall back to name matching
         // Cloud sessions have paths like "-tmp-repos-Knowledge"
         const cloudProjectName = session.projectPath?.split('-').pop() || '';
         return cloudProjectName.toLowerCase() === projectName.toLowerCase();
@@ -115,12 +129,8 @@ async function fetchCloudSessions(projectPath?: string): Promise<CloudSessionsRe
     }
 
     return response;
-  } catch (err) {
+  } catch {
     // Cloud sessions are optional - don't fail the whole request
-    console.debug(
-      'Cloud sessions unavailable:',
-      err instanceof Error ? err.message : 'Unknown error'
-    );
     return { sessions: [], available: false, count: 0 };
   }
 }
@@ -130,12 +140,25 @@ async function fetchCloudSessions(projectPath?: string): Promise<CloudSessionsRe
 // ============================================================
 
 /**
+ * Normalize a project identifier for comparison
+ * Handles git URL variations (.git suffix, trailing slashes, case)
+ */
+function normalizeProjectIdentifier(identifier: string): string {
+  return identifier
+    .toLowerCase()
+    .replace(/\.git$/, '')
+    .replace(/\/$/, '')
+    .trim();
+}
+
+/**
  * Convert a local session to merged format
  */
 function toMergedSession(session: SessionSummarySerialized): MergedSessionSummary {
   return {
     ...session,
-    source: 'local',
+    source: session.source || 'local',
+    projectIdentifier: session.projectIdentifier,
   };
 }
 
@@ -156,30 +179,55 @@ function cloudToMergedSession(session: CloudSession): MergedSessionSummary {
     projectName: session.projectName,
     projectPath: session.projectPath,
     status: session.status,
+    projectIdentifier: session.projectIdentifier,
   };
 }
 
 /**
  * Merge and sort local and cloud sessions
- * Sorts by lastActivityAt descending (most recent first)
+ * Groups by projectIdentifier and sorts by lastActivityAt descending (most recent first)
+ *
+ * @param localSessions - Sessions from the local laptop
+ * @param cloudSessions - Sessions from Modal cloud
+ * @param projectIdentifier - Optional identifier to assign to sessions missing one
  */
 function mergeSessions(
   localSessions: SessionSummarySerialized[],
-  cloudSessions: CloudSession[]
+  cloudSessions: CloudSession[],
+  projectIdentifier?: string
 ): MergedSessionSummary[] {
-  const merged: MergedSessionSummary[] = [
-    ...localSessions.map(toMergedSession),
-    ...cloudSessions.map(cloudToMergedSession),
-  ];
+  // Convert local sessions, assigning projectIdentifier if missing
+  const mergedLocal = localSessions.map((s) => {
+    const merged = toMergedSession(s);
+    if (!merged.projectIdentifier && projectIdentifier) {
+      merged.projectIdentifier = projectIdentifier;
+    }
+    return merged;
+  });
+
+  // Convert cloud sessions
+  const mergedCloud = cloudSessions.map(cloudToMergedSession);
+
+  const merged: MergedSessionSummary[] = [...mergedLocal, ...mergedCloud];
+
+  // Deduplicate by session ID (same session shouldn't appear twice)
+  const seenIds = new Set<string>();
+  const deduplicated = merged.filter((s) => {
+    if (seenIds.has(s.id)) {
+      return false;
+    }
+    seenIds.add(s.id);
+    return true;
+  });
 
   // Sort by most recent activity
-  merged.sort((a, b) => {
+  deduplicated.sort((a, b) => {
     const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
     const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
     return bTime - aTime;
   });
 
-  return merged;
+  return deduplicated;
 }
 
 // ============================================================
@@ -191,7 +239,8 @@ function mergeSessions(
  */
 async function fetchMergedSessions(
   encodedPath: string,
-  projectPath?: string
+  projectPath?: string,
+  projectIdentifier?: string
 ): Promise<{
   sessions: MergedSessionSummary[];
   cloudAvailable: boolean;
@@ -201,10 +250,14 @@ async function fetchMergedSessions(
   // Fetch both in parallel
   const [localSessions, cloudResponse] = await Promise.all([
     fetchLocalSessions(encodedPath),
-    fetchCloudSessions(projectPath),
+    fetchCloudSessions(projectPath, projectIdentifier),
   ]);
 
-  const merged = mergeSessions(localSessions, cloudResponse.sessions);
+  // Extract projectIdentifier from local sessions if not provided
+  const localIdentifier =
+    projectIdentifier || localSessions.find((s) => s.projectIdentifier)?.projectIdentifier;
+
+  const merged = mergeSessions(localSessions, cloudResponse.sessions, localIdentifier);
 
   return {
     sessions: merged,
@@ -214,35 +267,54 @@ async function fetchMergedSessions(
   };
 }
 
+export interface UseSessionsOptions {
+  /** Decoded project path for cloud session filtering */
+  projectPath?: string;
+  /** Git remote URL or project identifier for cross-environment matching */
+  projectIdentifier?: string;
+}
+
 /**
  * Hook for fetching sessions for a specific project
  *
  * Fetches both local and cloud sessions, merging them into a single list.
  * Cloud sessions are fetched in parallel and won't block local sessions.
+ * Uses projectIdentifier for accurate cross-environment matching.
  *
  * @param encodedPath - The encoded project path, or null to disable
- * @param projectPath - Optional decoded project path for cloud session filtering
+ * @param options - Optional configuration for filtering
  * @returns Object containing merged sessions, loading state, error, and refresh function
  *
  * @example
  * ```tsx
- * const { sessions, isLoading, cloudAvailable } = useSessions(
+ * const { sessions, isLoading, cloudAvailable, localCount, cloudCount } = useSessions(
  *   project.encodedPath,
- *   project.path
+ *   { projectPath: project.path, projectIdentifier: project.gitRemoteUrl }
  * );
  *
  * if (isLoading) return <Loading />;
  *
  * return (
  *   <SessionList sessions={sessions}>
- *     {cloudAvailable && <Badge>Cloud connected</Badge>}
+ *     {cloudAvailable && <Badge>Cloud: {cloudCount}</Badge>}
+ *     <Badge>Local: {localCount}</Badge>
  *   </SessionList>
  * );
  * ```
  */
-export function useSessions(encodedPath: string | null, projectPath?: string): UseSessionsReturn {
-  // Create a cache key that includes both paths
-  const cacheKey = encodedPath ? ['sessions', encodedPath, projectPath || ''].join(':') : null;
+export function useSessions(
+  encodedPath: string | null,
+  options?: UseSessionsOptions | string // string for backward compatibility (projectPath)
+): UseSessionsReturn {
+  // Handle backward compatibility - string arg means projectPath
+  const normalizedOptions: UseSessionsOptions =
+    typeof options === 'string' ? { projectPath: options } : options || {};
+  const { projectPath, projectIdentifier } = normalizedOptions;
+
+  // Create a cache key that includes all relevant identifiers
+  const cacheKey = encodedPath
+    ? ['sessions', encodedPath, projectPath || '', projectIdentifier || ''].join(':')
+    : null;
 
   const { data, error, isLoading, mutate } = useSWR<{
     sessions: MergedSessionSummary[];
@@ -254,7 +326,7 @@ export function useSessions(encodedPath: string | null, projectPath?: string): U
     // Only fetch if we have a project path
     () =>
       encodedPath
-        ? fetchMergedSessions(encodedPath, projectPath)
+        ? fetchMergedSessions(encodedPath, projectPath, projectIdentifier)
         : Promise.resolve({
             sessions: [],
             cloudAvailable: false,

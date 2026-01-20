@@ -29,6 +29,14 @@ interface SessionPickerProps {
   projectPath?: string;
   /** Callback when a new session is started (triggers refresh) */
   onNewSession?: () => void;
+  /** Number of local sessions included in the list */
+  localCount?: number;
+  /** Number of cloud sessions included in the list */
+  cloudCount?: number;
+  /** Callback to continue a session in a different environment */
+  onContinueIn?: (sessionId: string, targetEnvironment: 'local' | 'cloud') => void;
+  /** Whether to show the continue action (requires both environments available) */
+  showContinueAction?: boolean;
   /** Additional CSS classes */
   className?: string;
 }
@@ -182,6 +190,10 @@ export function SessionPicker({
   onSelectSession,
   projectPath,
   onNewSession,
+  localCount = 0,
+  cloudCount = 0,
+  onContinueIn,
+  showContinueAction = false,
   className,
 }: SessionPickerProps) {
   const modalRef = useRef<HTMLDivElement>(null);
@@ -327,12 +339,22 @@ export function SessionPicker({
           {/* Drag handle indicator */}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-text-primary/20" />
 
-          <div className="flex items-center gap-2">
-            <h2 id="session-picker-title" className="text-lg font-semibold text-text-primary">
-              Select Session
-            </h2>
-            {sessions.length > 0 && (
-              <span className="text-sm text-text-muted">({sessions.length})</span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <h2 id="session-picker-title" className="text-lg font-semibold text-text-primary">
+                Select Session
+              </h2>
+              {sessions.length > 0 && (
+                <span className="text-sm text-text-muted">({sessions.length})</span>
+              )}
+            </div>
+            {/* Show source breakdown when we have sessions from multiple sources */}
+            {(localCount > 0 || cloudCount > 0) && (
+              <div className="flex items-center gap-2 text-xs">
+                {localCount > 0 && <span className="text-emerald-400">{localCount} local</span>}
+                {localCount > 0 && cloudCount > 0 && <span className="text-text-muted">·</span>}
+                {cloudCount > 0 && <span className="text-violet-400">{cloudCount} cloud</span>}
+              </div>
             )}
           </div>
 
@@ -436,6 +458,8 @@ export function SessionPicker({
                   session={session}
                   isSelected={selectedSession === session.id}
                   onSelect={handleSelectSession}
+                  onContinueIn={onContinueIn}
+                  showContinueAction={showContinueAction}
                 />
               ))}
             </div>

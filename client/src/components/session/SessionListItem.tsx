@@ -17,6 +17,10 @@ interface SessionListItemProps {
   isSelected: boolean;
   /** Callback when session is selected */
   onSelect: (sessionId: string) => void;
+  /** Callback to continue session in opposite environment */
+  onContinueIn?: (sessionId: string, targetEnvironment: 'local' | 'cloud') => void;
+  /** Whether context continuation is enabled (requires cloud to be available) */
+  showContinueAction?: boolean;
   /** Additional CSS classes */
   className?: string;
 }
@@ -84,6 +88,24 @@ function CloudChatIcon({ className }: { className?: string }) {
 }
 
 /**
+ * Arrow right icon for "Continue in..." action
+ */
+function ArrowRightIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-4 w-4', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+    </svg>
+  );
+}
+
+/**
  * SessionListItem component - displays a single session row
  *
  * @example
@@ -99,6 +121,8 @@ export function SessionListItem({
   session,
   isSelected,
   onSelect,
+  onContinueIn,
+  showContinueAction = false,
   className,
 }: SessionListItemProps) {
   const handleClick = () => {
@@ -112,6 +136,15 @@ export function SessionListItem({
     }
   };
 
+  const handleContinueClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onContinueIn) {
+      // Continue in the opposite environment
+      const targetEnvironment = session.source === 'cloud' ? 'local' : 'cloud';
+      onContinueIn(session.id, targetEnvironment);
+    }
+  };
+
   // Display preview or fallback text
   const displayPreview =
     session.preview || (session.source === 'cloud' ? 'Cloud session' : 'Empty session');
@@ -120,6 +153,10 @@ export function SessionListItem({
 
   // Choose icon based on source
   const SessionIcon = isCloud ? CloudChatIcon : ChatBubbleIcon;
+
+  // Target environment for continuation
+  const targetEnv = isCloud ? 'local' : 'cloud';
+  const continueLabel = isCloud ? 'Continue locally' : 'Continue in cloud';
 
   return (
     <button
@@ -162,15 +199,15 @@ export function SessionListItem({
         <div className="flex items-center gap-2">
           <span
             className={cn(
-              'line-clamp-1',
+              'line-clamp-1 flex-1',
               isSelected ? 'text-accent' : 'text-text-primary',
               !hasPreview && 'italic text-text-muted'
             )}
           >
             {displayPreview}
           </span>
-          {/* Cloud badge - only show for cloud sessions to save space */}
-          {isCloud && <SessionSourceBadge source="cloud" size="sm" />}
+          {/* Source badge - show for both sources for clear distinction in merged lists */}
+          <SessionSourceBadge source={session.source} size="sm" />
         </div>
 
         {/* Last activity and message count */}
@@ -199,6 +236,33 @@ export function SessionListItem({
           )}
         </div>
       </div>
+
+      {/* Continue in... button */}
+      {showContinueAction && onContinueIn && (
+        <button
+          type="button"
+          onClick={handleContinueClick}
+          className={cn(
+            'flex-shrink-0 p-2 rounded-lg min-w-[40px] min-h-[40px]',
+            'flex items-center justify-center gap-1',
+            'text-xs font-medium',
+            targetEnv === 'cloud'
+              ? 'text-violet-400 hover:bg-violet-500/10'
+              : 'text-emerald-400 hover:bg-emerald-500/10',
+            'transition-colors duration-150',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          )}
+          title={continueLabel}
+          aria-label={continueLabel}
+        >
+          <ArrowRightIcon />
+          {targetEnv === 'cloud' ? (
+            <CloudChatIcon className="h-4 w-4" />
+          ) : (
+            <ChatBubbleIcon className="h-4 w-4" />
+          )}
+        </button>
+      )}
 
       {/* Selected checkmark */}
       {isSelected && (

@@ -10,6 +10,7 @@ import {
 } from '../services/sessionManager.js';
 import { sendPrompt, stopAgent, startNewSession } from '../services/claudeService.js';
 import { updateSettings } from '../services/settingsService.js';
+import { generateContextSummary } from '../services/contextSummaryService.js';
 
 const router: RouterType = Router();
 
@@ -31,6 +32,10 @@ const sendPromptSchema = z.object({
 const newSessionSchema = z.object({
   projectPath: z.string().min(1, 'Project path is required'),
   prompt: z.string().optional(),
+});
+
+const contextSummaryQuerySchema = z.object({
+  source: z.enum(['local', 'cloud']).optional().default('local'),
 });
 
 // ============================================================
@@ -199,6 +204,51 @@ router.get('/:id/status', async (req, res) => {
       error: err instanceof Error ? err.message : 'Unknown error',
     });
     res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get session status'));
+  }
+});
+
+/**
+ * Get context summary for a session (for cross-environment continuation)
+ * GET /api/sessions/:id/context-summary
+ * Query params:
+ *   - source: 'local' | 'cloud' (default: 'local') - the source environment
+ *
+ * Returns a compact context summary that can be used as a preamble when
+ * continuing the session in a different environment.
+ */
+router.get('/:id/context-summary', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Parse and validate query params
+    const parseResult = contextSummaryQuerySchema.safeParse(req.query);
+    if (!parseResult.success) {
+      res.status(400).json(error(ErrorCodes.BAD_REQUEST, 'Invalid query parameters'));
+      return;
+    }
+    const { source } = parseResult.data;
+
+    // Check if session exists
+    const session = await getSession(id);
+    if (!session) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Session not found'));
+      return;
+    }
+
+    // Generate context summary
+    const summary = await generateContextSummary(id, source);
+    if (!summary) {
+      res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to generate context summary'));
+      return;
+    }
+
+    res.json(success(summary));
+  } catch (err) {
+    logger.error('Failed to get context summary', {
+      sessionId: req.params.id,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to get context summary'));
   }
 });
 
