@@ -72,19 +72,49 @@ async function fetcher<T>(path: string): Promise<T> {
 }
 
 /**
+ * Get the laptop API URL for direct requests
+ * Used when in cloud mode to still fetch local sessions if laptop is reachable
+ */
+function getLaptopUrl(): string | null {
+  // In development, always use localhost
+  if (import.meta.env.DEV) {
+    return 'http://localhost:3457';
+  }
+  // In production, use configured URL (e.g., Tailscale URL)
+  return import.meta.env.VITE_LAPTOP_API_URL || null;
+}
+
+/**
  * Fetch local sessions from the laptop server
+ *
+ * When in cloud mode, explicitly calls the laptop URL to get local sessions.
+ * This allows seeing both local and cloud sessions regardless of current mode.
  */
 async function fetchLocalSessions(encodedPath: string): Promise<SessionSummarySerialized[]> {
-  try {
-    return await api.get<SessionSummarySerialized[]>(`/projects/${encodedPath}/sessions`);
-  } catch (err) {
-    // If we're in cloud mode and can't reach local, that's expected
-    if (getApiMode() === 'cloud') {
-      // Local sessions unavailable in cloud mode - this is expected
+  const currentMode = getApiMode();
+
+  // In cloud mode, try to fetch from laptop directly
+  if (currentMode === 'cloud') {
+    const laptopUrl = getLaptopUrl();
+    if (!laptopUrl) {
+      // No laptop URL configured - can't fetch local sessions
       return [];
     }
-    throw err;
+
+    try {
+      // Make direct request to laptop API
+      return await api.get<SessionSummarySerialized[]>(`/projects/${encodedPath}/sessions`, {
+        baseUrl: laptopUrl,
+        timeout: 5000,
+      });
+    } catch {
+      // Laptop unreachable in cloud mode - this is expected when laptop is asleep
+      return [];
+    }
   }
+
+  // In local mode, use the default API client (which points to laptop)
+  return api.get<SessionSummarySerialized[]>(`/projects/${encodedPath}/sessions`);
 }
 
 /**
