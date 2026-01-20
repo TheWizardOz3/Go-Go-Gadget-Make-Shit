@@ -201,6 +201,8 @@ No waiting for completion, no session tracking, no concurrency concerns. The app
 | PUT    | `/api/scheduled-prompts/:id`        | Update prompt               | `Partial<ScheduledPromptInput>` |
 | DELETE | `/api/scheduled-prompts/:id`        | Delete scheduled prompt     | —                               |
 | PATCH  | `/api/scheduled-prompts/:id/toggle` | Toggle enabled/disabled     | —                               |
+| POST   | `/api/scheduled-prompts/:id/run`    | Manually run prompt now     | —                               |
+| GET    | `/api/scheduled-prompts/status/missed` | Get missed prompts       | —                               |
 
 ```typescript
 interface ScheduledPromptInput {
@@ -358,15 +360,108 @@ Not required — feature is additive and non-breaking. Ship when ready.
 
 ---
 
-## 9. Known Limitations
+## 9. Cloud-Based Scheduling
 
-1. **Server must be running** — Prompts only fire if Node.js server is active
-2. **Laptop must be awake** — macOS sleep means missed prompts
-3. **Missed executions aren't retried** — If server is down at scheduled time, prompt is skipped
-4. **Single machine** — No multi-device coordination (future serverless will address this)
+### 9.1 Overview
+
+Scheduled prompts can now run even when your laptop is offline via Modal cloud execution. When prompts are created or updated locally, they are automatically synced to Modal, where a cron job checks every 30 minutes for due prompts and executes them.
+
+### 9.2 Architecture
+
+```
+┌─────────────────────────────────────┐
+│  Local Server (laptop)              │
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │ scheduledPromptsStorage.ts  │    │
+│  │   - CRUD operations         │    │
+│  │   - After changes: sync →   │────┼───┐
+│  └─────────────────────────────┘    │   │
+│                                     │   │
+│  ┌─────────────────────────────┐    │   │
+│  │ schedulerService.ts         │    │   │
+│  │   - Local cron execution    │    │   │
+│  │   - node-cron jobs          │    │   │
+│  └─────────────────────────────┘    │   │
+└─────────────────────────────────────┘   │
+                                          │
+                                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Modal Cloud                                                │
+│                                                             │
+│  ┌─────────────────────────────┐    ┌─────────────────────┐ │
+│  │ POST /api/scheduled-        │◄───│ syncPromptsToModal  │ │
+│  │      prompts/sync           │    │   (from local)      │ │
+│  │   - Stores in Modal Dict    │    └─────────────────────┘ │
+│  └─────────────────────────────┘                            │
+│                                                             │
+│  ┌─────────────────────────────┐    ┌─────────────────────┐ │
+│  │ Modal Dict                  │◄───│ check_scheduled_    │ │
+│  │   - prompts: [...]          │    │ prompts()           │ │
+│  │   - settings: {ntfyTopic}   │    │   @modal.Cron       │ │
+│  └─────────────────────────────┘    │   "*/30 * * * *"    │ │
+│                                     │   (every 30 min)    │ │
+│                                     └──────────┬──────────┘ │
+│                                                │            │
+│                                                ▼            │
+│                                     ┌─────────────────────┐ │
+│                                     │ execute_prompt()    │ │
+│                                     │   - Clone repo      │ │
+│                                     │   - Run Claude CLI  │ │
+│                                     │   - Send ntfy       │ │
+│                                     └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 9.3 How It Works
+
+1. **Prompt Creation/Update (Local)**
+   - User creates or edits a scheduled prompt in the UI
+   - Prompt is saved to `~/.gogogadgetclaude/scheduled-prompts.json`
+   - `scheduledPromptsSyncService.ts` automatically syncs all prompts to Modal
+   - Each prompt is enriched with `gitRemoteUrl` and `projectName` for cloud execution
+
+2. **Cloud Cron Check (Every 30 Minutes)**
+   - Modal runs `check_scheduled_prompts()` on a `*/30 * * * *` schedule
+   - For each enabled prompt, checks if `nextRunAt` is in the past
+   - If due, calls `execute_prompt()` with the prompt's git repo and project info
+   - Updates `lastExecution` and recalculates `nextRunAt`
+   - Sends ntfy notification if configured
+
+3. **Execution (Cloud)**
+   - Clones the git repo (or reuses existing from Modal Volume)
+   - Runs `claude -p "prompt"` with allowed tools
+   - Commits changes locally (but does NOT auto-push)
+   - Sends completion notification via ntfy
+
+### 9.4 Requirements for Cloud Scheduling
+
+- **Modal App Deployed**: Run `modal deploy modal/modal_app.py`
+- **Modal Secrets Configured**:
+  - `ANTHROPIC_API_KEY` - For Claude Code execution
+  - `GITHUB_TOKEN` - For private repo access (optional)
+- **Git Remote URL**: Projects must have a git remote URL (GitHub, etc.)
+- **ntfy Topic (Optional)**: Configure in Settings for push notifications
+
+### 9.5 Limitations
+
+- **30-minute granularity**: Cloud checks run every 30 minutes, so prompts may execute up to 30 minutes after their scheduled time
+- **No auto-push**: Changes are committed locally in the cloud container but not pushed (use explicit push endpoint)
+- **Requires git remote**: Local-only projects without git remotes cannot run in the cloud
+
+---
+
+## 10. Known Limitations (Local-Only)
+
+1. **Server must be running** — Local prompts only fire if Node.js server is active
+2. **Laptop must be awake** — macOS sleep means missed local prompts
+3. **Missed executions aren't retried automatically** — If server is down at scheduled time, prompt is skipped
+   - Server logs a warning on startup about missed prompts
+   - Use `POST /api/scheduled-prompts/:id/run` to manually catch up on missed prompts
+   - Use `GET /api/scheduled-prompts/status/missed` to check for missed prompts
 
 ---
 
 *Created: 2026-01-17*
-*Updated: 2026-01-17 — Implementation complete. All tasks finished, 39 tests written, manual verification passed.*
+*Updated: 2026-01-19 — Added cloud-based scheduling via Modal, edit functionality for prompts.*
 

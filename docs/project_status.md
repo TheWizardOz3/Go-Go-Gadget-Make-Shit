@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-18 (V1.5 Dashboard Framework planned)
+**Last Updated**: 2026-01-19 (Cloud-based scheduled prompts via Modal, edit prompt functionality)
 
 ---
 
@@ -81,6 +81,17 @@
 | ntfy Notifications             | 2026-01-17      | Push notifications via ntfy.sh (44 tests) - [doc](Features/ntfy-notifications.md)                          |
 | Serverless/Async Execution     | 2026-01-17      | Run agents without laptop awake (Modal + Vercel) - [doc](Features/serverless-execution.md)                 |
 | Auto Git Remote URLs (patch)   | 2026-01-17      | Projects auto-include git remote URL for seamless cloud execution                                          |
+
+---
+
+## V1.3 Progress - Cloud Scheduled Prompts ✅
+
+**Completed**: 2026-01-19 (v0.26.0)
+
+| Feature/Task            | Completion Date | Notes                                                                      |
+|-------------------------|-----------------|----------------------------------------------------------------------------|
+| Cloud Scheduled Prompts | 2026-01-19      | Run scheduled prompts via Modal when laptop is offline (30-min cron check) |
+| Edit Scheduled Prompts  | 2026-01-19      | Click any prompt to edit it, reuses existing form                          |
 
 ---
 

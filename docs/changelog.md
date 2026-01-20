@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.26.0 | 2026-01-19 | minor | Cloud-based scheduled prompts via Modal, edit prompt functionality |
 | 0.25.0 | 2026-01-19 | minor | Image Attachments - attach screenshots to prompts in local and cloud modes |
 | 0.24.0 | 2026-01-18 | minor | Persistent Repo Volumes - repos persist across containers, explicit push |
 | 0.23.0 | 2026-01-18 | minor | Cloud Mode Polish - session continuation, ntfy notifications, debug logging |
@@ -59,6 +60,36 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.26.0] - 2026-01-19
+
+### Summary
+**Cloud-Based Scheduled Prompts & Edit Functionality** - Scheduled prompts can now run even when your laptop is offline via Modal cloud. Also added the ability to edit existing scheduled prompts.
+
+### Added
+- **Cloud Scheduled Prompts** - Prompts are synced to Modal and executed by a cron job every 30 minutes
+  - `POST /api/scheduled-prompts/sync` endpoint in Modal for receiving prompt sync
+  - Modal Dict storage (`gogogadget-scheduled-prompts`) for persistent prompt data
+  - `check_scheduled_prompts()` cron function with `@modal.Cron("*/30 * * * *")` decorator
+  - Automatic ntfy notifications when cloud prompts complete
+  - Prompts enriched with `gitRemoteUrl` and `projectName` for cloud execution
+- **Edit Scheduled Prompts** - Click any prompt in the list to edit it
+  - Edit button (pencil icon) on each prompt row
+  - Row is clickable to open edit form
+  - Reuses existing creation form with pre-filled values
+  - `updatePrompt()` function in useScheduledPrompts hook
+- **Automatic Cloud Sync** - Local changes automatically sync to Modal in background
+  - `scheduledPromptsSyncService.ts` handles enrichment and sync
+  - `triggerCloudSync()` called after create, update, delete, toggle operations
+
+### Changed
+- **Scheduled Prompts: Manual Run Endpoint** - `POST /api/scheduled-prompts/:id/run` to manually execute a scheduled prompt immediately
+- **Scheduled Prompts: Missed Detection** - `GET /api/scheduled-prompts/status/missed` endpoint for checking missed prompts
+
+### Fixed
+- **Scheduled Prompts: Missed Prompt Visibility** - Server detects and warns about prompts missed due to downtime
 
 ---
 

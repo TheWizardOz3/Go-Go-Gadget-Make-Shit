@@ -244,6 +244,9 @@ function AppMain() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledPromptsOpen, setIsScheduledPromptsOpen] = useState(false);
   const [isScheduledPromptFormOpen, setIsScheduledPromptFormOpen] = useState(false);
+  const [editingScheduledPrompt, setEditingScheduledPrompt] = useState<
+    import('@/hooks/useScheduledPrompts').ScheduledPrompt | null
+  >(null);
 
   // Fetch projects
   const {
@@ -272,8 +275,11 @@ function AppMain() {
   const { count: filesChangedCount } = useFilesChanged(selectedProject);
 
   // Scheduled prompts hook
-  const { createPrompt: createScheduledPrompt, isLoading: scheduledPromptsLoading } =
-    useScheduledPrompts();
+  const {
+    createPrompt: createScheduledPrompt,
+    updatePrompt: updateScheduledPrompt,
+    isLoading: scheduledPromptsLoading,
+  } = useScheduledPrompts();
 
   // Monitor scheduled prompt executions and show toast notifications
   useScheduledPromptNotifications();
@@ -605,6 +611,12 @@ function AppMain() {
         isOpen={isScheduledPromptsOpen}
         onClose={() => setIsScheduledPromptsOpen(false)}
         onAddNew={() => {
+          setEditingScheduledPrompt(null);
+          setIsScheduledPromptsOpen(false);
+          setIsScheduledPromptFormOpen(true);
+        }}
+        onEdit={(prompt) => {
+          setEditingScheduledPrompt(prompt);
           setIsScheduledPromptsOpen(false);
           setIsScheduledPromptFormOpen(true);
         }}
@@ -613,10 +625,18 @@ function AppMain() {
       {/* Scheduled Prompt Form */}
       <ScheduledPromptForm
         isOpen={isScheduledPromptFormOpen}
-        onClose={() => setIsScheduledPromptFormOpen(false)}
-        onSubmit={async (input: ScheduledPromptInput) => {
-          await createScheduledPrompt(input);
+        onClose={() => {
+          setIsScheduledPromptFormOpen(false);
+          setEditingScheduledPrompt(null);
         }}
+        onSubmit={async (input: ScheduledPromptInput) => {
+          if (editingScheduledPrompt) {
+            await updateScheduledPrompt(editingScheduledPrompt.id, input);
+          } else {
+            await createScheduledPrompt(input);
+          }
+        }}
+        editingPrompt={editingScheduledPrompt}
         projects={projects?.map((p) => ({ path: p.path, name: p.name })) ?? []}
         isSubmitting={scheduledPromptsLoading}
       />

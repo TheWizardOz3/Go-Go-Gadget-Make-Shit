@@ -18,6 +18,8 @@ interface ScheduledPromptsPanelProps {
   onClose: () => void;
   /** Callback to open the add form */
   onAddNew: () => void;
+  /** Callback to open the edit form with a prompt */
+  onEdit: (prompt: import('@/hooks/useScheduledPrompts').ScheduledPrompt) => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -167,6 +169,7 @@ export function ScheduledPromptsPanel({
   isOpen,
   onClose,
   onAddNew,
+  onEdit,
   className,
 }: ScheduledPromptsPanelProps) {
   const modalRef = useRef<HTMLDivElement>(null);
@@ -329,6 +332,7 @@ export function ScheduledPromptsPanel({
                   prompt={prompt}
                   onToggle={handleToggle}
                   onDelete={handleDelete}
+                  onEdit={onEdit}
                   isLoading={actionInProgress === prompt.id}
                 />
               ))}

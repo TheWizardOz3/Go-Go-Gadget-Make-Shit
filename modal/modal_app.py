@@ -39,6 +39,10 @@ volume = modal.Volume.from_name("gogogadget-sessions", create_if_missing=True)
 # This allows repos to persist across container restarts, avoiding re-cloning
 repos_volume = modal.Volume.from_name("gogogadget-repos", create_if_missing=True)
 
+# Dict for storing scheduled prompts synced from local
+# This enables cloud-based scheduling even when laptop is offline
+scheduled_prompts_dict = modal.Dict.from_name("gogogadget-scheduled-prompts", create_if_missing=True)
+
 # Container image with Claude CLI and dependencies
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -769,6 +773,206 @@ def push_repo_changes(project_name: str, repo_url: str) -> dict[str, Any]:
             "success": False,
             "error": str(e),
         }
+
+
+# =============================================================================
+# Scheduled Prompts (Cloud Scheduler)
+# =============================================================================
+
+
+def calculate_next_run_at(prompt: dict[str, Any]) -> str:
+    """
+    Calculate the next run time for a scheduled prompt.
+    Returns ISO timestamp string.
+    """
+    from datetime import timedelta
+    
+    now = datetime.now(timezone.utc)
+    time_parts = prompt.get("timeOfDay", "09:00").split(":")
+    hour = int(time_parts[0])
+    minute = int(time_parts[1]) if len(time_parts) > 1 else 0
+    
+    # Start with today at the scheduled time (in local time, then convert)
+    # Note: This assumes the user wants times in their local timezone
+    # For simplicity, we'll treat timeOfDay as UTC
+    next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    
+    schedule_type = prompt.get("scheduleType", "daily")
+    
+    if schedule_type == "daily":
+        if next_run <= now:
+            next_run += timedelta(days=1)
+    
+    elif schedule_type == "weekly":
+        target_day = prompt.get("dayOfWeek", 1)  # Default Monday
+        current_day = next_run.weekday()
+        # Convert to 0=Sunday format (prompt uses 0=Sunday)
+        current_day_sun = (current_day + 1) % 7
+        days_until = (target_day - current_day_sun) % 7
+        if days_until == 0 and next_run <= now:
+            days_until = 7
+        next_run += timedelta(days=days_until)
+    
+    elif schedule_type == "monthly":
+        target_day = prompt.get("dayOfMonth", 1)
+        next_run = next_run.replace(day=target_day)
+        if next_run <= now:
+            # Move to next month
+            if next_run.month == 12:
+                next_run = next_run.replace(year=next_run.year + 1, month=1)
+            else:
+                next_run = next_run.replace(month=next_run.month + 1)
+    
+    elif schedule_type == "yearly":
+        next_run = next_run.replace(month=1, day=1)
+        if next_run <= now:
+            next_run = next_run.replace(year=next_run.year + 1)
+    
+    return next_run.isoformat()
+
+
+def is_prompt_due(prompt: dict[str, Any], now: datetime) -> bool:
+    """Check if a scheduled prompt is due to run."""
+    if not prompt.get("enabled", False):
+        return False
+    
+    next_run_at = prompt.get("nextRunAt")
+    if not next_run_at:
+        return False
+    
+    try:
+        next_run = datetime.fromisoformat(next_run_at.replace("Z", "+00:00"))
+        return next_run <= now
+    except (ValueError, TypeError):
+        return False
+
+
+@app.function(
+    schedule=modal.Cron("*/30 * * * *"),  # Every 30 minutes
+    image=image,
+    volumes={
+        "/root/.claude": volume,
+        "/repos": repos_volume,
+    },
+    secrets=[
+        modal.Secret.from_name("ANTHROPIC_API_KEY"),
+        modal.Secret.from_name("GITHUB_TOKEN"),
+    ],
+    timeout=600,
+)
+def check_scheduled_prompts():
+    """
+    Cron job that runs every 30 minutes to check for due scheduled prompts.
+    When a prompt is due, it executes it using the existing execute_prompt function.
+    """
+    import requests
+    
+    print("=== Scheduled Prompts Cron Check ===")
+    print(f"Time: {datetime.now(timezone.utc).isoformat()}")
+    
+    # Get prompts from Modal Dict
+    try:
+        prompts = scheduled_prompts_dict.get("prompts", [])
+        settings = scheduled_prompts_dict.get("settings", {})
+    except Exception as e:
+        print(f"Failed to read scheduled prompts dict: {e}")
+        return {"checked": 0, "executed": 0, "error": str(e)}
+    
+    if not prompts:
+        print("No scheduled prompts configured")
+        return {"checked": 0, "executed": 0}
+    
+    print(f"Found {len(prompts)} scheduled prompts")
+    
+    now = datetime.now(timezone.utc)
+    executed = []
+    errors = []
+    
+    for prompt in prompts:
+        prompt_id = prompt.get("id", "unknown")
+        
+        if not prompt.get("enabled", False):
+            print(f"  [{prompt_id[:8]}] Disabled, skipping")
+            continue
+        
+        if not is_prompt_due(prompt, now):
+            next_run = prompt.get("nextRunAt", "unknown")
+            print(f"  [{prompt_id[:8]}] Not due (next: {next_run})")
+            continue
+        
+        print(f"  [{prompt_id[:8]}] DUE - executing...")
+        
+        # Get project info
+        project_path = prompt.get("projectPath")
+        git_remote_url = prompt.get("gitRemoteUrl")
+        project_name = prompt.get("projectName")
+        
+        if not git_remote_url or not project_name:
+            error_msg = f"Missing gitRemoteUrl or projectName for prompt {prompt_id}"
+            print(f"    ERROR: {error_msg}")
+            errors.append({"promptId": prompt_id, "error": error_msg})
+            continue
+        
+        try:
+            # Execute the prompt using existing function
+            result = execute_prompt.remote(
+                prompt=prompt.get("prompt", ""),
+                project_repo=git_remote_url,
+                project_name=project_name,
+                session_id=None,  # Always new session for scheduled prompts
+                allowed_tools=None,  # Use defaults
+                notification_webhook=None,
+                ntfy_topic=settings.get("ntfyTopic"),  # Use global ntfy topic from settings
+            )
+            
+            print(f"    SUCCESS: session={result.get('sessionId', 'unknown')[:8]}")
+            executed.append({
+                "promptId": prompt_id,
+                "sessionId": result.get("sessionId"),
+                "success": result.get("success", False),
+            })
+            
+            # Update lastExecution and nextRunAt in the prompt
+            prompt["lastExecution"] = {
+                "timestamp": now.isoformat(),
+                "status": "success" if result.get("success") else "failed",
+                "sessionId": result.get("sessionId"),
+            }
+            prompt["nextRunAt"] = calculate_next_run_at(prompt)
+            
+        except Exception as e:
+            error_msg = str(e)
+            print(f"    ERROR: {error_msg}")
+            errors.append({"promptId": prompt_id, "error": error_msg})
+            
+            # Update lastExecution with error
+            prompt["lastExecution"] = {
+                "timestamp": now.isoformat(),
+                "status": "failed",
+                "error": error_msg,
+            }
+            prompt["nextRunAt"] = calculate_next_run_at(prompt)
+    
+    # Save updated prompts back to Dict
+    try:
+        scheduled_prompts_dict["prompts"] = prompts
+        print(f"Updated prompts in Dict")
+    except Exception as e:
+        print(f"Failed to save updated prompts: {e}")
+    
+    # Commit volumes
+    volume.commit()
+    repos_volume.commit()
+    
+    summary = {
+        "checked": len(prompts),
+        "executed": len(executed),
+        "errors": len(errors),
+        "timestamp": now.isoformat(),
+    }
+    print(f"=== Cron Check Complete: {summary} ===")
+    
+    return summary
 
 
 @app.function(
@@ -1535,10 +1739,49 @@ async def api_fetch_tree(request: FetchTreeRequest):
     return {"data": result}
 
 
+class SyncScheduledPromptsRequest(BaseModel):
+    prompts: list[dict[str, Any]]
+    settings: dict[str, Any] | None = None
+
+
 @web_app.get("/api/scheduled-prompts")
 async def api_get_scheduled_prompts():
-    """Return empty scheduled prompts (cloud doesn't support scheduling)."""
-    return {"data": []}
+    """Return scheduled prompts from Modal Dict."""
+    try:
+        prompts = scheduled_prompts_dict.get("prompts", [])
+        return {"data": prompts}
+    except Exception as e:
+        return {"data": [], "error": str(e)}
+
+
+@web_app.post("/api/scheduled-prompts/sync")
+async def api_sync_scheduled_prompts(request: SyncScheduledPromptsRequest):
+    """
+    Sync scheduled prompts from local server to Modal.
+    Called whenever prompts are created, updated, or deleted locally.
+    """
+    try:
+        # Store prompts in Modal Dict
+        scheduled_prompts_dict["prompts"] = request.prompts
+        
+        # Store settings if provided (e.g., ntfyTopic)
+        if request.settings:
+            scheduled_prompts_dict["settings"] = request.settings
+        
+        print(f"Synced {len(request.prompts)} scheduled prompts to Modal Dict")
+        
+        return {
+            "data": {
+                "synced": len(request.prompts),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        }
+    except Exception as e:
+        print(f"Failed to sync scheduled prompts: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "SYNC_ERROR", "message": str(e)}},
+        )
 
 
 # Mount the FastAPI app as a Modal web endpoint

@@ -20,6 +20,8 @@ interface ScheduledPromptListItemProps {
   onToggle: (id: string) => void;
   /** Callback when delete is clicked */
   onDelete: (id: string) => void;
+  /** Callback when edit is clicked */
+  onEdit: (prompt: ScheduledPrompt) => void;
   /** Whether an action is in progress */
   isLoading?: boolean;
 }
@@ -61,6 +63,27 @@ function FolderIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Pencil icon for edit button
+ */
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
       />
     </svg>
   );
@@ -142,6 +165,7 @@ export function ScheduledPromptListItem({
   prompt,
   onToggle,
   onDelete,
+  onEdit,
   isLoading,
 }: ScheduledPromptListItemProps) {
   const scheduleDesc = getScheduleDescription(prompt);
@@ -155,15 +179,45 @@ export function ScheduledPromptListItem({
         'group px-4 py-3',
         'border-b border-text-primary/5 last:border-b-0',
         'transition-colors duration-150',
-        !prompt.enabled && 'opacity-60'
+        !prompt.enabled && 'opacity-60',
+        'cursor-pointer hover:bg-text-primary/5'
       )}
+      onClick={() => onEdit(prompt)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onEdit(prompt);
+        }
+      }}
     >
       {/* Top row: prompt text + toggle */}
       <div className="flex items-start justify-between gap-3 mb-2">
         <p className={cn('text-sm text-text-primary leading-snug', 'line-clamp-2 flex-1')}>
           {prompt.prompt}
         </p>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(prompt);
+            }}
+            disabled={isLoading}
+            className={cn(
+              'p-2 rounded-lg min-w-[44px] min-h-[44px]',
+              'flex items-center justify-center',
+              'text-accent',
+              'hover:bg-accent/10 active:bg-accent/20',
+              'transition-colors duration-150',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+              isLoading && 'opacity-50 cursor-not-allowed'
+            )}
+            aria-label="Edit scheduled prompt"
+          >
+            <PencilIcon />
+          </button>
           <ToggleSwitch
             enabled={prompt.enabled}
             onToggle={() => onToggle(prompt.id)}
@@ -177,12 +231,12 @@ export function ScheduledPromptListItem({
             }}
             disabled={isLoading}
             className={cn(
-              'p-2 -mr-2 rounded-lg',
-              'text-text-muted hover:text-error',
+              'p-2 -mr-2 rounded-lg min-w-[44px] min-h-[44px]',
+              'flex items-center justify-center',
+              'text-text-muted hover:text-error active:text-error',
               'hover:bg-error/10 active:bg-error/20',
               'transition-colors duration-150',
-              'opacity-0 group-hover:opacity-100',
-              'focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-error',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-error',
               isLoading && 'opacity-50 cursor-not-allowed'
             )}
             aria-label="Delete scheduled prompt"

@@ -31,6 +31,46 @@ export type {
 };
 
 // ============================================================
+// Cloud Sync (Lazy Import to Avoid Circular Dependencies)
+// ============================================================
+
+/** Flag to enable/disable cloud sync */
+let cloudSyncEnabled = true;
+
+/**
+ * Trigger cloud sync after a change
+ * Uses dynamic import to avoid circular dependencies
+ */
+async function triggerCloudSync(): Promise<void> {
+  if (!cloudSyncEnabled) return;
+
+  try {
+    // Dynamic import to avoid circular dependency
+    const { syncPromptsToModal } = await import('./scheduledPromptsSyncService.js');
+
+    // Sync in background (don't block the local operation)
+    syncPromptsToModal().catch((err) => {
+      logger.warn('Background cloud sync failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  } catch (err) {
+    logger.warn('Failed to import cloud sync service', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * Enable or disable cloud sync
+ * Useful for testing or when Modal is unavailable
+ */
+export function setCloudSyncEnabled(enabled: boolean): void {
+  cloudSyncEnabled = enabled;
+  logger.info('Cloud sync for scheduled prompts', { enabled });
+}
+
+// ============================================================
 // Constants
 // ============================================================
 
@@ -241,6 +281,9 @@ export async function createPrompt(input: ScheduledPromptInput): Promise<Schedul
     timeOfDay: newPrompt.timeOfDay,
   });
 
+  // Sync to cloud
+  triggerCloudSync();
+
   return newPrompt;
 }
 
@@ -284,6 +327,9 @@ export async function updatePrompt(
 
   logger.info('Updated scheduled prompt', { id });
 
+  // Sync to cloud
+  triggerCloudSync();
+
   return updated;
 }
 
@@ -305,6 +351,9 @@ export async function deletePrompt(id: string): Promise<boolean> {
   await writePromptsFile({ prompts });
 
   logger.info('Deleted scheduled prompt', { id });
+
+  // Sync to cloud
+  triggerCloudSync();
 
   return true;
 }
@@ -330,6 +379,9 @@ export async function togglePrompt(id: string): Promise<ScheduledPrompt | null> 
     id,
     enabled: prompts[index].enabled,
   });
+
+  // Sync to cloud
+  triggerCloudSync();
 
   return prompts[index];
 }
@@ -359,6 +411,9 @@ export async function updateLastExecution(
     id,
     status: execution.status,
   });
+
+  // Sync to cloud (so cloud knows about local execution)
+  triggerCloudSync();
 
   return prompts[index];
 }

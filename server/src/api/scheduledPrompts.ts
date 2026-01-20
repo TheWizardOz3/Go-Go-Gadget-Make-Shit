@@ -23,6 +23,8 @@ import {
   handlePromptDeleted,
   handlePromptToggle,
   isSchedulerRunning,
+  runPromptNow,
+  getMissedPrompts,
 } from '../services/schedulerService.js';
 
 const router: RouterType = Router();
@@ -283,6 +285,104 @@ router.patch('/:id/toggle', async (req, res) => {
     });
 
     res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to toggle scheduled prompt'));
+  }
+});
+
+/**
+ * Get list of missed scheduled prompts
+ * GET /api/scheduled-prompts/missed
+ *
+ * Returns prompts whose scheduled time has passed but weren't executed
+ * (typically because the server wasn't running at that time).
+ */
+router.get('/status/missed', async (_req, res) => {
+  try {
+    const missed = await getMissedPrompts();
+
+    logger.debug('Retrieved missed prompts', {
+      count: missed.length,
+    });
+
+    res.json(
+      success({
+        missed,
+        count: missed.length,
+        message:
+          missed.length > 0
+            ? 'Some scheduled prompts were missed. Use POST /api/scheduled-prompts/:id/run to execute them manually.'
+            : 'No missed prompts.',
+      })
+    );
+  } catch (err) {
+    logger.error('Failed to get missed prompts', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to check for missed prompts'));
+  }
+});
+
+/**
+ * Manually run a scheduled prompt now
+ * POST /api/scheduled-prompts/:id/run
+ *
+ * Immediately executes the scheduled prompt, creating a new Claude session.
+ * Useful for testing or catching up on missed prompts.
+ */
+router.post('/:id/run', async (req, res) => {
+  try {
+    const id = req.params.id as string;
+
+    if (!isSchedulerRunning()) {
+      res
+        .status(503)
+        .json(
+          error(ErrorCodes.INTERNAL_ERROR, 'Scheduler is not running. Server may be starting up.')
+        );
+      return;
+    }
+
+    const result = await runPromptNow(id);
+
+    if (!result) {
+      res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Scheduled prompt not found'));
+      return;
+    }
+
+    if (!result.success) {
+      logger.warn('Manual prompt execution failed', {
+        id,
+        error: result.error,
+      });
+
+      res
+        .status(500)
+        .json(
+          error(ErrorCodes.INTERNAL_ERROR, result.error ?? 'Failed to execute scheduled prompt')
+        );
+      return;
+    }
+
+    logger.info('Manually executed scheduled prompt', {
+      id,
+      timestamp: result.timestamp,
+    });
+
+    res.json(
+      success({
+        executed: true,
+        promptId: id,
+        timestamp: result.timestamp,
+        message: 'Scheduled prompt executed successfully. A new Claude session has been started.',
+      })
+    );
+  } catch (err) {
+    logger.error('Failed to run scheduled prompt', {
+      id: req.params.id,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+
+    res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to run scheduled prompt'));
   }
 });
 

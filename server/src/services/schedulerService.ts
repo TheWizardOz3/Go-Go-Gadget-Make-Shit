@@ -326,6 +326,54 @@ export function getRegisteredCount(): number {
 }
 
 // ============================================================
+// Missed Prompt Detection
+// ============================================================
+
+/** Info about a missed scheduled prompt */
+export interface MissedPromptInfo {
+  id: string;
+  prompt: string;
+  scheduledFor: string;
+  projectPath: string | null;
+  missedBy: string; // Human readable duration
+}
+
+/**
+ * Check for prompts that should have run but didn't
+ * (i.e., their nextRunAt is in the past)
+ *
+ * @param prompts - Array of scheduled prompts to check
+ * @returns Array of missed prompt info
+ */
+function detectMissedPrompts(prompts: ScheduledPrompt[]): MissedPromptInfo[] {
+  const now = new Date();
+  const missed: MissedPromptInfo[] = [];
+
+  for (const prompt of prompts) {
+    if (!prompt.enabled || !prompt.nextRunAt) continue;
+
+    const nextRun = new Date(prompt.nextRunAt);
+    if (nextRun < now) {
+      // Calculate how long ago it should have run
+      const diffMs = now.getTime() - nextRun.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const missedBy = diffHours > 0 ? `${diffHours}h ${diffMins % 60}m ago` : `${diffMins}m ago`;
+
+      missed.push({
+        id: prompt.id,
+        prompt: prompt.prompt.substring(0, 100) + (prompt.prompt.length > 100 ? '...' : ''),
+        scheduledFor: prompt.nextRunAt,
+        projectPath: prompt.projectPath,
+        missedBy,
+      });
+    }
+  }
+
+  return missed;
+}
+
+// ============================================================
 // Scheduler Lifecycle
 // ============================================================
 
@@ -353,13 +401,38 @@ export async function startScheduler(): Promise<void> {
       enabled: enabledPrompts.length,
     });
 
+    // Check for missed prompts
+    const missedPrompts = detectMissedPrompts(enabledPrompts);
+    if (missedPrompts.length > 0) {
+      logger.warn('Detected missed scheduled prompts', {
+        count: missedPrompts.length,
+        prompts: missedPrompts.map((p) => ({
+          id: p.id,
+          scheduledFor: p.scheduledFor,
+          missedBy: p.missedBy,
+        })),
+      });
+
+      // Log each missed prompt with details
+      for (const missed of missedPrompts) {
+        logger.warn('Missed scheduled prompt', {
+          id: missed.id,
+          promptPreview: missed.prompt,
+          scheduledFor: missed.scheduledFor,
+          missedBy: missed.missedBy,
+          projectPath: missed.projectPath,
+          hint: 'Use POST /api/scheduled-prompts/:id/run to execute manually',
+        });
+      }
+    }
+
     // Register cron jobs for enabled prompts
     let registered = 0;
     for (const prompt of enabledPrompts) {
       if (registerCronJob(prompt)) {
         registered++;
 
-        // Update next run time
+        // Update next run time (this will skip past any missed times)
         const nextRunAt = calculateNextRunAt(prompt);
         await updateNextRunAt(prompt.id, nextRunAt);
       }
@@ -369,6 +442,7 @@ export async function startScheduler(): Promise<void> {
 
     logger.info('Scheduler service started', {
       registeredJobs: registered,
+      missedPrompts: missedPrompts.length,
     });
   } catch (error) {
     logger.error('Failed to start scheduler service', {
@@ -500,4 +574,42 @@ export async function handlePromptUpdated(prompt: ScheduledPrompt): Promise<void
  */
 export function handlePromptDeleted(promptId: string): void {
   unregisterCronJob(promptId);
+}
+
+/**
+ * Manually run a scheduled prompt now
+ *
+ * Useful for testing or catching up on missed prompts.
+ *
+ * @param promptId - The prompt ID to run
+ * @returns Execution result, or null if prompt not found
+ */
+export async function runPromptNow(promptId: string): Promise<ExecutionResult | null> {
+  const prompt = await getPromptById(promptId);
+
+  if (!prompt) {
+    logger.warn('Cannot run prompt - not found', { id: promptId });
+    return null;
+  }
+
+  logger.info('Manually running scheduled prompt', {
+    id: promptId,
+    scheduleType: prompt.scheduleType,
+  });
+
+  return executePrompt(prompt);
+}
+
+/**
+ * Get list of missed scheduled prompts
+ *
+ * Returns prompts whose nextRunAt time has passed.
+ * Useful for UI to show missed prompts.
+ *
+ * @returns Array of missed prompt info
+ */
+export async function getMissedPrompts(): Promise<MissedPromptInfo[]> {
+  const prompts = await getAllPrompts();
+  const enabledPrompts = prompts.filter((p) => p.enabled);
+  return detectMissedPrompts(enabledPrompts);
 }
