@@ -117,26 +117,38 @@ const JobStatusResponseSchema = z.object({
   }),
 });
 
-/** Schema for cloud session (matches SharedCloudSession with string dates) */
+/** Schema for cloud session from Modal API (more flexible than SharedCloudSession) */
 const CloudSessionSchema = z.object({
   id: z.string(),
-  projectPath: z.string(),
-  projectName: z.string(),
+  filePath: z.string().optional(),
+  projectPath: z.string().optional(),
+  projectName: z.string().optional(),
   startedAt: z.string(),
   lastActivityAt: z.string(),
   messageCount: z.number(),
-  status: z.enum(['working', 'waiting', 'idle']),
-  source: z.literal('cloud'),
+  status: z.enum(['working', 'waiting', 'idle']).optional(),
+  source: z.literal('cloud').optional(),
+  preview: z.string().nullable().optional(),
 });
 
-/** Schema for list sessions response */
+/** Schema for list sessions response (wrapped in data field) */
 const ListSessionsResponseSchema = z.object({
-  sessions: z.array(CloudSessionSchema),
+  data: z.array(CloudSessionSchema),
 });
 
-/** Schema for list projects response */
+/** Schema for a cloud project item */
+const CloudProjectSchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  encodedPath: z.string(),
+  sessionCount: z.number().optional(),
+  lastSessionId: z.string().optional(),
+  lastActivityAt: z.string().optional(),
+});
+
+/** Schema for list projects response (wrapped in data field) */
 const ListProjectsResponseSchema = z.object({
-  projects: z.array(z.string()),
+  data: z.array(CloudProjectSchema),
 });
 
 /** Schema for raw JSONL message from Modal (flexible to accept various formats) */
@@ -271,7 +283,7 @@ export async function checkModalHealth(): Promise<HealthCheckResult> {
   }
 
   try {
-    const response = await modalFetch(config, '/api_health', {
+    const response = await modalFetch(config, '/api/status', {
       timeout: 10000,
     });
 
@@ -330,7 +342,7 @@ export async function dispatchJob(request: CloudJobDispatchRequest): Promise<Dis
   });
 
   try {
-    const response = await modalFetch(config, '/api_dispatch_job', {
+    const response = await modalFetch(config, '/api/cloud/jobs', {
       method: 'POST',
       body: {
         prompt: request.prompt,
@@ -418,10 +430,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatusResult> {
   }
 
   try {
-    const response = await modalFetch(
-      config,
-      `/api_job_status?job_id=${encodeURIComponent(jobId)}`
-    );
+    const response = await modalFetch(config, `/api/cloud/jobs/${encodeURIComponent(jobId)}`);
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -484,7 +493,7 @@ export async function listCloudProjects(): Promise<ListProjectsResult> {
   }
 
   try {
-    const response = await modalFetch(config, '/api_list_projects');
+    const response = await modalFetch(config, '/api/projects');
 
     if (!response.ok) {
       return {
@@ -503,9 +512,10 @@ export async function listCloudProjects(): Promise<ListProjectsResult> {
       };
     }
 
+    // Extract encoded paths from the project objects
     return {
       success: true,
-      projects: parsed.data.projects,
+      projects: parsed.data.data.map((p) => p.encodedPath),
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -532,7 +542,7 @@ export async function listCloudSessions(projectPath: string): Promise<ListSessio
   try {
     const response = await modalFetch(
       config,
-      `/api_get_sessions?project_path=${encodeURIComponent(projectPath)}`
+      `/api/projects/${encodeURIComponent(projectPath)}/sessions`
     );
 
     if (!response.ok) {
@@ -555,15 +565,15 @@ export async function listCloudSessions(projectPath: string): Promise<ListSessio
       };
     }
 
-    // Convert to our CloudSession type
-    const sessions: CloudSession[] = parsed.data.sessions.map((s) => ({
+    // Convert to our CloudSession type (data is now in parsed.data.data due to wrapper)
+    const sessions: CloudSession[] = parsed.data.data.map((s) => ({
       id: s.id,
-      projectPath: s.projectPath,
-      projectName: s.projectName,
+      projectPath: s.projectPath || projectPath,
+      projectName: s.projectName || projectPath.split('-').pop() || 'Unknown',
       startedAt: s.startedAt,
       lastActivityAt: s.lastActivityAt,
       messageCount: s.messageCount,
-      status: s.status,
+      status: s.status || 'idle',
       source: 'cloud' as const,
     }));
 
@@ -598,12 +608,10 @@ export async function getCloudMessages(
   }
 
   try {
-    const params = new URLSearchParams({
-      session_id: sessionId,
-      project_path: projectPath,
-    });
-
-    const response = await modalFetch(config, `/api_get_messages?${params.toString()}`);
+    const response = await modalFetch(
+      config,
+      `/api/sessions/${sessionId}/messages?project_path=${encodeURIComponent(projectPath)}`
+    );
 
     if (!response.ok) {
       if (response.status === 404) {
