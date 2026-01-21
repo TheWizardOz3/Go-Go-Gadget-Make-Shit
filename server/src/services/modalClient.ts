@@ -62,20 +62,29 @@ export interface ListSessionsResult {
   error?: string;
 }
 
-/** Raw message from JSONL (before parsing) */
-export interface RawJsonlMessage {
+/**
+ * Message from Modal API (already transformed from JSONL)
+ *
+ * Modal's get_messages endpoint transforms raw JSONL into this format,
+ * so we receive properly formatted messages with content at top level.
+ */
+export interface ModalMessage {
+  id: string;
+  sessionId: string;
   type: string;
-  message?: unknown;
-  timestamp?: string;
-  sessionId?: string;
-  uuid?: string;
-  parentMessageId?: string;
+  content: string;
+  timestamp: string;
+  toolUse?: Array<{
+    tool: string;
+    input?: Record<string, unknown>;
+    status?: string;
+  }>;
 }
 
 /** Result from getting messages */
 export interface GetMessagesResult {
   success: boolean;
-  messages?: RawJsonlMessage[];
+  messages?: ModalMessage[];
   error?: string;
 }
 
@@ -151,19 +160,34 @@ const ListProjectsResponseSchema = z.object({
   data: z.array(CloudProjectSchema),
 });
 
-/** Schema for raw JSONL message from Modal (flexible to accept various formats) */
-const RawMessageSchema = z.object({
+/**
+ * Schema for messages from Modal API
+ *
+ * Modal returns ALREADY TRANSFORMED messages with top-level content field,
+ * not raw JSONL format. The format is:
+ * { id, sessionId, type, content, timestamp, toolUse? }
+ */
+const ModalMessageSchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
   type: z.string(),
-  message: z.any().optional(),
-  timestamp: z.string().optional(),
-  sessionId: z.string().optional(),
-  uuid: z.string().optional(),
-  parentMessageId: z.string().optional(),
+  content: z.string(),
+  timestamp: z.string(),
+  toolUse: z
+    .array(
+      z.object({
+        tool: z.string(),
+        input: z.record(z.unknown()).optional(),
+        status: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 /** Schema for get messages response */
 const GetMessagesResponseSchema = z.object({
-  messages: z.array(RawMessageSchema),
+  messages: z.array(ModalMessageSchema),
+  status: z.string().optional(),
 });
 
 /** Schema for health check response */

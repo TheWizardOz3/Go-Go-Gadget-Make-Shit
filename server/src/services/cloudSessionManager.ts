@@ -13,7 +13,7 @@ import {
   listCloudSessions,
   getCloudMessages,
   type CloudSession,
-  type RawJsonlMessage,
+  type ModalMessage,
 } from './modalClient.js';
 import type {
   SessionStatus,
@@ -33,9 +33,9 @@ interface CachedCloudSession {
   lastFetched: Date;
 }
 
-/** Cached cloud messages */
+/** Cached cloud messages (already transformed by Modal) */
 interface CachedMessages {
-  messages: RawJsonlMessage[];
+  messages: ModalMessage[];
   lastFetched: Date;
 }
 
@@ -115,67 +115,34 @@ function isCacheValid(lastFetched: Date, ttl: number): boolean {
 }
 
 // ============================================================
-// Message Parsing
+// Message Transformation
 // ============================================================
 
 /**
- * Parse raw JSONL messages into our MessageSerialized format
+ * Transform Modal messages to our MessageSerialized format
  *
- * This mirrors the logic in jsonlParser.ts but works with the raw
- * format returned from the Modal API.
+ * Modal already transforms JSONL messages into a clean format with
+ * top-level content. We just need to map to our exact interface and
+ * convert toolUse to our ToolUseEvent format.
  */
-function parseRawMessages(rawMessages: RawJsonlMessage[], sessionId: string): MessageSerialized[] {
-  const messages: MessageSerialized[] = [];
-  let messageIndex = 0;
-
-  for (const raw of rawMessages) {
-    // Only process user and assistant messages
-    if (raw.type !== 'user' && raw.type !== 'assistant') {
-      continue;
-    }
-
-    // Extract content from the message field
-    let content = '';
-    if (raw.message && typeof raw.message === 'object') {
-      // Handle structured message format
-      const msg = raw.message as { content?: unknown };
-      if (Array.isArray(msg.content)) {
-        // Content is an array of text blocks
-        content = msg.content
-          .filter((block: unknown) => {
-            const b = block as { type?: string };
-            return b.type === 'text';
-          })
-          .map((block: unknown) => {
-            const b = block as { text?: string };
-            return b.text || '';
-          })
-          .join('\n');
-      } else if (typeof msg.content === 'string') {
-        content = msg.content;
-      }
-    } else if (typeof raw.message === 'string') {
-      content = raw.message;
-    }
-
-    // Skip empty messages
-    if (!content.trim()) {
-      continue;
-    }
-
-    messages.push({
-      id: raw.uuid || `${sessionId}-${messageIndex}`,
-      sessionId,
-      type: raw.type as 'user' | 'assistant',
-      content,
-      timestamp: raw.timestamp || new Date().toISOString(),
-      // Tool use would require more complex parsing, omit for now
-    });
-
-    messageIndex++;
-  }
-
-  return messages;
+function transformModalMessages(modalMessages: ModalMessage[]): MessageSerialized[] {
+  return modalMessages
+    .filter((msg) => msg.type === 'user' || msg.type === 'assistant')
+    .map((msg) => ({
+      id: msg.id,
+      sessionId: msg.sessionId,
+      type: msg.type as 'user' | 'assistant',
+      content: msg.content,
+      timestamp: msg.timestamp,
+      // Only include toolUse if present and has valid entries
+      toolUse: msg.toolUse
+        ?.filter((tool) => tool.tool && tool.status)
+        .map((tool) => ({
+          tool: tool.tool,
+          input: tool.input || {},
+          status: tool.status as 'pending' | 'complete' | 'error',
+        })),
+    }));
 }
 
 /**
@@ -374,6 +341,9 @@ export async function getCloudSession(
 /**
  * Get messages for a cloud session
  *
+ * Modal returns ALREADY TRANSFORMED messages, so we just need to convert
+ * them to our MessageSerialized format (they're very similar).
+ *
  * @param sessionId - The session UUID
  * @param projectPath - The encoded project path
  * @returns Cloud messages result
@@ -388,11 +358,11 @@ export async function getCloudSessionMessages(
 
   if (cached && isCacheValid(cached.lastFetched, MESSAGES_CACHE_TTL)) {
     logger.debug('Cloud messages cache hit', { sessionId });
-    const parsedMessages = parseRawMessages(cached.messages, sessionId);
+    const messages = transformModalMessages(cached.messages);
     return {
       success: true,
-      messages: parsedMessages,
-      status: inferStatusFromMessages(parsedMessages),
+      messages,
+      status: inferStatusFromMessages(messages),
       cached: true,
     };
   }
@@ -408,27 +378,26 @@ export async function getCloudSessionMessages(
     };
   }
 
-  const rawMessages = result.messages || [];
+  const modalMessages = result.messages || [];
 
-  // Update cache
+  // Update cache with Modal's already-transformed messages
   messagesCache.set(cacheKey, {
-    messages: rawMessages,
+    messages: modalMessages,
     lastFetched: new Date(),
   });
 
-  // Parse messages
-  const parsedMessages = parseRawMessages(rawMessages, sessionId);
+  // Convert Modal messages to our MessageSerialized format
+  const messages = transformModalMessages(modalMessages);
 
   logger.debug('Cloud messages fetched and cached', {
     sessionId,
-    rawCount: rawMessages.length,
-    parsedCount: parsedMessages.length,
+    messageCount: messages.length,
   });
 
   return {
     success: true,
-    messages: parsedMessages,
-    status: inferStatusFromMessages(parsedMessages),
+    messages,
+    status: inferStatusFromMessages(messages),
     cached: false,
   };
 }
