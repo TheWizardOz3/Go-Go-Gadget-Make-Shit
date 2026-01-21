@@ -17,7 +17,7 @@ import path from 'path';
 
 /** Modal cloud API endpoint */
 const MODAL_API_URL =
-  process.env.MODAL_API_URL || 'https://derekgood--gogogadget-claude-fastapi-app.modal.run';
+  process.env.MODAL_API_URL || 'https://osgood-derek--gogogadget-claude-fastapi-app.modal.run';
 
 // ============================================================
 // Types

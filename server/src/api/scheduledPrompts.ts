@@ -26,6 +26,10 @@ import {
   runPromptNow,
   getMissedPrompts,
 } from '../services/schedulerService.js';
+import {
+  syncPromptsToModal,
+  isModalSyncAvailable,
+} from '../services/scheduledPromptsSyncService.js';
 
 const router: RouterType = Router();
 
@@ -383,6 +387,54 @@ router.post('/:id/run', async (req, res) => {
     });
 
     res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to run scheduled prompt'));
+  }
+});
+
+/**
+ * Manually trigger cloud sync
+ * POST /api/scheduled-prompts/sync-to-cloud
+ *
+ * Syncs all local scheduled prompts to Modal cloud storage.
+ * This is normally automatic, but can be triggered manually.
+ */
+router.post('/sync-to-cloud', async (_req, res) => {
+  try {
+    const available = await isModalSyncAvailable();
+    if (!available) {
+      res
+        .status(503)
+        .json(
+          error(
+            ErrorCodes.INTERNAL_ERROR,
+            'Modal cloud service is not available. Check your network or Modal deployment.'
+          )
+        );
+      return;
+    }
+
+    const synced = await syncPromptsToModal();
+
+    if (!synced) {
+      res.status(500).json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to sync prompts to cloud'));
+      return;
+    }
+
+    logger.info('Manually synced scheduled prompts to cloud');
+
+    res.json(
+      success({
+        synced: true,
+        message: 'Scheduled prompts synced to Modal cloud successfully.',
+      })
+    );
+  } catch (err) {
+    logger.error('Failed to sync to cloud', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+
+    res
+      .status(500)
+      .json(error(ErrorCodes.INTERNAL_ERROR, 'Failed to sync scheduled prompts to cloud'));
   }
 });
 

@@ -23,6 +23,39 @@ import { startNewSession } from './claudeService.js';
 import { getSettings } from './settingsService.js';
 
 // ============================================================
+// Cloud Sync (Background on Startup)
+// ============================================================
+
+/**
+ * Sync prompts to Modal cloud on server startup
+ * Runs in background to avoid delaying server startup
+ */
+async function syncPromptsToCloudOnStartup(): Promise<void> {
+  try {
+    // Use dynamic import to avoid circular dependency
+    const { syncPromptsToModal, isModalSyncAvailable } =
+      await import('./scheduledPromptsSyncService.js');
+
+    const available = await isModalSyncAvailable();
+    if (!available) {
+      logger.info('Modal sync not available on startup (service may be cold starting)');
+      return;
+    }
+
+    const success = await syncPromptsToModal();
+    if (success) {
+      logger.info('Synced scheduled prompts to Modal cloud on startup');
+    } else {
+      logger.warn('Failed to sync scheduled prompts to Modal cloud on startup');
+    }
+  } catch (err) {
+    logger.warn('Error syncing to cloud on startup', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// ============================================================
 // Types
 // ============================================================
 
@@ -448,6 +481,9 @@ export async function startScheduler(): Promise<void> {
       registeredJobs: registered,
       missedPrompts: missedPrompts.length,
     });
+
+    // Sync prompts to cloud in background after startup
+    syncPromptsToCloudOnStartup();
   } catch (error) {
     logger.error('Failed to start scheduler service', {
       error: error instanceof Error ? error.message : 'Unknown error',
