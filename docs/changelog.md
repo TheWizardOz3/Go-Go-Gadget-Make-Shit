@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.3 | 2026-01-21 | patch | Session picker preview fixes - cloud previews and line break handling |
 | 0.28.2 | 2026-01-21 | patch | Cloud session messages fix - Modal message format parsing |
 | 0.28.1 | 2026-01-20 | patch | Cloud session selection fixes - viewing cloud sessions from unified list |
 | 0.28.0 | 2026-01-20 | minor | Context Continuation - continue sessions across environments |
@@ -64,6 +65,25 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.3] - 2026-01-21
+
+### Summary
+**Session Picker Preview Fixes** - Fixed two issues with session preview display in the session picker: cloud sessions now show actual prompt previews instead of generic "Cloud session" text, and local session previews properly handle line breaks using " · " separators instead of running text together.
+
+### Fixed
+- **Cloud sessions showing "Cloud session"** - Cloud sessions now display the first user message preview just like local sessions. Previously, cloud sessions always showed generic "Cloud session" text because the preview field wasn't being passed through from the Modal API.
+- **Line breaks collapsing in previews** - Session previews now show " · " between lines instead of running them together. This makes prompts with headers (e.g., "# Morning briefing") clearly distinct from the content that follows.
+
+### Technical Details
+- Modified `shared/types/index.ts` - Added `preview?: string | null` field to `CloudSession` interface
+- Modified `server/src/services/modalClient.ts` - Pass through `s.preview ?? null` when converting Modal API sessions
+- Modified `client/src/hooks/useSessions.ts` - Use `session.preview ?? null` in `cloudToMergedSession()` instead of hardcoded `null`
+- Modified `server/src/lib/jsonlParser.ts` - Updated `cleanPreviewText()` to replace newlines with " · " separator, preserving structure visibility (e.g., "# Header · 1. First item" instead of "# Header 1. First item")
+- Modified `server/src/lib/jsonlParser.test.ts` - Updated tests to expect new " · " separator behavior
+- Fixed pre-existing TypeScript error in `modalClient.ts` where `rawData` was `unknown` type
 
 ---
 

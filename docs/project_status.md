@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-21 (v0.28.2 - Cloud session messages fix)
+**Last Updated**: 2026-01-21 (v0.28.3 - Session picker preview fixes)
 
 ---
 
