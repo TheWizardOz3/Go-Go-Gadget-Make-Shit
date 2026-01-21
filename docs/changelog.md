@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.2 | 2026-01-21 | patch | Cloud session messages fix - Modal message format parsing |
 | 0.28.1 | 2026-01-20 | patch | Cloud session selection fixes - viewing cloud sessions from unified list |
 | 0.28.0 | 2026-01-20 | minor | Context Continuation - continue sessions across environments |
 | 0.27.0 | 2026-01-19 | minor | Unified session visibility - merge local and cloud sessions |
@@ -63,6 +64,29 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.2] - 2026-01-21
+
+### Summary
+**Cloud Session Messages Fix** - Fixed critical bug where cloud session messages were not displaying because the server was incorrectly parsing Modal's already-transformed message format.
+
+### Fixed
+- **Cloud session messages empty** - Modal API already transforms JSONL messages into a clean format with top-level `content`, `id`, `timestamp`, and `toolUse` fields. The server was incorrectly trying to parse these as raw JSONL format (looking for `message.content` instead of `content`), resulting in 0 parsed messages.
+
+### Changed
+- **Simplified UI** - Removed distracting right-side icons from session picker (source badges and "Continue in..." buttons). Left-side icons (chat bubble for local, cloud for cloud) are sufficient.
+- Updated `ModalMessageSchema` to match Modal's actual transformed message format
+- Replaced `parseRawMessages()` with `transformModalMessages()` that properly maps Modal's format to our `MessageSerialized` interface
+- Cleaned up unused props and imports in `SessionListItem`, `SessionPicker`, and `App.tsx`
+
+### Technical Details
+- Modified `server/src/services/modalClient.ts` - New `ModalMessageSchema` and `ModalMessage` interface
+- Modified `server/src/services/cloudSessionManager.ts` - New `transformModalMessages()` function
+- Modified `client/src/components/session/SessionListItem.tsx` - Removed `SessionSourceBadge` and "Continue in..." action
+- Modified `client/src/components/session/SessionPicker.tsx` - Removed `onContinueIn` and `showContinueAction` props
+- Modified `client/src/App.tsx` - Removed context continuation handler and related hooks
 
 ---
 
