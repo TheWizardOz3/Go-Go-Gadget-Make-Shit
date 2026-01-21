@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.4 | 2026-01-21 | patch | Fix cloud scheduled prompts - Modal URL, startup sync |
 | 0.28.3 | 2026-01-21 | patch | Session picker preview fixes - cloud previews and line break handling |
 | 0.28.2 | 2026-01-21 | patch | Cloud session messages fix - Modal message format parsing |
 | 0.28.1 | 2026-01-20 | patch | Cloud session selection fixes - viewing cloud sessions from unified list |
@@ -65,6 +66,21 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.4] - 2026-01-21
+
+### Fixed
+- **Cloud scheduled prompts not executing** - Multiple issues prevented cloud execution:
+  - Modal API URL was incorrect (`derekgood--` instead of `osgood-derek--`)
+  - Prompts weren't being synced to Modal on server startup
+  - Added `syncPromptsToCloudOnStartup()` to scheduler service
+- **Added manual sync endpoint** - `POST /api/scheduled-prompts/sync-to-cloud` for troubleshooting
+
+### Required User Action
+- **Set Vercel environment variable**: `VITE_MODAL_API_URL=https://osgood-derek--gogogadget-claude-fastapi-app.modal.run`
+- **Redeploy Vercel** for changes to take effect
 
 ---
 
