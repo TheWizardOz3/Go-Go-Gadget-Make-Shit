@@ -445,7 +445,7 @@ describe('getFirstUserMessagePreview', () => {
     expect(preview?.endsWith('…')).toBe(true);
   });
 
-  it('cleans up extra whitespace in messages', () => {
+  it('cleans up extra whitespace and uses · separator for line breaks', () => {
     const entries: RawJsonlEntry[] = [
       createUserEntry({
         message: { role: 'user', content: '  Hello    World  \n\n  Test  ' },
@@ -453,7 +453,8 @@ describe('getFirstUserMessagePreview', () => {
     ];
     const preview = getFirstUserMessagePreview(entries);
 
-    expect(preview).toBe('Hello World Test');
+    // Line breaks become " · " separators to preserve structure visibility
+    expect(preview).toBe('Hello World · Test');
   });
 
   it('skips empty user messages and finds the next one', () => {
@@ -474,7 +475,7 @@ describe('getFirstUserMessagePreview', () => {
     expect(preview).toBe('Actual content');
   });
 
-  it('handles content as array of text blocks', () => {
+  it('handles content as array of text blocks with · separator', () => {
     const entries: RawJsonlEntry[] = [
       createUserEntry({
         message: {
@@ -488,7 +489,8 @@ describe('getFirstUserMessagePreview', () => {
     ];
     const preview = getFirstUserMessagePreview(entries);
 
-    expect(preview).toBe('First part. Second part.');
+    // Content blocks are joined with line breaks which become " · " separators
+    expect(preview).toBe('First part. · Second part.');
   });
 
   it('returns first user message by timestamp order', () => {

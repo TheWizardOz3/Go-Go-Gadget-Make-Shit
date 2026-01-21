@@ -203,8 +203,8 @@ function cloudToMergedSession(session: CloudSession): MergedSessionSummary {
     startedAt: session.startedAt,
     lastActivityAt: session.lastActivityAt,
     messageCount: session.messageCount,
-    // Cloud sessions may not have a preview readily available
-    preview: null,
+    // Use cloud session preview if available
+    preview: session.preview ?? null,
     source: 'cloud',
     projectName: session.projectName,
     projectPath: session.projectPath,

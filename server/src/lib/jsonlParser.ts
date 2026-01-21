@@ -339,7 +339,8 @@ export function extractProjectPath(entries: RawJsonlEntry[]): string | null {
 
 /**
  * Clean preview text by removing XML-like tags (e.g., <ide_opened_file>)
- * and other non-human-readable content
+ * and other non-human-readable content.
+ * Line breaks are replaced with " · " to preserve structure visibility.
  */
 function cleanPreviewText(text: string): string {
   return (
@@ -350,8 +351,13 @@ function cleanPreviewText(text: string): string {
       .replace(/<[^>]+\/>/g, '')
       // Remove standalone opening/closing tags
       .replace(/<\/?[^>]+>/g, '')
-      // Clean up extra whitespace
-      .replace(/\s+/g, ' ')
+      // Replace line breaks with " · " to preserve structure (e.g., "# Header · 1. First item")
+      .replace(/[\r\n]+/g, ' · ')
+      // Clean up multiple spaces (but not the · separators)
+      .replace(/ {2,}/g, ' ')
+      // Remove separators at start/end and clean up double separators
+      .replace(/^[\s·]+|[\s·]+$/g, '')
+      .replace(/ · · /g, ' · ')
       .trim()
   );
 }

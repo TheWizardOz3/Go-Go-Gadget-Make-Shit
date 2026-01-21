@@ -473,6 +473,8 @@ export interface CloudSession {
   source: 'cloud';
   /** Unified project identifier (git remote URL or project name) for cross-environment matching */
   projectIdentifier?: string;
+  /** First user message preview (truncated) */
+  preview?: string | null;
 }
 
 // ============================================================

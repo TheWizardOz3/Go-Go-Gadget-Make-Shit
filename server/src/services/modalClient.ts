@@ -575,6 +575,7 @@ export async function listCloudSessions(projectPath: string): Promise<ListSessio
       messageCount: s.messageCount,
       status: s.status || 'idle',
       source: 'cloud' as const,
+      preview: s.preview ?? null,
     }));
 
     return {
@@ -610,7 +611,7 @@ export async function getCloudMessages(
   try {
     const response = await modalFetch(
       config,
-      `/api/sessions/${sessionId}/messages?project_path=${encodeURIComponent(projectPath)}`
+      `/api/sessions/${sessionId}/messages?projectPath=${encodeURIComponent(projectPath)}`
     );
 
     if (!response.ok) {
@@ -627,10 +628,20 @@ export async function getCloudMessages(
       };
     }
 
-    const data = await response.json();
+    const rawData: unknown = await response.json();
+
+    // Modal wraps responses in { data: ... }
+    const rawDataObj = rawData as Record<string, unknown>;
+    const data = rawDataObj.data || rawData;
     const parsed = GetMessagesResponseSchema.safeParse(data);
 
     if (!parsed.success) {
+      logger.debug('Messages parse error', {
+        sessionId,
+        error: parsed.error.message,
+        rawKeys: typeof rawData === 'object' && rawData ? Object.keys(rawData) : [],
+        dataKeys: typeof data === 'object' && data ? Object.keys(data as object) : 'null',
+      });
       return {
         success: false,
         error: 'Invalid messages response',
