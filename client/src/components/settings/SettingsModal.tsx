@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, forwardRef } from 'react';
 import { cn } from '@/lib/cn';
 import { useSettings, sendTestNotification } from '@/hooks/useSettings';
+import { useApiEndpointContext } from '@/hooks/useApiEndpoint';
 import { ServerlessSettingsSection } from './ServerlessSettingsSection';
 import { getDebugLogs, clearDebugLogs } from '@/lib/debugLog';
 import type {
@@ -215,11 +216,15 @@ function isValidPhoneNumber(phone: string): boolean {
 }
 
 /**
- * Debug Logs Section - shows API logs for troubleshooting cloud mode
+ * Debug Section - cloud mode testing and API logs for troubleshooting
  */
-function DebugLogsSection() {
+function DebugSection() {
   const [logs, setLogs] = useState<ReturnType<typeof getDebugLogs>>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const { mode, isLaptopAvailable, forceMode } = useApiEndpointContext();
+
+  // Track if we're forcing cloud mode (when laptop is available but we want cloud)
+  const isForcingCloud = mode === 'cloud' && isLaptopAvailable;
 
   const refreshLogs = () => setLogs(getDebugLogs());
 
@@ -230,6 +235,16 @@ function DebugLogsSection() {
   const handleClear = () => {
     clearDebugLogs();
     setLogs([]);
+  };
+
+  const handleToggleForceCloud = () => {
+    if (isForcingCloud) {
+      // Clear forced mode - let auto-detection take over
+      forceMode(null);
+    } else {
+      // Force cloud mode for testing
+      forceMode('cloud');
+    }
   };
 
   const logCount = logs.length;
@@ -258,7 +273,7 @@ function DebugLogsSection() {
               d="M12 12.75c1.148 0 2.278.08 3.383.237 1.037.146 1.866.966 1.866 2.013 0 3.728-2.35 6.75-5.25 6.75S6.75 18.728 6.75 15c0-1.046.83-1.867 1.866-2.013A24.204 24.204 0 0112 12.75zm0 0c2.883 0 5.647.508 8.207 1.44a23.91 23.91 0 01-1.152 6.06M12 12.75c-2.883 0-5.647.508-8.207 1.44a23.91 23.91 0 001.152 6.06M12 12.75V6.75m0 0a2.25 2.25 0 10-4.5 0 2.25 2.25 0 004.5 0z"
             />
           </svg>
-          <span className="text-base font-medium text-text-primary">Debug Logs</span>
+          <span className="text-base font-medium text-text-primary">Developer</span>
           {logCount > 0 && (
             <span className="px-1.5 py-0.5 text-xs bg-text-primary/10 rounded-full">
               {logCount}
@@ -277,67 +292,97 @@ function DebugLogsSection() {
       </button>
 
       {isExpanded && (
-        <div className="mt-3 space-y-2">
-          <p className="text-xs text-text-muted">API logs for troubleshooting cloud mode issues.</p>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={refreshLogs}
-              className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const text = logs
-                  .map((log) => {
-                    const time = new Date(log.timestamp).toLocaleTimeString();
-                    const data = log.data !== undefined ? ` ${JSON.stringify(log.data)}` : '';
-                    return `${time} ${log.level.toUpperCase()}: ${log.message}${data}`;
-                  })
-                  .join('\n');
-                navigator.clipboard.writeText(text);
-              }}
-              className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
-            >
-              Copy
-            </button>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
-            >
-              Clear
-            </button>
+        <div className="mt-3 space-y-4">
+          {/* Force Cloud Mode toggle */}
+          <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0 pr-3">
+                <p className="text-sm font-medium text-text-primary">Force Cloud Mode</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {isLaptopAvailable
+                    ? 'Test cloud mode while laptop is connected'
+                    : 'Laptop not detected (already in cloud mode)'}
+                </p>
+              </div>
+              <Toggle
+                enabled={isForcingCloud}
+                onChange={handleToggleForceCloud}
+                disabled={!isLaptopAvailable}
+                label="Force cloud mode for testing"
+              />
+            </div>
+            {isForcingCloud && (
+              <p className="text-xs text-violet-400 mt-2">
+                ☁️ Cloud mode forced. Toggle off to return to local.
+              </p>
+            )}
           </div>
 
-          {logs.length === 0 ? (
-            <p className="text-xs text-text-muted italic">No logs yet.</p>
-          ) : (
-            <div className="max-h-48 overflow-y-auto rounded-lg bg-black/50 p-2 text-[10px] font-mono">
-              {logs.map((log, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'py-0.5',
-                    log.level === 'error' && 'text-red-400',
-                    log.level === 'warn' && 'text-yellow-400',
-                    log.level === 'info' && 'text-text-secondary'
-                  )}
-                >
-                  <span className="text-text-muted">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </span>{' '}
-                  <span className="uppercase">{log.level}</span>: {log.message}
-                  {log.data !== undefined && (
-                    <span className="text-text-muted"> {String(JSON.stringify(log.data))}</span>
-                  )}
-                </div>
-              ))}
+          {/* Debug Logs */}
+          <div>
+            <p className="text-xs text-text-muted mb-2">
+              API logs for troubleshooting cloud mode issues.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={refreshLogs}
+                className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
+              >
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const text = logs
+                    .map((log) => {
+                      const time = new Date(log.timestamp).toLocaleTimeString();
+                      const data = log.data !== undefined ? ` ${JSON.stringify(log.data)}` : '';
+                      return `${time} ${log.level.toUpperCase()}: ${log.message}${data}`;
+                    })
+                    .join('\n');
+                  navigator.clipboard.writeText(text);
+                }}
+                className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="px-2 py-1 text-xs bg-surface-elevated rounded border border-text-primary/10 hover:bg-text-primary/5"
+              >
+                Clear
+              </button>
             </div>
-          )}
+
+            {logs.length === 0 ? (
+              <p className="text-xs text-text-muted italic mt-2">No logs yet.</p>
+            ) : (
+              <div className="max-h-48 overflow-y-auto rounded-lg bg-black/50 p-2 text-[10px] font-mono mt-2">
+                {logs.map((log, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'py-0.5',
+                      log.level === 'error' && 'text-red-400',
+                      log.level === 'warn' && 'text-yellow-400',
+                      log.level === 'info' && 'text-text-secondary'
+                    )}
+                  >
+                    <span className="text-text-muted">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>{' '}
+                    <span className="uppercase">{log.level}</span>: {log.message}
+                    {log.data !== undefined && (
+                      <span className="text-text-muted"> {String(JSON.stringify(log.data))}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>
@@ -1095,8 +1140,8 @@ export function SettingsModal({ isOpen, onClose, className }: SettingsModalProps
                 onUpdateSettings={updateSettings}
               />
 
-              {/* Debug Logs Section */}
-              <DebugLogsSection />
+              {/* Developer Section (Force Cloud Mode + Debug Logs) */}
+              <DebugSection />
 
               {/* Info Section */}
               <section className="pt-4 border-t border-text-primary/10">

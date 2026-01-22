@@ -78,8 +78,8 @@ export interface UseApiEndpointReturn {
   error: string | null;
   /** Force a connectivity check now */
   checkNow: () => Promise<void>;
-  /** Force switch to a specific mode (for testing) */
-  forceMode: (mode: ApiEndpointMode) => void;
+  /** Force switch to a specific mode (for testing). Pass null to clear and return to auto-detection. */
+  forceMode: (mode: ApiEndpointMode | null) => void;
 }
 
 // ============================================================
@@ -223,15 +223,24 @@ export function useApiEndpoint(): UseApiEndpointReturn {
 
   /**
    * Force switch to a specific mode (bypasses auto-detection)
+   * Pass null to clear forced mode and return to auto-detection
    */
-  const forceMode = useCallback((newMode: ApiEndpointMode) => {
-    setForcedMode(newMode);
-    setMode(newMode);
+  const forceMode = useCallback(
+    (newMode: ApiEndpointMode | null) => {
+      setForcedMode(newMode);
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, newMode);
-    }
-  }, []);
+      if (newMode !== null) {
+        setMode(newMode);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, newMode);
+        }
+      } else {
+        // Clear forced mode - trigger a fresh connectivity check
+        performCheck();
+      }
+    },
+    [performCheck]
+  );
 
   // Initial check on mount
   useEffect(() => {

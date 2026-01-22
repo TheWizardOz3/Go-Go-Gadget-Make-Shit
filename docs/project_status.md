@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-21 (v0.28.3 - Session picker preview fixes)
+**Last Updated**: 2026-01-22 (v0.28.5 - Force Cloud Mode toggle for testing)
 
 ---
 

@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.5 | 2026-01-22 | patch | Force Cloud Mode toggle for testing |
 | 0.28.4 | 2026-01-21 | patch | Fix cloud scheduled prompts - Modal URL, startup sync |
 | 0.28.3 | 2026-01-21 | patch | Session picker preview fixes - cloud previews and line break handling |
 | 0.28.2 | 2026-01-21 | patch | Cloud session messages fix - Modal message format parsing |
@@ -66,6 +67,13 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.5] - 2026-01-22
+
+### Added
+- **Force Cloud Mode toggle** - New toggle in Settings > Developer section to force Cloud mode for testing even when laptop is connected. Useful for testing cloud functionality without disconnecting from Tailscale.
 
 ---
 
