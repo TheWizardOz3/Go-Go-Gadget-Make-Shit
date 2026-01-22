@@ -13,6 +13,17 @@ vi.mock('execa', () => ({
   execa: vi.fn(),
 }));
 
+// Mock fs/promises
+vi.mock('node:fs/promises', () => ({
+  default: {
+    stat: vi.fn().mockResolvedValue({
+      isDirectory: () => true,
+    }),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 // Mock settings service to return allowEdits: false by default
 vi.mock('./settingsService.js', () => ({
   getSettings: vi.fn().mockResolvedValue({
@@ -105,6 +116,25 @@ describe('claudeService', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Failed to start Claude');
+    });
+
+    it('should return error when project directory does not exist', async () => {
+      // Mock fs.stat to throw ENOENT
+      const fs = await import('node:fs/promises');
+      vi.mocked(fs.default.stat).mockRejectedValueOnce(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      );
+
+      const result = await sendPrompt({
+        sessionId: 'test-session',
+        projectPath: '/nonexistent/path',
+        prompt: 'Test prompt',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Project directory does not exist');
+      // execa should NOT have been called
+      expect(mockExeca).not.toHaveBeenCalled();
     });
 
     it('should pass the exact prompt text', async () => {

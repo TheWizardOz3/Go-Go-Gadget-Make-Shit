@@ -110,6 +110,28 @@ export async function sendPrompt(options: SendPromptOptions): Promise<SendPrompt
     hasImage: !!imageAttachment,
   });
 
+  // Validate project directory exists before attempting to spawn
+  try {
+    const stat = await fs.stat(projectPath);
+    if (!stat.isDirectory()) {
+      logger.error('Project path is not a directory', { sessionId, projectPath });
+      return {
+        success: false,
+        error: `Project path is not a directory: ${projectPath}`,
+      };
+    }
+  } catch (err) {
+    logger.error('Project directory does not exist', {
+      sessionId,
+      projectPath,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    return {
+      success: false,
+      error: `Project directory does not exist: ${projectPath}`,
+    };
+  }
+
   // If there's an image attachment, save it to a temp file
   let tempImagePath: string | null = null;
   if (imageAttachment) {
@@ -314,6 +336,27 @@ export async function startNewSession(
     hasPrompt: !!prompt,
     promptLength: prompt?.length ?? 0,
   });
+
+  // Validate project directory exists before attempting to spawn
+  try {
+    const stat = await fs.stat(projectPath);
+    if (!stat.isDirectory()) {
+      logger.error('Project path is not a directory', { projectPath });
+      return {
+        success: false,
+        error: `Project path is not a directory: ${projectPath}`,
+      };
+    }
+  } catch (err) {
+    logger.error('Project directory does not exist', {
+      projectPath,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    return {
+      success: false,
+      error: `Project directory does not exist: ${projectPath}`,
+    };
+  }
 
   try {
     // Check settings for allowEdits flag

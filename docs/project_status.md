@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-22 (v0.28.6 - Cloud mode loading performance optimization)
+**Last Updated**: 2026-01-22 (v0.28.8 - Filter orphaned projects, fix server crash on missing paths)
 
 ---
 

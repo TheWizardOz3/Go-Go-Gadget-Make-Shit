@@ -13,6 +13,8 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.8 | 2026-01-22 | patch | Filter orphaned projects (renamed/moved/deleted paths) from project list |
+| 0.28.7 | 2026-01-22 | patch | Fix server crash when project directory doesn't exist |
 | 0.28.6 | 2026-01-22 | patch | Cloud mode loading performance - instant render with cached data |
 | 0.28.5 | 2026-01-22 | patch | Force Cloud Mode toggle for testing |
 | 0.28.4 | 2026-01-21 | patch | Fix cloud scheduled prompts - Modal URL, startup sync |
@@ -68,6 +70,50 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.8] - 2026-01-22
+
+### Summary
+**Filter Orphaned Projects** - Projects that have been renamed, moved, or deleted on disk are now automatically filtered from the project list. This prevents users from selecting projects that no longer exist, which could cause errors when attempting to send prompts.
+
+### Changed
+- **`scanProjects()`** now verifies each project directory exists on disk before including it in results
+- **`getProject()`** now includes a `pathExists` boolean field indicating whether the project directory exists
+- Orphaned projects are logged at DEBUG level for diagnostics
+
+### Technical Details
+- When a project is renamed/moved (e.g., `/Users/derek/Waygate-Test-App` → `/Users/derek/Waygate/Test/App`), Claude Code's session data remains in `~/.claude/projects/` pointing to the old path
+- Previously, these orphaned projects would appear in the project list but fail when used
+- Now, projects are filtered during scanning using the existing `directoryExists()` helper
+- Added `pathExists?: boolean` field to `Project` interface
+
+### Test Count
+- Server: 304 tests
+- Client: 423 tests
+- Total: 727 tests
+
+---
+
+## [0.28.7] - 2026-01-22
+
+### Summary
+**Fix Server Crash on Non-Existent Project** - Prevented server crashes when attempting to start a Claude session or send a prompt to a project directory that no longer exists. The server now validates that the project directory exists before spawning the Claude process.
+
+### Fixed
+- **Server no longer crashes when project directory doesn't exist** - Added pre-spawn validation to `sendPrompt()` and `startNewSession()` in `claudeService.ts`
+- **Graceful error handling** - Returns descriptive error message ("Project directory does not exist: /path") instead of unhandled exception
+
+### Technical Details
+- **Root cause:** User had a project (`Waygate-Test-App`) in the Claude sessions that no longer existed on disk. When they sent a prompt from their phone, `execa` attempted to spawn Claude with an invalid `cwd`, causing an unhandled promise rejection that crashed the Node.js server.
+- **Fix:** Added `fs.stat()` validation before calling `execa()` to verify the project path exists and is a directory.
+- Added corresponding test case: "should return error when project directory does not exist"
+
+### Test Count
+- Server: 304 tests (+1)
+- Client: 423 tests
+- Total: 727 tests
 
 ---
 

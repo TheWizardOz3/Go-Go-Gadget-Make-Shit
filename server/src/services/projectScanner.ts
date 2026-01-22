@@ -40,6 +40,8 @@ export interface Project {
   lastSessionId?: string;
   /** Last activity timestamp */
   lastActivityAt?: Date;
+  /** Whether the project directory exists on disk (false = orphaned) */
+  pathExists?: boolean;
 }
 
 /** Summary of a session for listing */
@@ -173,6 +175,18 @@ export async function scanProjects(): Promise<Project[]> {
       const decodedPath = projectPath || decodePath(entry.name);
       const projectName = getProjectName(decodedPath);
 
+      // Check if the actual project directory exists on disk
+      // If not, this is an "orphaned" project (renamed/moved/deleted)
+      const projectPathExists = await directoryExists(decodedPath);
+      if (!projectPathExists) {
+        logger.debug('Skipping orphaned project (path no longer exists)', {
+          encodedPath: entry.name,
+          decodedPath,
+          sessionCount: mainSessionFiles.length,
+        });
+        continue;
+      }
+
       // Find the most recent session from main session files
       let lastActivityAt: Date | null = null;
       let lastSessionId: string | undefined;
@@ -201,6 +215,7 @@ export async function scanProjects(): Promise<Project[]> {
         sessionCount: mainSessionFiles.length,
         lastSessionId,
         lastActivityAt: lastActivityAt ?? undefined,
+        pathExists: true, // We already verified this above
       });
     }
 
@@ -262,6 +277,9 @@ export async function getProject(encodedPath: string): Promise<Project | null> {
   const decodedPath = projectPath || decodePath(encodedPath);
   const projectName = getProjectName(decodedPath);
 
+  // Check if the actual project directory exists on disk
+  const projectPathExists = await directoryExists(decodedPath);
+
   // Find the most recent session from main session files
   let lastActivityAt: Date | null = null;
   let lastSessionId: string | undefined;
@@ -290,6 +308,7 @@ export async function getProject(encodedPath: string): Promise<Project | null> {
     sessionCount: mainSessionFiles.length,
     lastSessionId,
     lastActivityAt: lastActivityAt ?? undefined,
+    pathExists: projectPathExists,
   };
 }
 
