@@ -102,16 +102,52 @@ function setStoredSession(encodedPath: string | null, sessionId: string | null):
 
 /**
  * Loading screen shown while determining API endpoint
+ *
+ * Shows a skeleton of the app UI rather than a blank screen,
+ * providing visual feedback and reducing perceived load time.
+ * This screen is rarely shown for returning cloud users (they see cached data).
  */
 function InitializationLoader() {
   return (
-    <div className="dark h-dvh flex flex-col items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-4">
-        {/* Spinner */}
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-        {/* Text */}
-        <p className="text-text-muted text-sm">Connecting...</p>
+    <div className={cn('dark', 'h-dvh', 'flex', 'flex-col', 'bg-background', 'overflow-hidden')}>
+      {/* Header skeleton */}
+      <header className="flex-shrink-0 px-3 py-1.5 border-b border-text-primary/10 bg-surface safe-top">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+            {/* Project name skeleton */}
+            <div className="h-5 w-32 bg-text-primary/10 rounded animate-pulse" />
+            {/* Session skeleton */}
+            <div className="h-4 w-48 bg-text-primary/5 rounded animate-pulse" />
+          </div>
+          <div className="flex items-center gap-1">
+            {/* Connection badge skeleton */}
+            <div className="h-5 w-16 bg-text-primary/10 rounded-full animate-pulse" />
+            {/* Status skeleton */}
+            <div className="h-5 w-12 bg-text-primary/10 rounded-full animate-pulse" />
+          </div>
+        </div>
+      </header>
+
+      {/* Content skeleton - conversation */}
+      <div className="flex-1 overflow-hidden">
+        <ConversationSkeleton />
       </div>
+
+      {/* Connecting indicator */}
+      <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div className="flex flex-col items-center gap-4 p-6 rounded-xl bg-surface shadow-lg">
+          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          <p className="text-text-muted text-sm">Connecting to server...</p>
+        </div>
+      </div>
+
+      {/* Tab bar skeleton */}
+      <nav className="flex-shrink-0 border-t border-text-primary/10 bg-surface safe-bottom">
+        <div className="flex items-center justify-around py-2">
+          <div className="h-8 w-12 bg-text-primary/10 rounded animate-pulse" />
+          <div className="h-8 w-12 bg-text-primary/10 rounded animate-pulse" />
+        </div>
+      </nav>
     </div>
   );
 }

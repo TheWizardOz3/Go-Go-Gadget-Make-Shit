@@ -170,12 +170,12 @@ describe('TemplateChips', () => {
   });
 
   describe('touch target size', () => {
-    it('buttons have minimum height of 44px for accessibility', () => {
+    it('buttons have minimum height of 36px for compact display', () => {
       render(<TemplateChips templates={mockTemplates} onSelect={vi.fn()} />);
 
       const buttons = screen.getAllByRole('button');
       buttons.forEach((button) => {
-        expect(button).toHaveClass('min-h-[44px]');
+        expect(button).toHaveClass('min-h-[36px]');
       });
     });
   });
@@ -256,12 +256,12 @@ describe('TemplateChipsSkeleton', () => {
     expect(widths).toEqual(['80px', '100px', '70px', '90px']);
   });
 
-  it('skeleton chips have correct height for touch targets', () => {
+  it('skeleton chips have correct height matching template chips', () => {
     const { container } = render(<TemplateChipsSkeleton />);
 
     const skeletonChips = container.querySelectorAll('.animate-pulse');
     skeletonChips.forEach((chip) => {
-      expect(chip).toHaveClass('h-[44px]');
+      expect(chip).toHaveClass('h-[36px]');
     });
   });
 

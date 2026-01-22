@@ -150,7 +150,8 @@ describe('PromptInput', () => {
       const sendButton = screen.getByRole('button', { name: /send/i });
       await user.click(sendButton);
 
-      expect(mockOnSend).toHaveBeenCalledWith('Hello Claude');
+      // onSend is called with (prompt, imageAttachment) - imageAttachment is undefined when no image attached
+      expect(mockOnSend).toHaveBeenCalledWith('Hello Claude', undefined);
     });
 
     it('should clear input after send', async () => {
@@ -182,7 +183,8 @@ describe('PromptInput', () => {
       await user.type(textarea, 'Hello');
       await user.keyboard('{Enter}');
 
-      expect(mockOnSend).toHaveBeenCalledWith('Hello');
+      // onSend is called with (prompt, imageAttachment) - imageAttachment is undefined when no image attached
+      expect(mockOnSend).toHaveBeenCalledWith('Hello', undefined);
     });
 
     it('should not send on Shift+Enter (allows newline)', async () => {

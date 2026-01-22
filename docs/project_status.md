@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-22 (v0.28.5 - Force Cloud Mode toggle for testing)
+**Last Updated**: 2026-01-22 (v0.28.6 - Cloud mode loading performance optimization)
 
 ---
 
@@ -54,9 +54,7 @@
 
 ## V0.75 Progress — COMPLETE ✅
 
-**Test Count: 617 tests** (423 client + 194 server)
-
-**Note**: Test count now at 682 tests (423 client + 259 server) after V1 features.
+**Test Count: 726 tests** (423 client + 303 server)
 
 | Feature/Task                | Completion Date | Notes                                                                                                           |
 |-----------------------------|-----------------|-----------------------------------------------------------------------------------------------------------------|
@@ -116,6 +114,14 @@
 - **Cloud session messages not loading**: `useConversation` now routes to cloud API for cloud sessions
 - **Modal API endpoint mismatch**: Updated `modalClient.ts` to use correct FastAPI paths
 - **Production build same-origin check**: Fixed `useApiEndpoint` to check same origin for production builds
+
+### v0.28.6 Performance Optimization (2026-01-22)
+
+- **Cloud mode loading performance** - Reduced loading times from 5-7s to <1s for returning cloud users
+- Instant render with cached projects/sessions from localStorage
+- Skip local session fetch when laptop is known unavailable
+- Faster 2s connectivity check timeout for returning cloud users
+- Improved skeleton UI during initialization
 
 ---
 

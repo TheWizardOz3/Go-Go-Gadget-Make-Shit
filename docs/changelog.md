@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.6 | 2026-01-22 | patch | Cloud mode loading performance - instant render with cached data |
 | 0.28.5 | 2026-01-22 | patch | Force Cloud Mode toggle for testing |
 | 0.28.4 | 2026-01-21 | patch | Fix cloud scheduled prompts - Modal URL, startup sync |
 | 0.28.3 | 2026-01-21 | patch | Session picker preview fixes - cloud previews and line break handling |
@@ -67,6 +68,32 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.6] - 2026-01-22
+
+### Summary
+**Cloud Mode Loading Performance** - Significantly reduced loading times when opening the webapp in cloud mode. Users now see cached data instantly instead of waiting 5+ seconds for connectivity checks.
+
+### Changed
+- **Instant render with cached data** - Projects and sessions now display immediately from localStorage cache while fresh data loads in the background
+- **Faster connectivity check for returning cloud users** - Reduced timeout from 5s to 2s when laptop hasn't been recently available
+- **Skip unnecessary local fetches in cloud mode** - No longer attempts to fetch local sessions when laptop is known to be unavailable
+- **Improved initialization flow** - Returning cloud users see `isInitialized: true` immediately, allowing instant display of cached content
+
+### Technical Details
+- `useProjects.ts`: Added SWR `fallbackData` from localStorage cache for instant render; skips API fetch entirely in cloud mode
+- `useSessions.ts`: Added session caching to localStorage; uses `fallbackData` for instant display; reduced local fetch timeout from 5s to 2s
+- `useApiEndpoint.tsx`: Track laptop availability history; mark initialized immediately for returning cloud users; use faster timeout when laptop was recently unavailable
+- `App.tsx`: Improved `InitializationLoader` to show skeleton UI instead of blank "Connecting..." screen
+
+### Performance Improvements
+| Metric | Before | After |
+|--------|--------|-------|
+| Cloud mode initial render | 5-7 seconds | <1 second |
+| Returning cloud user | 5 second wait | Instant (cached) |
+| Local session fetch timeout | 5 seconds | 2 seconds (cloud mode) |
 
 ---
 

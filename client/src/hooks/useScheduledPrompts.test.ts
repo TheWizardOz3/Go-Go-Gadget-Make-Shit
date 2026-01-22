@@ -92,9 +92,9 @@ describe('useScheduledPrompts utilities', () => {
       expect(formatNextRun(undefined)).toBe('Not scheduled');
     });
 
-    it('should return "Any moment" for past dates', () => {
+    it('should return "Missed - tap to run" for past dates', () => {
       const pastDate = new Date(Date.now() - 60000).toISOString();
-      expect(formatNextRun(pastDate)).toBe('Any moment');
+      expect(formatNextRun(pastDate)).toBe('Missed - tap to run');
     });
 
     it('should return "Less than a minute" for very near future', () => {

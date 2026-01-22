@@ -49,11 +49,17 @@ function getConfiguredUrls(): { laptopUrl: string; modalUrl: string } {
 /** How often to check laptop availability (ms) */
 const LAPTOP_CHECK_INTERVAL = 30000; // 30 seconds
 
-/** Timeout for laptop connectivity check (ms) */
+/** Timeout for laptop connectivity check (ms) - normal */
 const LAPTOP_CHECK_TIMEOUT = 5000; // 5 seconds
+
+/** Faster timeout for returning cloud users (ms) */
+const LAPTOP_CHECK_TIMEOUT_FAST = 2000; // 2 seconds
 
 /** Local storage key for last known mode */
 const STORAGE_KEY = 'gogogadget-api-mode';
+
+/** Local storage key for tracking last laptop availability */
+const STORAGE_KEY_LAST_AVAILABLE = 'gogogadget-laptop-last-available';
 
 // ============================================================
 // Types
@@ -91,13 +97,21 @@ export interface UseApiEndpointReturn {
  *
  * Sends a lightweight request to the /api/status endpoint.
  * Uses AbortController for timeout handling.
+ * Uses faster timeout for returning cloud users (who likely have laptop unavailable).
+ *
+ * @param laptopUrl - The laptop URL to check
+ * @param useFastTimeout - Use shorter timeout for returning cloud users
  */
-async function checkLaptopAvailability(laptopUrl: string): Promise<boolean> {
+async function checkLaptopAvailability(
+  laptopUrl: string,
+  useFastTimeout = false
+): Promise<boolean> {
   // If laptopUrl is empty, check same origin (for production builds served by Express)
   const checkUrl = laptopUrl || '';
 
+  const timeout = useFastTimeout ? LAPTOP_CHECK_TIMEOUT_FAST : LAPTOP_CHECK_TIMEOUT;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), LAPTOP_CHECK_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
     const response = await fetch(`${checkUrl}/api/status`, {
@@ -115,6 +129,33 @@ async function checkLaptopAvailability(laptopUrl: string): Promise<boolean> {
     return false;
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Get whether the laptop was recently available
+ * Returns true if laptop was available in the last 5 minutes
+ */
+function wasLaptopRecentlyAvailable(): boolean {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_LAST_AVAILABLE);
+    if (!stored) return false;
+    const lastAvailable = parseInt(stored, 10);
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    return lastAvailable > fiveMinutesAgo;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Record that the laptop is currently available
+ */
+function recordLaptopAvailable(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_LAST_AVAILABLE, Date.now().toString());
+  } catch {
+    // Ignore localStorage errors
   }
 }
 
@@ -159,14 +200,28 @@ export function useApiEndpoint(): UseApiEndpointReturn {
   const [error, setError] = useState<string | null>(null);
 
   // Track if initial connectivity check has completed
-  // This prevents SWR from fetching with wrong URL during startup
-  const [isInitialized, setIsInitialized] = useState(false);
+  // OPTIMIZATION: Mark initialized immediately for returning cloud users with cached data
+  // This allows them to see cached content while we check connectivity in background
+  const [isInitialized, setIsInitialized] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const storedMode = localStorage.getItem(STORAGE_KEY);
+      // If user was in cloud mode and laptop wasn't recently available,
+      // consider initialized immediately (will recheck in background)
+      if (storedMode === 'cloud' && !wasLaptopRecentlyAvailable()) {
+        return true;
+      }
+    }
+    return false;
+  });
 
   // Track if component is mounted to avoid state updates after unmount
   const isMountedRef = useRef(true);
 
   // Track forced mode (for testing/debugging)
   const [forcedMode, setForcedMode] = useState<ApiEndpointMode | null>(null);
+
+  // Track if this is the first check (to use faster timeout for returning cloud users)
+  const isFirstCheckRef = useRef(true);
 
   /**
    * Perform a connectivity check and update state
@@ -177,13 +232,24 @@ export function useApiEndpoint(): UseApiEndpointReturn {
     setIsChecking(true);
     setError(null);
 
+    // Use faster timeout for returning cloud users on first check
+    // If laptop was recently available, use normal timeout
+    const useFastTimeout =
+      isFirstCheckRef.current && mode === 'cloud' && !wasLaptopRecentlyAvailable();
+    isFirstCheckRef.current = false;
+
     try {
-      const available = await checkLaptopAvailability(laptopUrl);
+      const available = await checkLaptopAvailability(laptopUrl, useFastTimeout);
 
       if (!isMountedRef.current) return;
 
       setIsLaptopAvailable(available);
       setLastCheckedAt(new Date());
+
+      // Record availability for future optimization
+      if (available) {
+        recordLaptopAvailable();
+      }
 
       // Auto-switch mode based on availability (unless forced)
       if (forcedMode === null) {
@@ -212,7 +278,7 @@ export function useApiEndpoint(): UseApiEndpointReturn {
         setIsInitialized(true);
       }
     }
-  }, [laptopUrl, isCloudConfigured, forcedMode]);
+  }, [laptopUrl, isCloudConfigured, forcedMode, mode]);
 
   /**
    * Force immediate connectivity check

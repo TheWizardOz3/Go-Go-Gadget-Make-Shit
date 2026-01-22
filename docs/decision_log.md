@@ -13,6 +13,7 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-027 | 2026-01-22 | ui       | active | Instant render with cached data for cloud mode            |
 | ADR-026 | 2026-01-18 | arch     | active | Persistent repo volumes with explicit push for cloud mode |
 | ADR-025 | 2026-01-18 | arch     | active | Cloud session continuation via Claude CLI --continue flag |
 | ADR-024 | 2026-01-18 | infra    | active | Persistent client-side debug logging for cloud mode       |
@@ -49,6 +50,70 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-027: Instant Render with Cached Data for Cloud Mode
+
+**Date:** 2026-01-22  
+**Category:** ui  
+**Status:** active
+
+#### Context & Trigger
+
+Users reported very slow loading times when opening the webapp in cloud mode. The loading delay was 5-7 seconds due to:
+
+1. **Sequential initialization blocking** - App waited for 5-second laptop connectivity check before showing anything
+2. **No cached data during initialization** - Even though projects/sessions were cached in localStorage, they weren't displayed until after connectivity check
+3. **Unnecessary local fetches** - In cloud mode, still attempted to fetch local sessions (5-second timeout)
+
+User feedback: "The loading times when opening the webapp (primarily in cloud mode) are very slow -- it takes a long time for anything to render on screen."
+
+#### Decision
+
+Implement **instant render with cached data** pattern:
+
+1. **SWR `fallbackData` from localStorage** - Projects and sessions use cached data as fallback, displaying instantly while fresh data loads in background
+2. **Early initialization for returning cloud users** - If user was previously in cloud mode and laptop wasn't recently available, mark `isInitialized: true` immediately
+3. **Skip unnecessary fetches** - In cloud mode, don't attempt local session fetch when laptop is known to be unavailable
+4. **Faster timeout for returning cloud users** - Use 2-second timeout instead of 5-second for connectivity check when laptop wasn't recently available
+
+#### Implementation
+
+**`useProjects.ts`:**
+- Added `fallbackData: initialCachedProjects` to SWR config
+- Skip API fetch entirely in cloud mode (use cache only)
+- Added `isFromCache` return value
+
+**`useSessions.ts`:**
+- Added session caching to localStorage
+- Use `fallbackData` from cache for instant display
+- Skip local fetch when laptop not recently available (2-minute window)
+- Reduced timeout from 5s to 2s
+
+**`useApiEndpoint.tsx`:**
+- Track laptop availability history in localStorage
+- Mark `isInitialized: true` immediately for returning cloud users
+- Use faster timeout when laptop wasn't recently available
+
+**Performance Impact:**
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Cloud mode initial render | 5-7 seconds | <1 second |
+| Returning cloud user | 5 second wait | Instant (cached) |
+
+#### Alternatives Considered
+
+1. **Service Worker caching** - More complex, overkill for this use case
+2. **Server-side rendering** - Not applicable (SPA architecture)
+3. **Preload data in index.html** - Would require server changes
+
+#### AI Instructions
+
+- When adding new data hooks that fetch from API, consider adding localStorage caching and SWR `fallbackData` for instant display
+- Cloud mode should prioritize cached data over API calls to avoid unnecessary timeouts
+- Track resource availability history to make smarter timeout decisions
+
+---
 
 ### ADR-026: Persistent Repo Volumes with Explicit Push
 

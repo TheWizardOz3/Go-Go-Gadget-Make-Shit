@@ -6,7 +6,9 @@
  */
 
 import useSWR from 'swr';
+import { useEffect, useMemo } from 'react';
 import { api, getApiMode } from '@/lib/api';
+import { cacheSessions, getCachedSessions } from '@/lib/localCache';
 import type { SessionSummarySerialized, CloudSession, SessionStatus } from '@shared/types';
 
 // ============================================================
@@ -84,16 +86,38 @@ function getLaptopUrl(): string | null {
   return import.meta.env.VITE_LAPTOP_API_URL || null;
 }
 
+/** Local storage key for tracking laptop availability */
+const STORAGE_KEY_LAPTOP_AVAILABLE = 'gogogadget-laptop-last-available';
+
+/**
+ * Check if laptop was recently available (within last 2 minutes)
+ * Used to decide whether to attempt local fetch in cloud mode
+ */
+function isLaptopLikelyAvailable(): boolean {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_LAPTOP_AVAILABLE);
+    if (!stored) return false;
+    const lastAvailable = parseInt(stored, 10);
+    const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+    return lastAvailable > twoMinutesAgo;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Fetch local sessions from the laptop server
  *
- * When in cloud mode, explicitly calls the laptop URL to get local sessions.
- * This allows seeing both local and cloud sessions regardless of current mode.
+ * OPTIMIZATION: In cloud mode, skip fetching if laptop is known to be unavailable.
+ * This avoids waiting for a 5-second timeout on every session load.
+ *
+ * When in cloud mode AND laptop was recently available, still attempt to fetch
+ * (handles cases where user reconnected to local network).
  */
 async function fetchLocalSessions(encodedPath: string): Promise<SessionSummarySerialized[]> {
   const currentMode = getApiMode();
 
-  // In cloud mode, try to fetch from laptop directly
+  // In cloud mode, only try to fetch from laptop if it was recently available
   if (currentMode === 'cloud') {
     const laptopUrl = getLaptopUrl();
     if (!laptopUrl) {
@@ -101,11 +125,17 @@ async function fetchLocalSessions(encodedPath: string): Promise<SessionSummarySe
       return [];
     }
 
+    // OPTIMIZATION: Skip fetch if laptop hasn't been available recently
+    // This saves ~5 seconds on every page load in cloud mode
+    if (!isLaptopLikelyAvailable()) {
+      return [];
+    }
+
     try {
-      // Make direct request to laptop API
+      // Make direct request to laptop API with shorter timeout
       return await api.get<SessionSummarySerialized[]>(`/projects/${encodedPath}/sessions`, {
         baseUrl: laptopUrl,
-        timeout: 5000,
+        timeout: 2000, // Reduced from 5s to 2s for faster failure
       });
     } catch {
       // Laptop unreachable in cloud mode - this is expected when laptop is asleep
@@ -346,6 +376,23 @@ export function useSessions(
     ? ['sessions', encodedPath, projectPath || '', projectIdentifier || ''].join(':')
     : null;
 
+  // Get cached sessions for fallback data (instant render)
+  const cachedSessions = useMemo(() => {
+    if (!encodedPath) return undefined;
+    const cached = getCachedSessions(encodedPath);
+    if (!cached || cached.length === 0) return undefined;
+    // Convert cached sessions to merged format (assume they were local)
+    return {
+      sessions: cached.map((s) => ({
+        ...s,
+        source: 'local' as const,
+      })),
+      cloudAvailable: false,
+      cloudCount: 0,
+      localCount: cached.length,
+    };
+  }, [encodedPath]);
+
   const { data, error, isLoading, mutate } = useSWR<{
     sessions: MergedSessionSummary[];
     cloudAvailable: boolean;
@@ -364,6 +411,8 @@ export function useSessions(
             localCount: 0,
           }),
     {
+      // Use cached sessions as fallback for instant render
+      fallbackData: cachedSessions,
       // Revalidate every 10 seconds
       refreshInterval: 10000,
       // Revalidate when window regains focus
@@ -375,9 +424,23 @@ export function useSessions(
     }
   );
 
+  // Cache sessions to localStorage when we get fresh data from local mode
+  useEffect(() => {
+    if (data?.sessions && data.sessions.length > 0 && encodedPath && getApiMode() === 'local') {
+      // Only cache local sessions (cloud sessions are fetched from Modal)
+      const localSessions = data.sessions.filter((s) => s.source === 'local');
+      if (localSessions.length > 0) {
+        cacheSessions(encodedPath, localSessions);
+      }
+    }
+  }, [data?.sessions, encodedPath]);
+
+  // Don't show loading if we have cached data
+  const effectiveIsLoading = isLoading && !data?.sessions?.length;
+
   return {
     sessions: data?.sessions,
-    isLoading,
+    isLoading: effectiveIsLoading,
     error,
     cloudAvailable: data?.cloudAvailable ?? false,
     cloudCount: data?.cloudCount ?? 0,
