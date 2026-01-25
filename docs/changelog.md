@@ -13,6 +13,7 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.11 | 2026-01-25 | patch | Latency optimization - thinking indicator, optimistic UI, Modal warm containers |
 | 0.28.10 | 2026-01-25 | patch | Cloud scheduled prompts fix - timezone migration, ntfy notifications, improved logging |
 | 0.28.9 | 2026-01-22 | patch | Timezone fix for scheduled prompts - run at correct local time in cloud |
 | 0.28.8 | 2026-01-22 | patch | Filter orphaned projects (renamed/moved/deleted paths) from project list |
@@ -72,6 +73,36 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.11] - 2026-01-25
+
+### Summary
+
+Latency optimization release that improves perceived performance in cloud mode through thinking indicators, optimistic UI updates, and Modal container warming.
+
+### Added
+
+- **ThinkingIndicator component** - Animated "Claude is thinking..." indicator with elapsed time counter and shimmer progress bar
+- **Optimistic message display** - User messages appear instantly in the UI before server confirmation
+- **Shimmer CSS animation** - New animation utility for thinking indicator
+
+### Changed
+
+- **MessageList** now shows thinking indicator when status is 'working' or optimistic message pending
+- **ConversationView** manages optimistic message state with auto-clear on server confirmation
+- **Modal API** now keeps 1 container warm (`min_containers=1`) to reduce cold starts
+- **Volume reload rate limiting** - Volume reloads limited to every 2 seconds max (reduces redundant calls during polling)
+
+### Performance Impact
+
+| Improvement | Impact |
+|-------------|--------|
+| Warm containers | Reduces cold start from ~5s to ~0.5s |
+| Rate-limited reloads | Saves ~200-500ms per request |
+| Optimistic UI | Instant user feedback (0ms perceived) |
+| Thinking indicator | Clear status visibility |
 
 ---
 

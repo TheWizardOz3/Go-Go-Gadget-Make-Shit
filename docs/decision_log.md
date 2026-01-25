@@ -13,6 +13,7 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-029 | 2026-01-25 | arch     | active | Latency optimization via warm containers and optimistic UI |
 | ADR-028 | 2026-01-25 | arch     | active | Always sync settings and add backup notifications for cloud scheduled prompts |
 | ADR-027 | 2026-01-22 | ui       | active | Instant render with cached data for cloud mode            |
 | ADR-026 | 2026-01-18 | arch     | active | Persistent repo volumes with explicit push for cloud mode |
@@ -51,6 +52,54 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-029: Latency Optimization via Warm Containers and Optimistic UI
+
+**Date:** 2026-01-25  
+**Category:** arch  
+**Status:** active
+
+#### Context & Trigger
+
+Cloud mode experienced high perceived latency due to:
+1. Modal cold starts taking 1-5 seconds per request
+2. `volume.reload()` called on every API request (200-500ms overhead)
+3. No visual feedback during message send/receive cycle
+4. Users uncertain if Claude was actually processing
+
+#### Decision
+
+Implement multi-pronged latency optimization:
+
+1. **Warm Modal containers**: Set `min_containers=1` on ASGI function to keep one container always ready, eliminating cold starts for most requests.
+
+2. **Rate-limited volume reloads**: Implement `reload_volume_if_needed()` that only reloads volume every 2 seconds max, reducing redundant reloads during rapid polling.
+
+3. **Optimistic UI**: Show user messages immediately in conversation view before server confirmation, providing instant perceived feedback.
+
+4. **Thinking indicator**: Display animated "Claude is thinking..." indicator when status is 'working', with elapsed time counter for transparency.
+
+#### Implementation
+
+- `ThinkingIndicator.tsx` - New component with pulse animation, typing dots, shimmer progress
+- `MessageList.tsx` - Accepts `status` and `optimisticMessage` props
+- `ConversationView.tsx` - Manages optimistic message state, clears on server confirmation
+- `modal_app.py` - Added `reload_volume_if_needed()`, `min_containers=1`
+
+#### Rationale
+
+- **Warm containers** trade cost (~$0.02/hr) for responsiveness - acceptable for personal tool
+- **Rate limiting** is safe because session data changes infrequently (seconds apart)
+- **Optimistic UI** is standard pattern in modern apps (see Twitter, Slack)
+- **Thinking indicator** reduces perceived wait time by providing progress feedback
+
+#### AI Instructions
+
+- When adding new Modal endpoints, use `reload_volume_if_needed(volume)` instead of `volume.reload()`
+- When adding user actions that hit the server, consider optimistic UI patterns
+- Use `min_containers=1` for frequently-accessed Modal functions
+
+---
 
 ### ADR-028: Always Sync Settings and Backup Notifications for Cloud Scheduled Prompts
 

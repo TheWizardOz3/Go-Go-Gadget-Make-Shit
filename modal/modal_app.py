@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,32 @@ import modal
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# =============================================================================
+# Volume Caching (reduces volume.reload() calls for better latency)
+# =============================================================================
+
+# In-memory timestamp of last volume reload
+# This allows us to skip redundant reloads within a short window
+_last_volume_reload: float = 0.0
+_VOLUME_RELOAD_INTERVAL_SECONDS: float = 2.0  # Only reload every 2 seconds max
+
+
+def reload_volume_if_needed(vol: modal.Volume, force: bool = False) -> None:
+    """
+    Reload volume only if enough time has passed since the last reload.
+    This reduces latency by avoiding redundant reload calls during rapid requests.
+    
+    Args:
+        vol: The Modal volume to reload
+        force: If True, reload regardless of timing
+    """
+    global _last_volume_reload
+    now = time.time()
+    
+    if force or (now - _last_volume_reload) > _VOLUME_RELOAD_INTERVAL_SECONDS:
+        vol.reload()
+        _last_volume_reload = now
 
 # =============================================================================
 # Default Templates (matches server/src/services/templateService.ts)
@@ -1276,7 +1303,7 @@ def list_projects() -> list[dict[str, Any]]:
     Returns:
         List of project objects with path, name, encodedPath, sessionCount, etc.
     """
-    volume.reload()  # Ensure we see latest data
+    reload_volume_if_needed(volume)  # Rate-limited reload
 
     claude_dir = Path("/root/.claude/projects")
     projects = []
@@ -1336,7 +1363,7 @@ def get_sessions(encoded_path: str) -> list[dict[str, Any]]:
     Returns:
         List of session summary objects
     """
-    volume.reload()  # Ensure we see latest data
+    reload_volume_if_needed(volume)  # Rate-limited reload
 
     # Remove cloud- prefix if present
     if encoded_path.startswith("cloud-"):
@@ -1589,7 +1616,7 @@ def get_messages(session_id: str, encoded_path: str) -> dict[str, Any]:
     Returns:
         Object with messages array and status
     """
-    volume.reload()  # Ensure we see latest data
+    reload_volume_if_needed(volume)  # Rate-limited reload
 
     # Remove cloud- prefix if present
     if encoded_path.startswith("cloud-"):
@@ -1634,7 +1661,7 @@ def get_context_summary(session_id: str, encoded_path: str) -> dict[str, Any] | 
     Returns:
         Context summary dict or None if session not found
     """
-    volume.reload()
+    reload_volume_if_needed(volume)  # Rate-limited reload
 
     # Remove cloud- prefix if present
     if encoded_path.startswith("cloud-"):
@@ -1801,7 +1828,7 @@ async def api_get_context_summary(session_id: str, encoded_path: str = ""):
     """
     if not encoded_path:
         # Search all projects for the session
-        volume.reload()
+        reload_volume_if_needed(volume)
         base_path = Path("/root/.claude/projects")
         if base_path.exists():
             for project_dir in base_path.iterdir():
@@ -1829,7 +1856,7 @@ async def api_get_messages(
     """Get messages for a session."""
     # If no projectPath provided, search all projects for this session
     if not encoded_path:
-        volume.reload()
+        reload_volume_if_needed(volume)
         claude_dir = Path("/root/.claude/projects")
         if claude_dir.exists():
             for project_dir in claude_dir.iterdir():
@@ -1964,8 +1991,8 @@ async def api_get_cloud_sessions(projectPath: str = Query(None)):
     Claude Code stores sessions in ~/.claude/projects/[encoded-path]/[session-id].jsonl
     """
     try:
-        # Refresh volume to see latest sessions
-        volume.reload()
+        # Refresh volume to see latest sessions (with rate limiting)
+        reload_volume_if_needed(volume)
         
         claude_dir = Path("/root/.claude/projects")
         if not claude_dir.exists():
@@ -2244,6 +2271,9 @@ async def api_sync_scheduled_prompts(request: SyncScheduledPromptsRequest):
         modal.Secret.from_name("ANTHROPIC_API_KEY"),
         modal.Secret.from_name("GROQ_API_KEY"),
     ],
+    # Keep container warm to reduce cold start latency
+    # This keeps at least 1 container ready to serve requests
+    min_containers=1,
 )
 @modal.asgi_app()
 def fastapi_app():

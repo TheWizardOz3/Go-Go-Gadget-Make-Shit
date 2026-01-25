@@ -88,6 +88,13 @@ export function ConversationView({
   // Text to insert into PromptInput (from template selection)
   const [textToInsert, setTextToInsert] = useState<string | undefined>(undefined);
 
+  // Optimistic message - shown immediately while send is in progress
+  // This provides instant feedback before polling picks up the actual message
+  const [optimisticMessage, setOptimisticMessage] = useState<{
+    content: string;
+    timestamp: string;
+  } | null>(null);
+
   // Pass source and projectPath for cloud sessions
   const { messages, status, isLoading, error, refresh, isValidating } = useConversation(sessionId, {
     source: sessionSource,
@@ -357,6 +364,28 @@ export function ConversationView({
   }, [messages?.length, userScrolledUp, scrollToBottom]);
 
   /**
+   * Clear optimistic message when the actual message appears in the list
+   * This happens when polling picks up the message from the server
+   */
+  useEffect(() => {
+    if (!optimisticMessage || !messages || messages.length === 0) return;
+
+    // Check if any recent user message matches our optimistic message content
+    // Look at the last few messages since the optimistic one should be recent
+    const recentMessages = messages.slice(-5);
+    const found = recentMessages.some(
+      (msg) =>
+        msg.type === 'user' &&
+        typeof msg.content === 'string' &&
+        msg.content.trim() === optimisticMessage.content.trim()
+    );
+
+    if (found) {
+      setOptimisticMessage(null);
+    }
+  }, [messages, optimisticMessage]);
+
+  /**
    * Reset scroll state when session changes
    */
   useEffect(() => {
@@ -461,6 +490,15 @@ export function ConversationView({
         hasImageAttachment: !!imageAttachment,
       });
 
+      // Show optimistic message immediately for instant feedback
+      // This displays the user's message before polling confirms it
+      if (trimmedPrompt) {
+        setOptimisticMessage({
+          content: trimmedPrompt,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       const result = await sendPromptAdvanced(trimmedPrompt, undefined, imageAttachment);
       debugLog.info('sendPromptAdvanced result', {
         success: result.success,
@@ -495,6 +533,8 @@ export function ConversationView({
         // Scroll to bottom after a short delay to allow for UI update
         setTimeout(() => scrollToBottom('smooth'), 100);
       } else if (result.errorMessage) {
+        // Clear optimistic message on error
+        setOptimisticMessage(null);
         // Show error to user
         setToast({ message: result.errorMessage, type: 'error' });
       }
@@ -770,7 +810,7 @@ export function ConversationView({
           }}
         >
           {/* Messages */}
-          <MessageList messages={messages} />
+          <MessageList messages={messages} status={status} optimisticMessage={optimisticMessage} />
 
           {/* Scroll anchor for auto-scroll */}
           <div ref={messagesEndRef} className="h-px" />

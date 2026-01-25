@@ -2,15 +2,24 @@
  * MessageList - Renders a list of conversation messages
  *
  * Simple list component that renders MessageTurn components.
+ * Shows a thinking indicator when Claude is actively processing.
  */
 
 import { cn } from '@/lib/cn';
 import { MessageTurn } from './MessageTurn';
-import type { MessageSerialized } from '@shared/types';
+import { ThinkingIndicator } from './ThinkingIndicator';
+import type { MessageSerialized, SessionStatus } from '@shared/types';
 
 interface MessageListProps {
   /** Array of messages to render */
   messages: MessageSerialized[];
+  /** Current session status - shows thinking indicator when 'working' */
+  status?: SessionStatus;
+  /** Optimistic message to show at the end (before server confirms) */
+  optimisticMessage?: {
+    content: string;
+    timestamp: string;
+  } | null;
   /** Additional CSS classes */
   className?: string;
 }
@@ -64,20 +73,49 @@ function hasDisplayableContent(message: MessageSerialized): boolean {
 /**
  * MessageList component - renders messages in order
  *
+ * Shows a thinking indicator at the bottom when status is 'working',
+ * providing immediate visual feedback that Claude is processing.
+ * Also supports optimistic message display for instant user feedback.
+ *
  * @example
  * ```tsx
- * <MessageList messages={messages} />
+ * <MessageList
+ *   messages={messages}
+ *   status="working"
+ *   optimisticMessage={{ content: "Fix the bug", timestamp: "2024-01-01T00:00:00Z" }}
+ * />
  * ```
  */
-export function MessageList({ messages, className }: MessageListProps) {
+export function MessageList({ messages, status, optimisticMessage, className }: MessageListProps) {
   // Filter out empty messages
   const displayableMessages = messages.filter(hasDisplayableContent);
+
+  // Show thinking indicator when Claude is actively working
+  // OR when we have an optimistic message (user just sent, waiting for server)
+  const isThinking = status === 'working' || !!optimisticMessage;
 
   return (
     <div className={cn('flex flex-col', className)}>
       {displayableMessages.map((message) => (
         <MessageTurn key={message.id} message={message} />
       ))}
+
+      {/* Optimistic user message - shown immediately before server confirms */}
+      {optimisticMessage && (
+        <MessageTurn
+          message={{
+            id: 'optimistic-pending',
+            sessionId: '',
+            type: 'user',
+            content: optimisticMessage.content,
+            timestamp: optimisticMessage.timestamp,
+          }}
+          className="opacity-70" // Slightly faded to indicate pending state
+        />
+      )}
+
+      {/* Thinking indicator - shows when Claude is processing */}
+      {isThinking && <ThinkingIndicator />}
     </div>
   );
 }
