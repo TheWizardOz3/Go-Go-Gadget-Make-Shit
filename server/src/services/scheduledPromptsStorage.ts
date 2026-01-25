@@ -97,6 +97,7 @@ const ScheduledPromptSchema = z.object({
   prompt: z.string().min(1),
   scheduleType: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
   timeOfDay: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
+  timezone: z.string().optional(), // IANA timezone (e.g., "America/Los_Angeles")
   dayOfWeek: z.number().int().min(0).max(6).optional(),
   dayOfMonth: z.number().int().min(1).max(28).optional(),
   projectPath: z.string().nullable(),
@@ -116,6 +117,7 @@ const ScheduledPromptInputSchema = z.object({
   prompt: z.string().min(1, 'Prompt text is required'),
   scheduleType: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
   timeOfDay: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
+  timezone: z.string().optional(), // IANA timezone (e.g., "America/Los_Angeles")
   dayOfWeek: z.number().int().min(0).max(6).optional(),
   dayOfMonth: z.number().int().min(1).max(28).optional(),
   projectPath: z.string().nullable(),
@@ -249,6 +251,19 @@ export async function getPromptById(id: string): Promise<ScheduledPrompt | null>
 }
 
 /**
+ * Get the system's IANA timezone identifier
+ */
+function getSystemTimezone(): string {
+  try {
+    // Intl.DateTimeFormat().resolvedOptions().timeZone returns IANA timezone
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    // Fallback to UTC if timezone detection fails
+    return 'UTC';
+  }
+}
+
+/**
  * Create a new scheduled prompt
  *
  * @param input - Prompt configuration
@@ -259,11 +274,15 @@ export async function createPrompt(input: ScheduledPromptInput): Promise<Schedul
 
   const prompts = await getAllPrompts();
 
+  // Use provided timezone or detect system timezone
+  const timezone = input.timezone || getSystemTimezone();
+
   const newPrompt: ScheduledPrompt = {
     id: randomUUID(),
     prompt: input.prompt,
     scheduleType: input.scheduleType,
     timeOfDay: input.timeOfDay,
+    timezone, // Store timezone for cloud execution
     dayOfWeek: input.dayOfWeek,
     dayOfMonth: input.dayOfMonth,
     projectPath: input.projectPath,
@@ -279,6 +298,7 @@ export async function createPrompt(input: ScheduledPromptInput): Promise<Schedul
     id: newPrompt.id,
     scheduleType: newPrompt.scheduleType,
     timeOfDay: newPrompt.timeOfDay,
+    timezone: newPrompt.timezone,
   });
 
   // Sync to cloud
@@ -316,11 +336,19 @@ export async function updatePrompt(
     prompt: updated.prompt,
     scheduleType: updated.scheduleType,
     timeOfDay: updated.timeOfDay,
+    timezone: updated.timezone,
     dayOfWeek: updated.dayOfWeek,
     dayOfMonth: updated.dayOfMonth,
     projectPath: updated.projectPath,
   };
   validateInput(combined);
+
+  // If timezone was updated or missing, ensure it's set
+  if (!updated.timezone && input.timezone) {
+    updated.timezone = input.timezone;
+  } else if (!updated.timezone) {
+    updated.timezone = getSystemTimezone();
+  }
 
   prompts[index] = updated;
   await writePromptsFile({ prompts });

@@ -32,7 +32,8 @@ interface EnrichedPrompt extends ScheduledPrompt {
 /** Sync request payload */
 interface SyncPayload {
   prompts: EnrichedPrompt[];
-  settings?: {
+  // Settings are always included to ensure cloud gets latest config
+  settings: {
     ntfyTopic?: string;
   };
 }
@@ -49,14 +50,37 @@ function getProjectName(projectPath: string): string {
 }
 
 /**
- * Enrich prompts with git remote URLs and project names
- * Required for cloud execution which needs to clone repos
+ * Get the system's IANA timezone identifier
+ */
+function getSystemTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
+
+/**
+ * Enrich prompts with git remote URLs, project names, and ensure timezone is set
+ * Required for cloud execution which needs to clone repos and run at correct times
  */
 async function enrichPromptsWithGitInfo(prompts: ScheduledPrompt[]): Promise<EnrichedPrompt[]> {
   const enriched: EnrichedPrompt[] = [];
+  const systemTimezone = getSystemTimezone();
 
   for (const prompt of prompts) {
     const enrichedPrompt: EnrichedPrompt = { ...prompt };
+
+    // CRITICAL: Ensure timezone is always set for cloud execution
+    // If prompt doesn't have timezone, use the system timezone
+    // This prevents cloud from defaulting to UTC and running at wrong time
+    if (!enrichedPrompt.timezone) {
+      enrichedPrompt.timezone = systemTimezone;
+      logger.debug('Added missing timezone to prompt for cloud sync', {
+        promptId: prompt.id,
+        timezone: systemTimezone,
+      });
+    }
 
     if (prompt.projectPath) {
       try {
@@ -100,7 +124,7 @@ export async function syncPromptsToModal(): Promise<boolean> {
     // Get all prompts
     const prompts = await getAllPrompts();
 
-    // Enrich with git info
+    // Enrich with git info and ensure timezone is set
     const enrichedPrompts = await enrichPromptsWithGitInfo(prompts);
 
     // Get settings for ntfy topic
@@ -108,10 +132,22 @@ export async function syncPromptsToModal(): Promise<boolean> {
     const ntfyTopic = settings.channels?.ntfy?.topic;
 
     // Build sync payload
+    // IMPORTANT: Always include settings object, even if ntfyTopic is empty
+    // This ensures the cloud gets updated settings on every sync
+    // Previously, settings were only synced if ntfyTopic existed, which caused
+    // stale settings to persist in Modal Dict
     const payload: SyncPayload = {
       prompts: enrichedPrompts,
-      settings: ntfyTopic ? { ntfyTopic } : undefined,
+      settings: {
+        ntfyTopic: ntfyTopic || undefined,
+      },
     };
+
+    logger.debug('Syncing scheduled prompts to Modal', {
+      promptCount: enrichedPrompts.length,
+      hasNtfyTopic: !!ntfyTopic,
+      promptIds: enrichedPrompts.map((p) => p.id.slice(0, 8)),
+    });
 
     // Send to Modal
     const response = await fetch(`${MODAL_API_URL}/api/scheduled-prompts/sync`, {

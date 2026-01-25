@@ -338,8 +338,13 @@ export interface ScheduledPrompt {
   prompt: string;
   /** Recurrence pattern */
   scheduleType: ScheduleType;
-  /** Time of day in "HH:MM" 24h format (e.g., "09:00") */
+  /** Time of day in "HH:MM" 24h format (e.g., "09:00") in user's local timezone */
   timeOfDay: string;
+  /**
+   * IANA timezone identifier for timeOfDay (e.g., "America/Los_Angeles")
+   * If not set, defaults to system timezone on local server, UTC on cloud
+   */
+  timezone?: string;
   /** Day of week 0-6 (Sun-Sat), required for 'weekly' */
   dayOfWeek?: number;
   /** Day of month 1-28, required for 'monthly' */
@@ -352,7 +357,7 @@ export interface ScheduledPrompt {
   createdAt: string;
   /** Most recent execution result */
   lastExecution?: LastExecution;
-  /** Next scheduled run time */
+  /** Next scheduled run time (always in UTC) */
   nextRunAt?: string;
 }
 
@@ -364,6 +369,11 @@ export interface ScheduledPromptInput {
   scheduleType: ScheduleType;
   /** Time of day in "HH:MM" 24h format */
   timeOfDay: string;
+  /**
+   * IANA timezone identifier (e.g., "America/Los_Angeles")
+   * If not provided, server will use system timezone
+   */
+  timezone?: string;
   /** Day of week 0-6, required if weekly */
   dayOfWeek?: number;
   /** Day of month 1-28, required if monthly */

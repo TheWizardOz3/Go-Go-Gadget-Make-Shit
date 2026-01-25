@@ -13,6 +13,7 @@
 
 | ID      | Date       | Category | Status | Summary                                                   |
 |---------|------------|----------|--------|-----------------------------------------------------------|
+| ADR-028 | 2026-01-25 | arch     | active | Always sync settings and add backup notifications for cloud scheduled prompts |
 | ADR-027 | 2026-01-22 | ui       | active | Instant render with cached data for cloud mode            |
 | ADR-026 | 2026-01-18 | arch     | active | Persistent repo volumes with explicit push for cloud mode |
 | ADR-025 | 2026-01-18 | arch     | active | Cloud session continuation via Claude CLI --continue flag |
@@ -50,6 +51,70 @@
 ## Log Entries
 
 <!-- Add new entries below this line, newest first -->
+
+### ADR-028: Always Sync Settings and Backup Notifications for Cloud Scheduled Prompts
+
+**Date:** 2026-01-25  
+**Category:** arch  
+**Status:** active
+
+#### Context & Trigger
+
+Cloud-based scheduled prompts were failing to:
+1. Run at correct local times (running at UTC instead)
+2. Send ntfy notifications after completion
+
+Root causes identified:
+- **Timezone migration missing**: Prompts created before timezone support lacked the `timezone` field. When synced to Modal, the cloud scheduler defaulted to UTC.
+- **Settings conditionally synced**: The sync service only sent settings to Modal when `ntfyTopic` was defined. If undefined, settings weren't synced, leaving stale settings.
+- **Notification reliability**: The cloud scheduler relied entirely on `execute_prompt` for notifications with no backup.
+
+#### Decision
+
+1. **Always sync settings to Modal**: Even if `ntfyTopic` is empty/undefined, always include the `settings` object in sync payload. This ensures the cloud always has the latest configuration.
+
+2. **Timezone migration during sync**: When enriching prompts for cloud sync, check if `timezone` is missing and add the system timezone. This ensures existing prompts get proper timezone info.
+
+3. **Backup notification in scheduler**: Add direct notification logic in `check_scheduled_prompts()` cron function as a backup, not relying solely on `execute_prompt`.
+
+#### Implementation
+
+**`scheduledPromptsSyncService.ts`:**
+```typescript
+// Always include settings object (not conditional)
+const payload: SyncPayload = {
+  prompts: enrichedPrompts,
+  settings: {
+    ntfyTopic: ntfyTopic || undefined,
+  },
+};
+
+// Add timezone to prompts missing it
+if (!enrichedPrompt.timezone) {
+  enrichedPrompt.timezone = systemTimezone;
+}
+```
+
+**`modal_app.py`:**
+```python
+# Always store settings, even if empty
+settings = request.settings or {}
+scheduled_prompts_dict["settings"] = settings
+
+# Backup notification in check_scheduled_prompts
+if ntfy_topic:
+    _send_ntfy_notification(ntfy_topic, title, message, priority)
+```
+
+#### AI Instructions
+
+When working with cloud sync services:
+- Always sync configuration objects, not just when they have values
+- Add fallback/migration logic for missing fields in data
+- Don't rely on a single code path for critical operations like notifications
+- Add comprehensive logging to distributed systems for debugging
+
+---
 
 ### ADR-027: Instant Render with Cached Data for Cloud Mode
 

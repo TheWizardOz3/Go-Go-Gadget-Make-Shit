@@ -68,7 +68,6 @@ Developers often have recurring tasks they want Claude to handle on a schedule �
 - One-time scheduled prompts (only recurring schedules for MVP)
 - Complex cron expressions — use friendly UI instead
 - Full execution history/log (only tracking last execution per prompt)
-- Timezone configuration — uses system timezone
 - "Run now" button to manually trigger a scheduled prompt (can add later)
 
 ---
@@ -165,14 +164,15 @@ interface ScheduledPrompt {
   id: string;                      // UUID
   prompt: string;                  // The prompt text to send
   scheduleType: ScheduleType;      // Recurrence pattern
-  timeOfDay: string;               // "HH:MM" in 24h format (e.g., "09:00")
+  timeOfDay: string;               // "HH:MM" in 24h format (e.g., "09:00") in user's timezone
+  timezone?: string;               // IANA timezone (e.g., "America/Los_Angeles")
   dayOfWeek?: number;              // 0-6 (Sun-Sat), required for 'weekly'
   dayOfMonth?: number;             // 1-28, required for 'monthly'
   projectPath: string | null;      // Specific project path, or null for global
   enabled: boolean;                // Whether actively scheduled
   createdAt: string;               // ISO timestamp
   lastExecution?: LastExecution;   // Most recent execution result
-  nextRunAt?: string;              // ISO timestamp of next scheduled run
+  nextRunAt?: string;              // ISO timestamp of next scheduled run (always UTC)
 }
 
 // Storage: ~/.gogogadgetclaude/scheduled-prompts.json
@@ -354,9 +354,12 @@ Not required — feature is additive and non-breaking. Ship when ready.
    - Sufficient for debugging without storage bloat
    - Full history can be added later if needed
 
-5. **System timezone only**
-   - Store and execute in local time
-   - Keep simple for single-user local app
+5. **Timezone handling**
+   - `timeOfDay` is stored in user's local timezone (e.g., "08:45" means 8:45 AM in their timezone)
+   - `timezone` field stores IANA identifier (e.g., "America/Los_Angeles")
+   - `nextRunAt` is always stored in UTC for consistent comparison
+   - Local server uses system timezone for cron jobs (assumes user's timezone matches)
+   - Cloud (Modal) converts local time to UTC using the stored timezone field
 
 ---
 
@@ -464,4 +467,6 @@ Scheduled prompts can now run even when your laptop is offline via Modal cloud e
 
 *Created: 2026-01-17*
 *Updated: 2026-01-19 — Added cloud-based scheduling via Modal, edit functionality for prompts.*
+*Updated: 2026-01-22 — Fixed timezone handling for cloud scheduler. Prompts now run at correct local time.*
+*Updated: 2026-01-25 — Fixed timezone migration for existing prompts, fixed ntfy notifications not being sent for scheduled prompts.*
 

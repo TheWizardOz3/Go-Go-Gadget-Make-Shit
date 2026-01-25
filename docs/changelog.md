@@ -13,6 +13,8 @@
 
 | Version | Date | Type | Summary |
 |---------|------|------|---------|
+| 0.28.10 | 2026-01-25 | patch | Cloud scheduled prompts fix - timezone migration, ntfy notifications, improved logging |
+| 0.28.9 | 2026-01-22 | patch | Timezone fix for scheduled prompts - run at correct local time in cloud |
 | 0.28.8 | 2026-01-22 | patch | Filter orphaned projects (renamed/moved/deleted paths) from project list |
 | 0.28.7 | 2026-01-22 | patch | Fix server crash when project directory doesn't exist |
 | 0.28.6 | 2026-01-22 | patch | Cloud mode loading performance - instant render with cached data |
@@ -70,6 +72,53 @@
 ## [Unreleased]
 
 *No unreleased changes.*
+
+---
+
+## [0.28.10] - 2026-01-25
+
+### Summary
+**Cloud Scheduled Prompts Fix** - Fixed multiple issues preventing cloud-scheduled prompts from running correctly and sending notifications. Prompts now properly sync timezone information and ntfy settings to Modal for correct execution timing and push notifications.
+
+### Fixed
+- **Timezone migration for cloud sync**: Prompts missing the `timezone` field now automatically get the system timezone added during sync to Modal, preventing prompts from running at UTC time instead of local time
+- **Settings always synced**: Previously, settings (including `ntfyTopic`) were only synced to Modal if the ntfy topic was set. Now settings are always synced, ensuring the cloud scheduler has the latest configuration
+- **Cloud scheduler notification delivery**: Added backup notification logic in `check_scheduled_prompts` to ensure notifications are always sent for scheduled prompt executions, even if `execute_prompt` doesn't handle them
+- **Improved cloud scheduler logging**: Added comprehensive debug logging to help diagnose future issues with scheduled prompts
+
+### Technical Details
+- `scheduledPromptsSyncService.ts`: Added `getSystemTimezone()` helper and timezone migration in `enrichPromptsWithGitInfo()` 
+- `scheduledPromptsSyncService.ts`: Changed `SyncPayload.settings` from optional to required, always includes settings object
+- `modal_app.py`: Enhanced `check_scheduled_prompts()` with detailed logging and direct ntfy notification support
+- `modal_app.py`: Added `_send_ntfy_notification()` helper function for reliable notification delivery
+- `modal_app.py`: Updated `api_sync_scheduled_prompts()` to always store settings (not just when they exist)
+
+---
+
+## [0.28.9] - 2026-01-22
+
+### Summary
+**Timezone Fix for Scheduled Prompts** - Fixed scheduled prompts executing at wrong times when running in the cloud. The `timeOfDay` field (e.g., "08:45") now correctly respects the user's timezone (stored in new `timezone` field) instead of being interpreted as UTC by the cloud scheduler.
+
+### Fixed
+- **Cloud scheduled prompts now run at correct local time** - Previously, a prompt scheduled for "08:45" in PST would be interpreted as 08:45 UTC by Modal, causing it to run at 12:45 AM PST instead. Now prompts correctly use the user's timezone.
+- **Missed prompt detection** - The EOD briefing wasn't running because `nextRunAt` was stuck in the past. Fixed by properly recalculating `nextRunAt` with timezone awareness.
+
+### Added
+- **Timezone field on scheduled prompts** - Each prompt now stores an IANA timezone identifier (e.g., "America/Los_Angeles"). New prompts automatically capture the system timezone.
+- **Timezone-aware cloud scheduler** - Modal's cron job now correctly converts `timeOfDay` from the user's timezone to UTC before checking if prompts are due.
+- **Debug logging in cloud scheduler** - Added detailed logging showing timezone conversions to help diagnose scheduling issues.
+
+### Changed
+- **Existing prompts migrated** - All existing scheduled prompts have been updated to include `timezone: "America/Los_Angeles"` (PST).
+- **`nextRunAt` is always in UTC** - The stored `nextRunAt` value is now always in UTC (ISO 8601 format) for consistent comparison, while `timeOfDay` remains in the user's local timezone.
+
+### Technical Details
+- Updated `ScheduledPrompt` interface with optional `timezone` field
+- Updated `ScheduledPromptInput` interface to accept timezone
+- Modified `scheduledPromptsStorage.ts` to detect and store system timezone on prompt creation
+- Updated Modal's `calculate_next_run_at()` to convert local time to UTC using `zoneinfo`
+- Updated Modal's `is_prompt_due()` with enhanced debug logging
 
 ---
 

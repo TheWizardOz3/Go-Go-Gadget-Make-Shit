@@ -44,6 +44,7 @@ const createPromptSchema = z.object({
   prompt: z.string().min(1, 'Prompt text is required'),
   scheduleType: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
   timeOfDay: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format (24h)'),
+  timezone: z.string().optional(), // IANA timezone (e.g., "America/Los_Angeles")
   dayOfWeek: z.number().int().min(0).max(6).optional(),
   dayOfMonth: z.number().int().min(1).max(28).optional(),
   projectPath: z.string().nullable(),
@@ -59,6 +60,7 @@ const updatePromptSchema = z.object({
     .string()
     .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format (24h)')
     .optional(),
+  timezone: z.string().optional(), // IANA timezone (e.g., "America/Los_Angeles")
   dayOfWeek: z.number().int().min(0).max(6).optional(),
   dayOfMonth: z.number().int().min(1).max(28).optional(),
   projectPath: z.string().nullable().optional(),

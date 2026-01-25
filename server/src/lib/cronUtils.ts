@@ -3,9 +3,31 @@
  *
  * Converts ScheduledPrompt configurations to cron patterns for node-cron.
  * Also provides utilities for calculating next run times.
+ *
+ * TIMEZONE HANDLING:
+ * - timeOfDay is stored in the user's local timezone (e.g., "08:45" means 8:45 AM in their timezone)
+ * - timezone field stores the IANA timezone identifier (e.g., "America/Los_Angeles")
+ * - nextRunAt is always stored in UTC (ISO 8601 format) for consistent comparison
+ * - Local server: node-cron runs in system timezone, which should match user's timezone
+ * - Cloud (Modal): Receives timezone info and converts timeOfDay to UTC for scheduling
  */
 
 import type { ScheduledPrompt } from '../../../shared/types/index.js';
+
+// ============================================================
+// Timezone Utilities
+// ============================================================
+
+/**
+ * Get the system's IANA timezone identifier
+ */
+export function getSystemTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
 
 // ============================================================
 // Cron Pattern Generation

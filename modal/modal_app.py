@@ -880,10 +880,53 @@ def push_repo_changes(project_name: str, repo_url: str) -> dict[str, Any]:
 # =============================================================================
 
 
+def get_timezone_offset_hours(tz_name: str, dt: datetime) -> float:
+    """
+    Get the UTC offset in hours for a given timezone at a specific datetime.
+    Uses Python's zoneinfo (3.9+) for accurate timezone handling.
+    
+    Args:
+        tz_name: IANA timezone name (e.g., "America/Los_Angeles")
+        dt: The datetime to get the offset for (important for DST)
+    
+    Returns:
+        Offset in hours (negative for west of UTC, e.g., -8 for PST)
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(tz_name)
+        # Create a datetime in the target timezone
+        local_dt = dt.replace(tzinfo=timezone.utc).astimezone(tz)
+        # Get the UTC offset
+        offset = local_dt.utcoffset()
+        if offset:
+            return offset.total_seconds() / 3600
+        return 0
+    except Exception as e:
+        print(f"Warning: Failed to get timezone offset for {tz_name}: {e}")
+        # Common timezone fallbacks
+        tz_offsets = {
+            "America/Los_Angeles": -8,  # PST (or -7 for PDT)
+            "America/New_York": -5,     # EST (or -4 for EDT)
+            "America/Chicago": -6,      # CST
+            "America/Denver": -7,       # MST
+            "Europe/London": 0,
+            "Europe/Paris": 1,
+            "Asia/Tokyo": 9,
+            "UTC": 0,
+        }
+        return tz_offsets.get(tz_name, 0)
+
+
 def calculate_next_run_at(prompt: dict[str, Any]) -> str:
     """
     Calculate the next run time for a scheduled prompt.
-    Returns ISO timestamp string.
+    Returns ISO timestamp string in UTC.
+    
+    TIMEZONE HANDLING:
+    - timeOfDay is in the user's local timezone (stored in prompt["timezone"])
+    - We convert to UTC for storage and comparison
+    - If timezone is not set, we assume UTC (for backwards compatibility)
     """
     from datetime import timedelta
     
@@ -892,10 +935,41 @@ def calculate_next_run_at(prompt: dict[str, Any]) -> str:
     hour = int(time_parts[0])
     minute = int(time_parts[1]) if len(time_parts) > 1 else 0
     
-    # Start with today at the scheduled time (in local time, then convert)
-    # Note: This assumes the user wants times in their local timezone
-    # For simplicity, we'll treat timeOfDay as UTC
-    next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    # Get the user's timezone (default to UTC for backwards compatibility)
+    user_timezone = prompt.get("timezone", "UTC")
+    
+    # Calculate the UTC offset for the user's timezone
+    # Negative offset means west of UTC (e.g., PST is -8)
+    offset_hours = get_timezone_offset_hours(user_timezone, now)
+    
+    # Convert user's local time to UTC
+    # If user wants 08:45 PST (-8), that's 08:45 + 8 = 16:45 UTC
+    utc_hour = hour - int(offset_hours)  # Subtract because offset is already signed
+    utc_minute = minute - int((offset_hours % 1) * 60)
+    
+    # Handle minute overflow/underflow
+    if utc_minute < 0:
+        utc_minute += 60
+        utc_hour -= 1
+    elif utc_minute >= 60:
+        utc_minute -= 60
+        utc_hour += 1
+    
+    # Handle hour overflow/underflow (day boundary)
+    day_offset = 0
+    if utc_hour < 0:
+        utc_hour += 24
+        day_offset = -1
+    elif utc_hour >= 24:
+        utc_hour -= 24
+        day_offset = 1
+    
+    # Start with today at the calculated UTC time
+    next_run = now.replace(hour=utc_hour, minute=utc_minute, second=0, microsecond=0)
+    
+    # Apply day offset from timezone conversion
+    if day_offset != 0:
+        next_run += timedelta(days=day_offset)
     
     schedule_type = prompt.get("scheduleType", "daily")
     
@@ -932,7 +1006,13 @@ def calculate_next_run_at(prompt: dict[str, Any]) -> str:
 
 
 def is_prompt_due(prompt: dict[str, Any], now: datetime) -> bool:
-    """Check if a scheduled prompt is due to run."""
+    """
+    Check if a scheduled prompt is due to run.
+    
+    A prompt is due if:
+    1. It's enabled
+    2. nextRunAt is set and is in the past (relative to UTC now)
+    """
     if not prompt.get("enabled", False):
         return False
     
@@ -942,8 +1022,21 @@ def is_prompt_due(prompt: dict[str, Any], now: datetime) -> bool:
     
     try:
         next_run = datetime.fromisoformat(next_run_at.replace("Z", "+00:00"))
-        return next_run <= now
-    except (ValueError, TypeError):
+        is_due = next_run <= now
+        
+        # Debug logging
+        prompt_id = prompt.get("id", "unknown")[:8]
+        time_of_day = prompt.get("timeOfDay", "??:??")
+        user_tz = prompt.get("timezone", "UTC")
+        print(f"  [{prompt_id}] Checking if due:")
+        print(f"    timeOfDay: {time_of_day} in {user_tz}")
+        print(f"    nextRunAt: {next_run_at}")
+        print(f"    now (UTC): {now.isoformat()}")
+        print(f"    is_due: {is_due}")
+        
+        return is_due
+    except (ValueError, TypeError) as e:
+        print(f"  Error parsing nextRunAt '{next_run_at}': {e}")
         return False
 
 
@@ -964,57 +1057,96 @@ def check_scheduled_prompts():
     """
     Cron job that runs every 30 minutes to check for due scheduled prompts.
     When a prompt is due, it executes it using the existing execute_prompt function.
+    
+    IMPORTANT: Notifications are sent directly in this function after execution,
+    not delegated to execute_prompt. This ensures scheduled prompts always send
+    notifications even if execute_prompt doesn't handle them properly.
     """
     import requests
     
+    print("=" * 60)
     print("=== Scheduled Prompts Cron Check ===")
-    print(f"Time: {datetime.now(timezone.utc).isoformat()}")
+    print(f"Time (UTC): {datetime.now(timezone.utc).isoformat()}")
+    print("=" * 60)
     
-    # Get prompts from Modal Dict
+    # Get prompts and settings from Modal Dict
     try:
         prompts = scheduled_prompts_dict.get("prompts", [])
         settings = scheduled_prompts_dict.get("settings", {})
+        print(f"Retrieved from Modal Dict:")
+        print(f"  - Prompts count: {len(prompts)}")
+        print(f"  - Settings: {settings}")
     except Exception as e:
-        print(f"Failed to read scheduled prompts dict: {e}")
+        print(f"CRITICAL: Failed to read scheduled prompts dict: {e}")
         return {"checked": 0, "executed": 0, "error": str(e)}
     
     if not prompts:
-        print("No scheduled prompts configured")
+        print("No scheduled prompts configured - nothing to do")
         return {"checked": 0, "executed": 0}
     
-    print(f"Found {len(prompts)} scheduled prompts")
+    # Get ntfy topic for notifications
+    ntfy_topic = settings.get("ntfyTopic") if settings else None
+    print(f"Notification settings:")
+    print(f"  - ntfy topic: '{ntfy_topic or '(not configured)'}'")
     
     now = datetime.now(timezone.utc)
     executed = []
     errors = []
     
+    print(f"\nChecking {len(prompts)} scheduled prompts...")
+    print("-" * 40)
+    
     for prompt in prompts:
         prompt_id = prompt.get("id", "unknown")
+        prompt_preview = prompt.get("prompt", "")[:40] + "..." if len(prompt.get("prompt", "")) > 40 else prompt.get("prompt", "")
+        
+        print(f"\n[{prompt_id[:8]}] '{prompt_preview}'")
         
         if not prompt.get("enabled", False):
-            print(f"  [{prompt_id[:8]}] Disabled, skipping")
+            print(f"  -> SKIP: Disabled")
             continue
         
         if not is_prompt_due(prompt, now):
             next_run = prompt.get("nextRunAt", "unknown")
-            print(f"  [{prompt_id[:8]}] Not due (next: {next_run})")
+            print(f"  -> SKIP: Not due (next run: {next_run})")
             continue
         
-        print(f"  [{prompt_id[:8]}] DUE - executing...")
+        print(f"  -> DUE: Executing now...")
         
         # Get project info
         project_path = prompt.get("projectPath")
         git_remote_url = prompt.get("gitRemoteUrl")
         project_name = prompt.get("projectName")
+        prompt_timezone = prompt.get("timezone", "UTC")
+        
+        print(f"     Project: {project_name}")
+        print(f"     Timezone: {prompt_timezone}")
+        print(f"     Git URL: {git_remote_url[:50]}..." if git_remote_url and len(git_remote_url) > 50 else f"     Git URL: {git_remote_url}")
         
         if not git_remote_url or not project_name:
             error_msg = f"Missing gitRemoteUrl or projectName for prompt {prompt_id}"
-            print(f"    ERROR: {error_msg}")
+            print(f"  -> ERROR: {error_msg}")
             errors.append({"promptId": prompt_id, "error": error_msg})
+            
+            # Send error notification
+            if ntfy_topic:
+                try:
+                    _send_ntfy_notification(
+                        ntfy_topic,
+                        title=f"⚠️ Scheduled Prompt Failed: {prompt_preview}",
+                        message=f"Error: {error_msg}",
+                        priority="high",
+                    )
+                    print(f"     Sent error notification to ntfy")
+                except Exception as notify_err:
+                    print(f"     Failed to send error notification: {notify_err}")
+            
             continue
         
         try:
             # Execute the prompt using existing function
+            # Note: We pass ntfy_topic here too, but also send notification manually
+            # below to ensure it gets sent even if execute_prompt has issues
             result = execute_prompt.remote(
                 prompt=prompt.get("prompt", ""),
                 project_repo=git_remote_url,
@@ -1022,27 +1154,45 @@ def check_scheduled_prompts():
                 session_id=None,  # Always new session for scheduled prompts
                 allowed_tools=None,  # Use defaults
                 notification_webhook=None,
-                ntfy_topic=settings.get("ntfyTopic"),  # Use global ntfy topic from settings
+                ntfy_topic=ntfy_topic,  # Pass ntfy topic for execute_prompt notifications
             )
             
-            print(f"    SUCCESS: session={result.get('sessionId', 'unknown')[:8]}")
+            session_id = result.get('sessionId', 'unknown')
+            success = result.get("success", False)
+            
+            print(f"  -> COMPLETED: session={session_id[:8]}, success={success}")
             executed.append({
                 "promptId": prompt_id,
-                "sessionId": result.get("sessionId"),
-                "success": result.get("success", False),
+                "sessionId": session_id,
+                "success": success,
             })
             
             # Update lastExecution and nextRunAt in the prompt
             prompt["lastExecution"] = {
                 "timestamp": now.isoformat(),
-                "status": "success" if result.get("success") else "failed",
-                "sessionId": result.get("sessionId"),
+                "status": "success" if success else "failed",
+                "sessionId": session_id,
             }
             prompt["nextRunAt"] = calculate_next_run_at(prompt)
             
+            # Send completion notification (backup notification in case execute_prompt didn't send one)
+            # This ensures scheduled prompts ALWAYS notify, regardless of execute_prompt behavior
+            if ntfy_topic and not result.get("_ntfy_sent"):  # Only if execute_prompt didn't already send
+                try:
+                    status_emoji = "✅" if success else "❌"
+                    _send_ntfy_notification(
+                        ntfy_topic,
+                        title=f"{status_emoji} Scheduled: {project_name}",
+                        message=f"Prompt: {prompt_preview}\nSession: {session_id[:8]}",
+                        priority="default" if success else "high",
+                    )
+                    print(f"     Sent completion notification to ntfy")
+                except Exception as notify_err:
+                    print(f"     Failed to send completion notification: {notify_err}")
+            
         except Exception as e:
             error_msg = str(e)
-            print(f"    ERROR: {error_msg}")
+            print(f"  -> ERROR: {error_msg}")
             errors.append({"promptId": prompt_id, "error": error_msg})
             
             # Update lastExecution with error
@@ -1052,13 +1202,28 @@ def check_scheduled_prompts():
                 "error": error_msg,
             }
             prompt["nextRunAt"] = calculate_next_run_at(prompt)
+            
+            # Send error notification
+            if ntfy_topic:
+                try:
+                    _send_ntfy_notification(
+                        ntfy_topic,
+                        title=f"❌ Scheduled Failed: {project_name or 'Unknown'}",
+                        message=f"Error: {error_msg[:200]}",
+                        priority="high",
+                    )
+                    print(f"     Sent error notification to ntfy")
+                except Exception as notify_err:
+                    print(f"     Failed to send error notification: {notify_err}")
+    
+    print("\n" + "-" * 40)
     
     # Save updated prompts back to Dict
     try:
         scheduled_prompts_dict["prompts"] = prompts
-        print(f"Updated prompts in Dict")
+        print(f"Saved updated prompts to Modal Dict")
     except Exception as e:
-        print(f"Failed to save updated prompts: {e}")
+        print(f"WARNING: Failed to save updated prompts: {e}")
     
     # Commit volumes
     volume.commit()
@@ -1069,10 +1234,35 @@ def check_scheduled_prompts():
         "executed": len(executed),
         "errors": len(errors),
         "timestamp": now.isoformat(),
+        "ntfy_configured": bool(ntfy_topic),
     }
-    print(f"=== Cron Check Complete: {summary} ===")
+    print(f"\n=== Cron Check Complete ===")
+    print(f"Summary: {summary}")
+    print("=" * 60)
     
     return summary
+
+
+def _send_ntfy_notification(topic: str, title: str, message: str, priority: str = "default") -> None:
+    """
+    Helper to send ntfy notification.
+    Raises exception on failure for caller to handle.
+    """
+    import requests
+    
+    ntfy_url = f"https://ntfy.sh/{topic}"
+    response = requests.post(
+        ntfy_url,
+        data=message.encode("utf-8"),
+        headers={
+            "Title": title,
+            "Priority": priority,
+            "Tags": "robot",
+        },
+        timeout=10,
+    )
+    if response.status_code != 200:
+        raise Exception(f"ntfy returned status {response.status_code}: {response.text}")
 
 
 @app.function(
@@ -2005,25 +2195,41 @@ async def api_sync_scheduled_prompts(request: SyncScheduledPromptsRequest):
     """
     Sync scheduled prompts from local server to Modal.
     Called whenever prompts are created, updated, or deleted locally.
+    
+    IMPORTANT: This always updates both prompts AND settings to ensure
+    the cloud has the latest configuration.
     """
     try:
         # Store prompts in Modal Dict
         scheduled_prompts_dict["prompts"] = request.prompts
         
-        # Store settings if provided (e.g., ntfyTopic)
-        if request.settings:
-            scheduled_prompts_dict["settings"] = request.settings
+        # ALWAYS store settings (even if empty) to ensure cloud has latest config
+        # This prevents stale settings from persisting
+        settings = request.settings or {}
+        scheduled_prompts_dict["settings"] = settings
         
-        print(f"Synced {len(request.prompts)} scheduled prompts to Modal Dict")
+        # Log for debugging
+        prompt_ids = [p.get("id", "?")[:8] for p in request.prompts]
+        ntfy_topic = settings.get("ntfyTopic", "(not set)")
+        print(f"=" * 50)
+        print(f"Synced scheduled prompts from local:")
+        print(f"  - Prompt count: {len(request.prompts)}")
+        print(f"  - Prompt IDs: {prompt_ids}")
+        print(f"  - ntfy topic: {ntfy_topic}")
+        print(f"  - Timestamp: {datetime.now(timezone.utc).isoformat()}")
+        print(f"=" * 50)
         
         return {
             "data": {
                 "synced": len(request.prompts),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
+                "ntfyConfigured": bool(settings.get("ntfyTopic")),
             }
         }
     except Exception as e:
-        print(f"Failed to sync scheduled prompts: {e}")
+        print(f"CRITICAL: Failed to sync scheduled prompts: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail={"error": {"code": "SYNC_ERROR", "message": str(e)}},

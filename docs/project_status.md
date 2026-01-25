@@ -1,6 +1,6 @@
 # Project Status: GoGoGadgetClaude
 
-**Last Updated**: 2026-01-22 (v0.28.8 - Filter orphaned projects, fix server crash on missing paths)
+**Last Updated**: 2026-01-25 (v0.28.10 - Cloud scheduled prompts fix - timezone migration, ntfy notifications)
 
 ---
 
@@ -256,16 +256,19 @@
 
 ## Future Milestones
 
-### V1.6: Model Control & Advanced Widgets
-**Functionality Summary**: Model switching from mobile UI and additional dashboard widgets
+### V1.6: Model Control, Browser Testing & Advanced Widgets
+**Functionality Summary**: Model switching, headless browser testing in cloud mode, and additional dashboard widgets
 
 **Key Features:**
 - Claude model picker (change models from mobile UI)
+- **Headless Browser Testing in Cloud Mode** (🚧 Planning) - [Feature Doc](Features/headless-browser-cloud-testing.md)
 - Calendar widget for date-based visualizations
 - Dashboard data refresh improvements
 
 **Technical Scope:**
 - Claude CLI model switching integration
+- Playwright/Chromium in Modal container for browser automation
+- Browser MCP tools (navigate, snapshot, console, click, type)
 - Calendar widget component
 - Enhanced refresh mechanisms
 
