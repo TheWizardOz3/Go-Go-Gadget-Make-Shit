@@ -176,8 +176,36 @@ async function fetchCloudSessions(
         }
 
         // Priority 2: Fall back to name matching
-        // Cloud sessions have paths like "-tmp-repos-Knowledge"
-        const cloudProjectName = session.projectPath?.split('-').pop() || '';
+        // Use projectName if available (Modal API now provides it)
+        // Otherwise extract from projectPath for backward compatibility
+        let cloudProjectName = session.projectName || '';
+
+        if (!cloudProjectName && session.projectPath) {
+          // Cloud sessions can have various path formats:
+          // - "-repos-ProjectName" (simple format)
+          // - "-tmp-repos-ProjectName" (temp format)
+          // - "---modal-volumes-vo-{volumeId}-ProjectName" (volume-based format)
+          const path = session.projectPath;
+          if (path.startsWith('-tmp-repos-')) {
+            cloudProjectName = path.slice(11); // Remove "-tmp-repos-"
+          } else if (path.startsWith('-repos-')) {
+            cloudProjectName = path.slice(7); // Remove "-repos-"
+          } else if (path.includes('---modal-volumes-')) {
+            // Volume-based path: extract project name after the volume ID
+            const parts = path.split('-');
+            const voIdx = parts.indexOf('vo');
+            if (voIdx !== -1 && parts.length > voIdx + 2) {
+              cloudProjectName = parts.slice(voIdx + 2).join('-');
+            } else {
+              // Fallback: take the last segment
+              cloudProjectName = parts[parts.length - 1] || '';
+            }
+          } else {
+            // Fallback: take the last segment after '-'
+            cloudProjectName = path.split('-').pop() || '';
+          }
+        }
+
         return cloudProjectName.toLowerCase() === projectName.toLowerCase();
       });
 

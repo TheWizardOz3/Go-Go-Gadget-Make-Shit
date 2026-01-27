@@ -38,15 +38,16 @@
 
 ## 2. Documentation Map
 
-| Document | Purpose | When to Reference |
-|----------|---------|-------------------|
-| `docs/product_spec.md` | Requirements, features, UX specs | New features, understanding "what" to build |
-| `docs/architecture.md` | Tech stack, system design, patterns | Implementation decisions, "how" to build |
-| `docs/decision_log.md` | Architecture decisions & rationale | Before proposing major changes |
-| `docs/project_status.md` | Current progress, blockers, next steps | Session start, understanding context |
-| `docs/changelog.md` | Version history, recent changes | Understanding recent modifications |
-| `docs/brainstorm.md` | Ideas, exploration, rough concepts | Brainstorming new features or approaches |
-| `docs/Features/` | Individual feature specifications | Detailed feature work, use `feature_doc_template` as base |
+| Document                               | Purpose                                 | When to Reference                                         |
+|----------------------------------------|-----------------------------------------|-----------------------------------------------------------|
+| `docs/product_spec.md`                 | Requirements, features, UX specs        | New features, understanding "what" to build               |
+| `docs/architecture.md`                 | Tech stack, system design, patterns     | Implementation decisions, "how" to build                  |
+| `docs/decision_log.md`                 | Architecture decisions & rationale      | Before proposing major changes                            |
+| `docs/project_status.md`               | Current progress, blockers, next steps  | Session start, understanding context                      |
+| `docs/changelog.md`                    | Version history, recent changes         | Understanding recent modifications                        |
+| `docs/brainstorm.md`                   | Ideas, exploration, rough concepts      | Brainstorming new features or approaches                  |
+| `docs/server-operations-cheatsheet.md` | Start/stop/rebuild/troubleshoot servers | When server isn't running or needs restart                |
+| `docs/Features/`                       | Individual feature specifications       | Detailed feature work, use `feature_doc_template` as base |
 
 > **⚠️ CRITICAL:** Documentation must be kept in sync with code changes. See Section 11 for mandatory update triggers.
 
@@ -127,18 +128,18 @@
 
 ### 5.2 Naming Conventions
 
-| Element | Convention | Example |
-|---------|------------|---------|
-| Variables | camelCase, descriptive | `userEmail`, `isLoading` |
-| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT`, `API_BASE_URL` |
-| Functions | camelCase, verb prefix | `getUserById()`, `validateInput()` |
-| Classes | PascalCase, noun | `UserService`, `PaymentProcessor` |
-| Interfaces/Types | PascalCase, descriptive | `UserProfile`, `ApiResponse` |
-| Files (components) | PascalCase | `UserProfile.tsx` |
-| Files (utilities) | camelCase or kebab-case | `formatDate.ts`, `api-client.ts` |
-| CSS classes | kebab-case or BEM | `user-profile`, `btn--primary` |
-| Database tables | snake_case, plural | `user_accounts`, `order_items` |
-| Environment variables | SCREAMING_SNAKE_CASE | `DATABASE_URL`, `API_KEY` |
+| Element               | Convention              | Example                            |
+|-----------------------|-------------------------|------------------------------------|
+| Variables             | camelCase, descriptive  | `userEmail`, `isLoading`           |
+| Constants             | SCREAMING_SNAKE_CASE    | `MAX_RETRY_COUNT`, `API_BASE_URL`  |
+| Functions             | camelCase, verb prefix  | `getUserById()`, `validateInput()` |
+| Classes               | PascalCase, noun        | `UserService`, `PaymentProcessor`  |
+| Interfaces/Types      | PascalCase, descriptive | `UserProfile`, `ApiResponse`       |
+| Files (components)    | PascalCase              | `UserProfile.tsx`                  |
+| Files (utilities)     | camelCase or kebab-case | `formatDate.ts`, `api-client.ts`   |
+| CSS classes           | kebab-case or BEM       | `user-profile`, `btn--primary`     |
+| Database tables       | snake_case, plural      | `user_accounts`, `order_items`     |
+| Environment variables | SCREAMING_SNAKE_CASE    | `DATABASE_URL`, `API_KEY`          |
 
 **Naming Guidelines:**
 - Boolean variables: prefix with `is`, `has`, `should`, `can` (`isActive`, `hasPermission`)
@@ -306,12 +307,12 @@ function handleError(error: unknown): ApiErrorResponse {
 
 ### 6.3 Logging Standards
 
-| Level | When to Use |
-|-------|-------------|
-| `error` | Unexpected failures, exceptions, operational issues |
-| `warn` | Recoverable issues, deprecation notices, fallback triggered |
-| `info` | Significant events (startup, shutdown, auth, transactions) |
-| `debug` | Development diagnostics, request/response details |
+| Level   | When to Use                                                 |
+|---------|-------------------------------------------------------------|
+| `error` | Unexpected failures, exceptions, operational issues         |
+| `warn`  | Recoverable issues, deprecation notices, fallback triggered |
+| `info`  | Significant events (startup, shutdown, auth, transactions)  |
+| `debug` | Development diagnostics, request/response details           |
 
 **Log Context Requirements:**
 - Operation being performed
@@ -357,11 +358,11 @@ function handleError(error: unknown): ApiErrorResponse {
 
 ### 8.1 Coverage Expectations
 
-| Test Type | Requirement |
-|-----------|-------------|
-| Unit Tests | All business logic, utilities, helpers |
-| Integration Tests | API endpoints, database operations |
-| E2E Tests | Critical user journeys only |
+| Test Type         | Requirement                            |
+|-------------------|----------------------------------------|
+| Unit Tests        | All business logic, utilities, helpers |
+| Integration Tests | API endpoints, database operations     |
+| E2E Tests         | Critical user journeys only            |
 
 ### 8.2 What to Test
 
@@ -476,15 +477,30 @@ test('should return validation error when email format is invalid', () => {
 
 ### 10.4 After Making Changes
 
-> **⚠️ MANDATORY:** Always update documentation after completing work. This is not optional.
+Documentation updates should be **selective** — capture what matters for future context, not a complete record of every change.
 
-1. **Update `changelog.md`** with what was added, changed, or fixed
-2. **Update `project_status.md`** to reflect current progress
-3. **Add to `decision_log.md`** if any architectural decisions were made
-4. **Update `architecture.md`** if tech stack, schema, or API changed
-5. **Create/update feature docs** in `docs/Features/` for feature work
+#### Changelog (`changelog.md`)
 
-**Never leave documentation stale.** Documentation updates are part of completing the work, not a separate task.
+**Include:** User-facing features, breaking changes, security fixes, major bug fixes.  
+**Exclude:** Implementation details, file paths, function names, task-level breakdowns.  
+**Format:** 2-5 sentences per entry. Focus on *what* changed and *why it matters*, not *how*.
+
+#### Project Status (`project_status.md`)
+
+**Update when:** Milestone status changes, new blockers arise, scope changes.  
+**Don't update for:** Individual task completion, minor progress within a feature.
+
+#### Decision Log (`decision_log.md`)
+
+**Add entry when:** Making a choice that affects how future code should be written (patterns, conventions, architectural boundaries).  
+**Don't add for:** Implementation choices with no ongoing impact, one-time fixes, library configuration.  
+**Keep entries concise:** Trigger + Decision + Rationale + AI Instructions. Skip verbose implementation details.
+
+#### Architecture (`architecture.md`)
+
+**Update when:** Database schema changes, new API endpoints, new dependencies, system design changes.
+
+**Never leave critical documentation stale, but don't over-document.** The goal is future context, not a complete history.
 
 ### 10.5 Communication
 
@@ -502,32 +518,32 @@ test('should return validation error when email format is invalid', () => {
 
 ### 11.1 Automatic Documentation Update Triggers
 
-| Trigger Event | Required Documentation Updates |
-|---------------|-------------------------------|
-| **Feature completed (all tasks)** | `changelog.md` (Added section), `project_status.md` (move to Completed) |
-| **Bug fixed** | `changelog.md` (Fixed section), `project_status.md` (update Known Issues if applicable) |
-| **New dependency added** | `architecture.md` (tech stack tables), `changelog.md` (Dependencies section) |
-| **Database schema changed** | `architecture.md` (Section 4), `decision_log.md` (if significant), `changelog.md` |
-| **API endpoint added/changed** | `architecture.md` (Section 5), `changelog.md` |
-| **Tech stack decision made** | `decision_log.md` (new entry), `architecture.md` (update relevant section) |
-| **Breaking change introduced** | `changelog.md` (Breaking section with migration), `decision_log.md` |
-| **Work session started** | Read `project_status.md` first to understand context |
-| **Work session ended** | `project_status.md` (update progress, blockers, next steps) |
-| **Milestone completed** | `project_status.md`, `changelog.md`, potentially new version tag |
-| **Error pattern resolved** | `decision_log.md` (with AI Instructions for future prevention) |
-| **New feature planned** | Create `docs/Features/{{feature_name}}.md` using `feature_doc_template` |
+| Trigger Event                     | Required Documentation Updates                                                          |
+|-----------------------------------|-----------------------------------------------------------------------------------------|
+| **Feature completed (all tasks)** | `changelog.md` (Added section), `project_status.md` (move to Completed)                 |
+| **Bug fixed**                     | `changelog.md` (Fixed section), `project_status.md` (update Known Issues if applicable) |
+| **New dependency added**          | `architecture.md` (tech stack tables), `changelog.md` (Dependencies section)            |
+| **Database schema changed**       | `architecture.md` (Section 4), `decision_log.md` (if significant), `changelog.md`       |
+| **API endpoint added/changed**    | `architecture.md` (Section 5), `changelog.md`                                           |
+| **Tech stack decision made**      | `decision_log.md` (new entry), `architecture.md` (update relevant section)              |
+| **Breaking change introduced**    | `changelog.md` (Breaking section with migration), `decision_log.md`                     |
+| **Work session started**          | Read `project_status.md` first to understand context                                    |
+| **Work session ended**            | `project_status.md` (update progress, blockers, next steps)                             |
+| **Milestone completed**           | `project_status.md`, `changelog.md`, potentially new version tag                        |
+| **Error pattern resolved**        | `decision_log.md` (with AI Instructions for future prevention)                          |
+| **New feature planned**           | Create `docs/Features/{{feature_name}}.md` using `feature_doc_template`                 |
 
 ### 11.2 Document-Specific Update Rules
 
-| Document | Update When | What to Include |
-|----------|-------------|-----------------|
-| `project_status.md` | Start/end of work sessions, completing milestones | Current state, blockers, next priorities |
-| `architecture.md` | Adding services, changing tech stack, schema changes | Technical details, rationale, diagrams |
-| `decision_log.md` | Making significant technical decisions or resolving errors | Trigger, decision, rationale, AI instructions |
-| `changelog.md` | Completing features, fixing bugs, releasing versions | Categorized changes (Added/Changed/Fixed/etc.) |
-| `product_spec.md` | Requirements change (coordinate with product owner) | Updated specs, acceptance criteria |
-| `brainstorm.md` | Exploring ideas, documenting options considered | Raw ideas, pros/cons, exploration notes |
-| `docs/Features/*.md` | Planning or implementing specific features | Use `feature_doc_template` as base |
+| Document             | Update When                                                | What to Include                                |
+|----------------------|------------------------------------------------------------|------------------------------------------------|
+| `project_status.md`  | Start/end of work sessions, completing milestones          | Current state, blockers, next priorities       |
+| `architecture.md`    | Adding services, changing tech stack, schema changes       | Technical details, rationale, diagrams         |
+| `decision_log.md`    | Making significant technical decisions or resolving errors | Trigger, decision, rationale, AI instructions  |
+| `changelog.md`       | Completing features, fixing bugs, releasing versions       | Categorized changes (Added/Changed/Fixed/etc.) |
+| `product_spec.md`    | Requirements change (coordinate with product owner)        | Updated specs, acceptance criteria             |
+| `brainstorm.md`      | Exploring ideas, documenting options considered            | Raw ideas, pros/cons, exploration notes        |
+| `docs/Features/*.md` | Planning or implementing specific features                 | Use `feature_doc_template` as base             |
 
 ### 11.3 Documentation Standards
 
@@ -608,5 +624,5 @@ pnpm install                    # Install all dependencies
 
 ---
 
-*Last Updated: 2026-01-13*
+*Last Updated: 2026-01-26*
 

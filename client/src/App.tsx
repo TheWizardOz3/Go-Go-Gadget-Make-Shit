@@ -296,6 +296,7 @@ function AppMain() {
   const selectedProjectData = projects?.find((p) => p.encodedPath === selectedProject);
 
   // Fetch sessions for selected project (includes both local and cloud sessions)
+  // Pass projectIdentifier (gitRemoteUrl) to enable accurate cross-environment session matching
   const {
     sessions,
     isLoading: sessionsLoading,
@@ -304,7 +305,10 @@ function AppMain() {
     cloudAvailable: _cloudAvailable, // Available for future UI indicators
     localCount: sessionsLocalCount,
     cloudCount: sessionsCloudCount,
-  } = useSessions(selectedProject, selectedProjectData?.path);
+  } = useSessions(selectedProject, {
+    projectPath: selectedProjectData?.path,
+    projectIdentifier: selectedProjectData?.gitRemoteUrl,
+  });
 
   // Fetch conversation status for selected session
   const { status, isLoading: statusLoading } = useConversation(selectedSession);

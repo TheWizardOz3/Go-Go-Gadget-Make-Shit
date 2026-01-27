@@ -1090,6 +1090,7 @@ Key decisions affecting this architecture:
 | Decision Log | Why we chose things | `decision_log.md` |
 | Changelog | What changed | `changelog.md` |
 | Project Status | Current progress | `project_status.md` |
+| Server Operations | Start/stop/troubleshoot servers | `server-operations-cheatsheet.md` |
 
 ---
 

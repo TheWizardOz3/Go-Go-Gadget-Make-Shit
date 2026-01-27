@@ -1989,14 +1989,31 @@ async def api_get_cloud_sessions(projectPath: str = Query(None)):
     """
     List cloud sessions from Modal volume.
     Claude Code stores sessions in ~/.claude/projects/[encoded-path]/[session-id].jsonl
+    
+    Sessions from scheduled prompts will include projectIdentifier (git remote URL)
+    for accurate cross-environment matching.
     """
     try:
-        # Refresh volume to see latest sessions (with rate limiting)
-        reload_volume_if_needed(volume)
+        # ALWAYS reload volume when listing sessions to ensure fresh data
+        # This is critical for seeing newly created sessions from scheduled prompts
+        reload_volume_if_needed(volume, force=True)
         
         claude_dir = Path("/root/.claude/projects")
         if not claude_dir.exists():
             return {"data": {"sessions": [], "available": True, "count": 0}}
+        
+        # Build a mapping of project names to git remote URLs from scheduled prompts
+        # This allows us to enrich sessions with projectIdentifier for better matching
+        project_identifier_map: dict[str, str] = {}
+        try:
+            prompts = scheduled_prompts_dict.get("prompts", [])
+            for prompt in prompts:
+                pname = prompt.get("projectName")
+                git_url = prompt.get("gitRemoteUrl")
+                if pname and git_url:
+                    project_identifier_map[pname.lower()] = git_url
+        except Exception as e:
+            print(f"Warning: Could not load scheduled prompts for identifier mapping: {e}")
         
         sessions = []
         
@@ -2012,14 +2029,52 @@ async def api_get_cloud_sessions(projectPath: str = Query(None)):
                 if project_dir.name != encoded:
                     continue
             
+            # Extract project name from the encoded directory name
+            # Cloud paths can have various formats:
+            # - "-repos-ProjectName" (simple format)
+            # - "-tmp-repos-ProjectName" (temp format)
+            # - "---modal-volumes-vo-{volumeId}-ProjectName" (volume-based format)
+            dir_name = project_dir.name
+            project_name = dir_name
+            
+            if dir_name.startswith("-tmp-repos-"):
+                project_name = dir_name[11:]  # Remove "-tmp-repos-"
+            elif dir_name.startswith("-repos-"):
+                project_name = dir_name[7:]   # Remove "-repos-"
+            elif "---modal-volumes-" in dir_name:
+                # Volume-based path: ---modal-volumes-vo-{volumeId}-ProjectName
+                # Extract everything after the last hyphen sequence following "vo-{id}"
+                # The format is: ---modal-volumes-vo-{20charId}-ProjectName
+                # We need to find the project name after the volume ID
+                parts = dir_name.split("-")
+                # Find "vo" and skip 2 parts (vo and the ID), rest is project name
+                try:
+                    vo_idx = parts.index("vo")
+                    # Project name starts after vo and the ID (which is one part)
+                    # The ID is 20 chars but could have been split by additional hyphens in project name
+                    # Actually the ID is alphanumeric so it won't have hyphens
+                    # So project name is everything after parts[vo_idx + 1]
+                    if len(parts) > vo_idx + 2:
+                        project_name = "-".join(parts[vo_idx + 2:])
+                except ValueError:
+                    # Fallback: just take the last segment
+                    project_name = parts[-1] if parts else dir_name
+            
+            # Try to find projectIdentifier from scheduled prompts mapping
+            project_identifier = project_identifier_map.get(project_name.lower())
+            
             # Find all session files
             for session_file in project_dir.glob("*.jsonl"):
                 summary = get_session_summary(session_file)
                 if summary:
                     # Add cloud-specific fields
                     summary["source"] = "cloud"
-                    summary["projectPath"] = projectPath or project_dir.name
+                    summary["projectPath"] = projectPath or dir_name
+                    summary["projectName"] = project_name
                     summary["status"] = "completed"
+                    # Add projectIdentifier for cross-environment matching
+                    if project_identifier:
+                        summary["projectIdentifier"] = project_identifier
                     sessions.append(summary)
         
         # Sort by most recent activity
@@ -2034,6 +2089,8 @@ async def api_get_cloud_sessions(projectPath: str = Query(None)):
         }
     except Exception as e:
         print(f"Error listing cloud sessions: {e}")
+        import traceback
+        traceback.print_exc()
         return {"data": {"sessions": [], "available": False, "count": 0, "message": str(e)}}
 
 
